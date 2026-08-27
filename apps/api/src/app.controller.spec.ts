@@ -28,6 +28,14 @@ describe('AppController', () => {
       expect(health.service).toBe('ngl-api');
       expect(typeof health.appleWallet).toBe('boolean');
       expect(typeof health.googleWallet).toBe('boolean');
+      expect(health.wallet.apple).toMatchObject({
+        passTypeId: expect.any(Boolean),
+        teamId: expect.any(Boolean),
+        cert: expect.any(Boolean),
+        key: expect.any(Boolean),
+        wwdr: expect.any(Boolean),
+        ready: expect.any(Boolean),
+      });
     });
   });
 });
