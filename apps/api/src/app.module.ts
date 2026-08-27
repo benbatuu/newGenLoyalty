@@ -11,6 +11,7 @@ import { StampsModule } from './stamps/stamps.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { WalletModule } from './wallet/wallet.module';
 import { PublicModule } from './public/public.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PublicModule } from './public/public.module';
       ignoreEnvVars: false,
     }),
     ScheduleModule.forRoot(),
+    StorageModule,
     PrismaModule,
     AuthModule,
     SmsModule,

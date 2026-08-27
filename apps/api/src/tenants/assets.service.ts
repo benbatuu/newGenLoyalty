@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import sharp from 'sharp';
+import { ObjectStorageService } from '../storage/object-storage.service';
 
 export type AssetSlot = 'stampFilled' | 'stampEmpty' | 'logo' | 'icon';
 
@@ -30,12 +31,16 @@ export class AssetsService {
   private readonly logger = new Logger(AssetsService.name);
   readonly uploadsRoot = path.join(process.cwd(), 'uploads');
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly objects: ObjectStorageService,
+  ) {}
 
-  /** Absolute public URL base for stored assets (admin preview + optional fetch). */
+  /** Absolute public URL base for local-disk assets only. */
   publicBaseUrl(): string {
     const raw =
       this.config.get<string>('API_URL')?.trim() ||
+      process.env.API_URL?.trim() ||
       this.config.get<string>('APPLE_WEB_SERVICE_URL')?.trim();
     if (raw) return raw.replace(/\/$/, '');
     if (process.env.NODE_ENV === 'production') {
@@ -79,32 +84,53 @@ export class AssetsService {
       throw new BadRequestException('Dosya en fazla 2.5 MB olabilir');
     }
 
-    const dir = this.tenantDir(tenantId);
-    await fs.mkdir(dir, { recursive: true });
     const filename = SLOT_FILE[slot];
-    const dest = path.join(dir, filename);
-
+    let png: Buffer;
     try {
-      // Bildirim ikonu: kenarları kırpıp kareye oturt (geniş logo sorununu azalt)
       if (slot === 'icon') {
         const prepared = await this.prepareNotifyIconSquare(file.buffer);
-        await sharp(prepared).png().toFile(dest);
+        png = await sharp(prepared).png().toBuffer();
       } else {
         const size = slot === 'logo' ? 640 : 256;
-        await sharp(file.buffer)
+        png = await sharp(file.buffer)
           .resize(size, size, {
             fit: 'contain',
             background: { r: 0, g: 0, b: 0, alpha: 0 },
           })
           .png()
-          .toFile(dest);
+          .toBuffer();
       }
     } catch (err) {
       this.logger.warn(`Görsel işlenemedi: ${(err as Error).message}`);
-      throw new BadRequestException('Görsel işlenemedi — geçerli bir resim seçin');
+      throw new BadRequestException(
+        'Görsel işlenemedi — geçerli bir resim seçin',
+      );
     }
 
-    const url = `${this.publicBaseUrl()}/uploads/tenants/${tenantId}/${filename}?v=${Date.now()}`;
+    const key = `tenants/${tenantId}/${filename}`;
+
+    if (this.objects.isConfigured()) {
+      try {
+        const stored = await this.objects.putObject({
+          key,
+          body: png,
+          contentType: 'image/png',
+        });
+        this.logger.log(`Asset → R2 ${key}`);
+        return { url: stored.url };
+      } catch (err) {
+        this.logger.error(
+          `R2 upload failed, falling back to local: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    const dir = this.tenantDir(tenantId);
+    await fs.mkdir(dir, { recursive: true });
+    const dest = path.join(dir, filename);
+    await fs.writeFile(dest, png);
+    const url = `${this.publicBaseUrl()}/uploads/${key}?v=${Date.now()}`;
+    this.logger.warn(`Asset → local disk ${dest} (ephemeral on Render)`);
     return { url };
   }
 
@@ -163,7 +189,6 @@ export class AssetsService {
             .png()
             .toBuffer()
         : content;
-    // Marka karesindeki koyu boşluğu tekrar kırp
     const { data: d2, info: i2 } = await sharp(mark)
       .ensureAlpha()
       .raw()
@@ -176,7 +201,10 @@ export class AssetsService {
     for (let y = 0; y < i2.height; y++) {
       for (let x = 0; x < i2.width; x++) {
         const i = (y * i2.width + x) * 4;
-        if (d2[i + 3]! > 20 && (d2[i]! > thr || d2[i + 1]! > thr || d2[i + 2]! > thr)) {
+        if (
+          d2[i + 3]! > 20 &&
+          (d2[i]! > thr || d2[i + 1]! > thr || d2[i + 2]! > thr)
+        ) {
           n2++;
           if (x < x0) x0 = x;
           if (y < y0) y0 = y;
@@ -202,7 +230,6 @@ export class AssetsService {
         .png()
         .toBuffer();
     }
-    // Siyah zemini şeffaflaştır, krem plakaya oturt (kilit ekranı görünürlüğü)
     const { data: d3, info: i3 } = await sharp(tight)
       .ensureAlpha()
       .raw()
