@@ -144,6 +144,19 @@ export class StampsController {
     );
   }
 
+  /** Invite URL for in-store QR (no SMS). Use when SMS trial omits the link. */
+  @Get('customers/:customerId/wallet-invite')
+  @RequirePermissions('customer:write')
+  walletInvite(
+    @CurrentUser() user: AuthUser,
+    @Param('customerId') customerId: string,
+  ) {
+    return this.stampsService.walletInviteLink(
+      this.tenantIdOf(user),
+      customerId,
+    );
+  }
+
   @Post('customers/:customerId/redeem')
   @RequirePermissions('reward:redeem')
   redeem(

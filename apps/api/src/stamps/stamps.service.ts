@@ -107,6 +107,24 @@ export class StampsService {
     return { ...stampResult, walletInviteUrl };
   }
 
+  /** Invite link only (for counter QR popup). Does not send SMS. */
+  async walletInviteLink(tenantId: string, customerId: string) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, tenantId },
+    });
+    if (!customer) {
+      throw new NotFoundException('Müşteri bulunamadı');
+    }
+    return {
+      walletInviteUrl: this.wallet.inviteUrl(customerId, tenantId),
+      customer: {
+        id: customer.id,
+        phone: customer.phone,
+        displayName: customer.displayName,
+      },
+    };
+  }
+
   async addStamp(
     tenantId: string,
     customerId: string,

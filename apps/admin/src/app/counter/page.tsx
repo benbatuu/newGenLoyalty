@@ -2,6 +2,7 @@
 
 import { FormEvent, Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { InviteQrModal } from "../../components/invite-qr-modal";
 import {
   Badge,
   EmptyState,
@@ -85,6 +86,7 @@ function CounterContent() {
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [prefilled, setPrefilled] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
 
   const listPath =
     `/stamps/customers/directory?filter=${filter}&take=${PAGE_SIZE}&page=${page}` +
@@ -145,6 +147,10 @@ function CounterContent() {
     if (match) selectCustomer(match);
   }, [directory, searchParams, prefilled, selectCustomer]);
 
+  function openInvite(url: string | null | undefined) {
+    if (url) setInviteUrl(url);
+  }
+
   async function register(e?: FormEvent) {
     e?.preventDefault();
     const raw = phone.trim() || searchInput.trim();
@@ -163,12 +169,10 @@ function CounterContent() {
       selectCustomer(data.customer);
       setOk(
         data.walletInviteUrl
-          ? "Kayıt + ilk damga tamam. Wallet linki konsolda (SMS mock)."
+          ? "Kayıt + ilk damga tamam. Müşteri QR ile Wallet’a ekleyebilir."
           : "Kayıt + ilk damga tamam.",
       );
-      if (data.walletInviteUrl) {
-        console.info("[SMS mock] Wallet invite:", data.walletInviteUrl);
-      }
+      openInvite(data.walletInviteUrl);
       setPhone("");
       await refreshAll();
     } catch (err) {
@@ -197,9 +201,28 @@ function CounterContent() {
           ? `Damga eklendi — ödül hazır: ${data.rewardLabel}`
           : `Damga eklendi (${data.customer.stampCount}/${data.stampsRequired})`,
       );
+      openInvite(data.walletInviteUrl);
       await refreshAll();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Damga eklenemedi");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function showWalletQr() {
+    if (!selected) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const data = await api<{ walletInviteUrl: string }>(
+        `/stamps/customers/${selected.id}/wallet-invite`,
+      );
+      openInvite(data.walletInviteUrl);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Davet linki alınamadı",
+      );
     } finally {
       setBusy(false);
     }
@@ -237,6 +260,18 @@ function CounterContent() {
 
   return (
     <div className="w-full space-y-5">
+      {inviteUrl ? (
+        <InviteQrModal
+          url={inviteUrl}
+          phoneLabel={
+            selected
+              ? selected.displayName?.trim() || formatPhone(selected.phone)
+              : undefined
+          }
+          onClose={() => setInviteUrl(null)}
+        />
+      ) : null}
+
       <PageHeader
         eyebrow="Operasyon"
         title="Tezgâh"
@@ -448,22 +483,32 @@ function CounterContent() {
                   <Badge tone="success">Ödül hazır</Badge>
                 ) : null}
               </div>
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <div className="mt-4 flex flex-col gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    className={`${btnPrimary()} flex-1`}
+                    disabled={busy || selected.rewardReady}
+                    onClick={() => void addStamp()}
+                  >
+                    Damga ekle
+                  </button>
+                  <button
+                    type="button"
+                    className={`${btnGhost()} flex-1`}
+                    disabled={busy || !selected.rewardReady}
+                    onClick={() => void redeem()}
+                  >
+                    Ödül kullan
+                  </button>
+                </div>
                 <button
                   type="button"
-                  className={`${btnPrimary()} flex-1`}
-                  disabled={busy || selected.rewardReady}
-                  onClick={() => void addStamp()}
+                  className={btnGhost()}
+                  disabled={busy}
+                  onClick={() => void showWalletQr()}
                 >
-                  Damga ekle
-                </button>
-                <button
-                  type="button"
-                  className={`${btnGhost()} flex-1`}
-                  disabled={busy || !selected.rewardReady}
-                  onClick={() => void redeem()}
-                >
-                  Ödül kullan
+                  Wallet davet QR
                 </button>
               </div>
               {selected.rewardReady ? (
