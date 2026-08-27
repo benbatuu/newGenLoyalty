@@ -1068,10 +1068,10 @@ export class WalletService {
       tenant.name?.trim() ||
       'Damga Kartı';
 
-    // Logo varsa logoText gösterme (yan yana kesik isim); yoksa isim kullan.
-    // organizationName bildirim başlığı için her zaman dolu kalır.
+    // Logo image present → omit logoText entirely (empty string still reserved
+    // visually on some iOS versions if set). Name stays on organizationName.
     const logoText = logoArt?.logo
-      ? ''
+      ? undefined
       : tenant.logoText?.trim() || orgName;
 
     return this.apple.createPkPass({
@@ -1079,7 +1079,7 @@ export class WalletService {
       organizationName: orgName,
       description:
         tenant.passDescription?.trim() || `${orgName} Damga Kartı`,
-      logoText,
+      logoText: logoText ?? undefined,
       backgroundColor: tenant.primaryColor ?? '#1B4332',
       foregroundColor: tenant.foregroundColor ?? '#FFFFFF',
       labelColor: tenant.labelColor ?? '#DCDCDC',

@@ -18,7 +18,8 @@ export type ApplePassInput = {
   serialNumber: string;
   organizationName: string;
   description: string;
-  logoText: string;
+  /** Omit or empty when logo image fills the header (no name beside logo). */
+  logoText?: string;
   backgroundColor: string;
   foregroundColor?: string;
   labelColor?: string;

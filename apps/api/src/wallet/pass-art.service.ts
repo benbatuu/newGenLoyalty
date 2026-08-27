@@ -334,19 +334,49 @@ export class PassArtService {
     return { strip, strip2x };
   }
 
+  /**
+   * Pass header logo (@1x / @2x).
+   * Apple slot ≈ 160×50 pt (320×100 @2x). Square uploads must be LEFT-aligned
+   * and height-maximized — `fit:contain` centering leaves empty gap on the left
+   * (looks like reserved logoText space even when logoText is omitted).
+   */
   async buildLogoAssets(
     logoUrl: string | null | undefined,
   ): Promise<{ logo: Buffer; logo2x: Buffer } | null> {
     const buf = await this.loadImageBuffer(logoUrl);
     if (!buf) return null;
     try {
-      const logo2x = await sharp(buf)
-        .resize(LOGO_W, LOGO_H, {
-          fit: 'contain',
+      const trimmed = await sharp(buf).trim({ threshold: 4 }).png().toBuffer();
+      const source = trimmed.length > 64 ? trimmed : buf;
+
+      const fitted2x = await sharp(source)
+        .resize({
+          width: LOGO_W,
+          height: LOGO_H,
+          fit: 'inside',
           background: { r: 0, g: 0, b: 0, alpha: 0 },
         })
+        .ensureAlpha()
         .png()
         .toBuffer();
+
+      const meta = await sharp(fitted2x).metadata();
+      const w = meta.width ?? LOGO_W;
+      const h = meta.height ?? LOGO_H;
+      const top = Math.max(0, Math.floor((LOGO_H - h) / 2));
+
+      const logo2x = await sharp({
+        create: {
+          width: LOGO_W,
+          height: LOGO_H,
+          channels: 4,
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        },
+      })
+        .composite([{ input: fitted2x, left: 0, top }])
+        .png()
+        .toBuffer();
+
       const logo = await sharp(logo2x)
         .resize(Math.floor(LOGO_W / 2), Math.floor(LOGO_H / 2))
         .png()
