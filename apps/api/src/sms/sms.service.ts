@@ -200,9 +200,19 @@ export class SmsService {
           ? `${apiBase.replace(/\/$/, '')}/webhooks/twilio?token=${encodeURIComponent(webhookToken)}`
           : undefined;
 
+      // Trial accounts reject custom SMS body — body must be a Twilio template name
+      // (sms_delivery_updates, sms_order_confirmation, …). See TWILIO_TRIAL_TEMPLATE.
+      const trialTemplate = this.env('TWILIO_TRIAL_TEMPLATE');
+      const outboundBody = trialTemplate || body;
+      if (trialTemplate) {
+        this.logger.warn(
+          `Twilio trial template="${trialTemplate}" — custom invite text not sent; open link from API walletInviteUrl / sms.link. Upgrade Twilio for real invite SMS.`,
+        );
+      }
+
       const msg = await client.messages.create({
         to,
-        body,
+        body: outboundBody,
         ...(messagingServiceSid
           ? { messagingServiceSid }
           : { from: from! }),
@@ -223,6 +233,7 @@ export class SmsService {
             from: msg.from,
             errorCode: msg.errorCode,
             errorMessage: msg.errorMessage,
+            trialTemplate: trialTemplate || null,
           } as Prisma.InputJsonValue,
         },
       });
@@ -231,7 +242,10 @@ export class SmsService {
       );
       return { ok: true, mode: 'twilio', messageId, orderId: msg.sid };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      let message = err instanceof Error ? err.message : String(err);
+      if (/invalid template name|predefined sms templates/i.test(message)) {
+        message = `${message} | Trial hesabı özel SMS metni kabul etmez. Çözüm: (1) Twilio hesabını Upgrade et, veya (2) Render’da TWILIO_TRIAL_TEMPLATE=sms_delivery_updates ekle (SMS’te invite linki olmaz; walletInviteUrl kullan).`;
+      }
       this.logger.error(`Twilio send error: ${message} link=${link ?? ''}`);
       await this.prisma.smsMessage.update({
         where: { id: messageId },
