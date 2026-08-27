@@ -4,11 +4,13 @@ import {
   Get,
   Post,
   Query,
+  Req,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Role } from '@prisma/client';
+import type { Request } from 'express';
 import { RequirePermissions } from '../auth/decorators/permissions.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -23,25 +25,29 @@ export class SmsController {
     private readonly config: ConfigService,
   ) {}
 
+  private assertWebhookToken(token: string | undefined) {
+    const expected =
+      process.env.SMS_WEBHOOK_TOKEN?.trim() ||
+      this.config.get<string>('SMS_WEBHOOK_TOKEN')?.trim();
+    if (!expected || token !== expected) {
+      throw new UnauthorizedException('Invalid webhook token');
+    }
+  }
+
   /**
    * iletiMerkezi DLR webhook.
    * Panel: Ayarlar → API → Bildirim Adresi
    * Örnek: https://API_HOST/webhooks/iletimerkezi?token=SMS_WEBHOOK_TOKEN
-   * Docs: https://www.iletimerkezi.com/docs/api/webhooks
    */
   @Post('webhooks/iletimerkezi')
   async iletimerkeziWebhook(
     @Query('token') token: string | undefined,
     @Body() body: { report?: Record<string, unknown> },
   ) {
-    const expected = this.config.get<string>('SMS_WEBHOOK_TOKEN')?.trim();
-    if (!expected || token !== expected) {
-      throw new UnauthorizedException('Invalid webhook token');
-    }
+    this.assertWebhookToken(token);
 
     const report = body?.report;
     if (!report || report.id == null || report.packet_id == null) {
-      // Hızlı 200 — malformed'ı sessizce yut (retry storm önleme)
       return { received: true, ignored: true };
     }
 
@@ -53,6 +59,29 @@ export class SmsController {
       body: report.body != null ? String(report.body) : undefined,
     });
 
+    return { received: true };
+  }
+
+  /**
+   * Twilio Message status callback (application/x-www-form-urlencoded).
+   * https://API_HOST/webhooks/twilio?token=SMS_WEBHOOK_TOKEN
+   */
+  @Post('webhooks/twilio')
+  async twilioWebhook(
+    @Query('token') token: string | undefined,
+    @Req() req: Request,
+  ) {
+    this.assertWebhookToken(token);
+    const body = (req.body ?? {}) as Record<string, string>;
+    await this.sms.applyTwilioStatus({
+      MessageSid: body.MessageSid,
+      SmsSid: body.SmsSid,
+      MessageStatus: body.MessageStatus,
+      SmsStatus: body.SmsStatus,
+      To: body.To,
+      ErrorCode: body.ErrorCode,
+      ErrorMessage: body.ErrorMessage,
+    });
     return { received: true };
   }
 

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
+import twilio from 'twilio';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type SmsPayload = {
@@ -26,25 +27,42 @@ export class SmsService {
     private readonly prisma: PrismaService,
   ) {}
 
-  private provider(): string {
-    return (this.config.get<string>('SMS_PROVIDER') ?? 'mock').toLowerCase();
+  private env(key: string): string | undefined {
+    return (
+      process.env[key]?.trim() ||
+      this.config.get<string>(key)?.trim() ||
+      undefined
+    );
   }
 
-  /** TR numara → 905XXXXXXXXX */
-  normalizePhone(raw: string): string {
-    let d = raw.replace(/\D/g, '');
-    if (d.startsWith('0')) d = d.slice(1);
-    if (d.length === 10 && d.startsWith('5')) d = `90${d}`;
-    if (d.startsWith('90') && d.length === 12) return d;
-    return d;
+  private provider(): string {
+    return (this.env('SMS_PROVIDER') ?? 'mock').toLowerCase();
   }
 
   /**
-   * Sender = panelde onaylı alfanumerik başlık (max 11) veya test için APITEST.
-   * Telefon numarası sender olamaz.
+   * Normalize to digits only (no +).
+   * TR local → 905XXXXXXXXX; international keep country code digits.
+   */
+  normalizePhone(raw: string): string {
+    let d = raw.replace(/\D/g, '');
+    if (d.startsWith('00')) d = d.slice(2);
+    if (d.startsWith('0') && d.length === 11) d = d.slice(1);
+    if (d.length === 10 && d.startsWith('5')) d = `90${d}`;
+    return d;
+  }
+
+  /** E.164 with leading + for Twilio */
+  toE164(raw: string): string {
+    const d = this.normalizePhone(raw);
+    return d.startsWith('+') ? d : `+${d}`;
+  }
+
+  /**
+   * iletiMerkezi: alphanumeric sender (max 11) or APITEST.
+   * Twilio: unused (TWILIO_FROM / Messaging Service used instead).
    */
   private resolveSender(): string {
-    const raw = (this.config.get<string>('SMS_SENDER') ?? '').trim();
+    const raw = (this.env('SMS_SENDER') ?? '').trim();
     if (!raw) return 'APITEST';
     const digits = raw.replace(/\D/g, '');
     if (digits.length >= 10 && /^\+?90?\d+$/.test(raw.replace(/\s/g, ''))) {
@@ -67,7 +85,12 @@ export class SmsService {
 
     const row = await this.prisma.smsMessage.create({
       data: {
-        provider: mode === 'iletimerkezi' ? 'iletimerkezi' : mode || 'mock',
+        provider:
+          mode === 'iletimerkezi'
+            ? 'iletimerkezi'
+            : mode === 'twilio'
+              ? 'twilio'
+              : mode || 'mock',
         toPhone,
         body: payload.body,
         link: payload.link ?? null,
@@ -92,6 +115,10 @@ export class SmsService {
       return this.sendIletimerkezi(row.id, toPhone, payload.body, payload.link);
     }
 
+    if (mode === 'twilio') {
+      return this.sendTwilio(row.id, toPhone, payload.body, payload.link);
+    }
+
     this.logger.warn(
       `SMS provider "${mode}" henüz bağlı değil; mock gibi loglandı.`,
     );
@@ -108,16 +135,195 @@ export class SmsService {
     return { ok: true, mode: 'fallback-mock', messageId: row.id };
   }
 
+  private createTwilioClient() {
+    const accountSid = this.env('TWILIO_ACCOUNT_SID');
+    const apiKeySid = this.env('TWILIO_API_KEY_SID');
+    const apiKeySecret =
+      this.env('TWILIO_API_KEY_SECRET') || this.env('TWILIO_CLIENT_SECRET');
+    const authToken = this.env('TWILIO_AUTH_TOKEN');
+
+    // Common mistake: putting SK… into TWILIO_ACCOUNT_SID
+    if (accountSid?.startsWith('SK') && !apiKeySid) {
+      throw new Error(
+        'TWILIO_ACCOUNT_SID şu an SK… (API Key). Console’dan Account SID (AC…) al; SK’yi TWILIO_API_KEY_SID yap.',
+      );
+    }
+
+    if (!accountSid?.startsWith('AC')) {
+      throw new Error(
+        'TWILIO_ACCOUNT_SID gerekli ve AC… ile başlamalı (Twilio Console → Account SID)',
+      );
+    }
+
+    if (apiKeySid?.startsWith('SK') && apiKeySecret) {
+      return twilio(apiKeySid, apiKeySecret, { accountSid });
+    }
+
+    if (authToken) {
+      return twilio(accountSid, authToken);
+    }
+
+    throw new Error(
+      'Twilio auth eksik: TWILIO_AUTH_TOKEN veya TWILIO_API_KEY_SID + TWILIO_API_KEY_SECRET',
+    );
+  }
+
+  private async sendTwilio(
+    messageId: string,
+    toPhone: string,
+    body: string,
+    link?: string,
+  ) {
+    const from = this.env('TWILIO_FROM');
+    const messagingServiceSid = this.env('TWILIO_MESSAGING_SERVICE_SID');
+    const apiBase =
+      this.env('API_URL') ||
+      this.env('APPLE_WEB_SERVICE_URL') ||
+      '';
+    const webhookToken = this.env('SMS_WEBHOOK_TOKEN');
+
+    if (!from && !messagingServiceSid) {
+      const err = 'TWILIO_FROM veya TWILIO_MESSAGING_SERVICE_SID gerekli';
+      this.logger.error(err);
+      await this.prisma.smsMessage.update({
+        where: { id: messageId },
+        data: { status: 'failed', error: err, statusAt: new Date() },
+      });
+      return { ok: false, mode: 'twilio', messageId };
+    }
+
+    try {
+      const client = this.createTwilioClient();
+      const to = this.toE164(toPhone);
+      const statusCallback =
+        apiBase.startsWith('https://') && webhookToken
+          ? `${apiBase.replace(/\/$/, '')}/webhooks/twilio?token=${encodeURIComponent(webhookToken)}`
+          : undefined;
+
+      const msg = await client.messages.create({
+        to,
+        body,
+        ...(messagingServiceSid
+          ? { messagingServiceSid }
+          : { from: from! }),
+        ...(statusCallback ? { statusCallback, statusCallbackMethod: 'POST' as const } : {}),
+      });
+
+      await this.prisma.smsMessage.update({
+        where: { id: messageId },
+        data: {
+          orderId: msg.sid,
+          status: msg.status || 'sent',
+          sentAt: new Date(),
+          statusAt: new Date(),
+          providerRaw: {
+            sid: msg.sid,
+            status: msg.status,
+            to: msg.to,
+            from: msg.from,
+            errorCode: msg.errorCode,
+            errorMessage: msg.errorMessage,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      this.logger.log(
+        `Twilio OK sid=${msg.sid} to=${to} status=${msg.status}`,
+      );
+      return { ok: true, mode: 'twilio', messageId, orderId: msg.sid };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Twilio send error: ${message} link=${link ?? ''}`);
+      await this.prisma.smsMessage.update({
+        where: { id: messageId },
+        data: { status: 'failed', error: message, statusAt: new Date() },
+      });
+      return { ok: false, mode: 'twilio', messageId };
+    }
+  }
+
+  /** Twilio Message status callback (form-urlencoded) */
+  async applyTwilioStatus(report: {
+    MessageSid?: string;
+    SmsSid?: string;
+    MessageStatus?: string;
+    SmsStatus?: string;
+    To?: string;
+    ErrorCode?: string;
+    ErrorMessage?: string;
+  }) {
+    const sid = String(report.MessageSid || report.SmsSid || '').trim();
+    const status = String(
+      report.MessageStatus || report.SmsStatus || '',
+    ).toLowerCase();
+    if (!sid) return { ok: true, ignored: true };
+
+    const mapped =
+      status === 'delivered'
+        ? 'delivered'
+        : status === 'undelivered' || status === 'failed'
+          ? 'undelivered'
+          : status === 'sent' || status === 'sending' || status === 'queued'
+            ? status === 'queued'
+              ? 'queued'
+              : 'sent'
+            : status || 'sent';
+
+    const toPhone = report.To ? this.normalizePhone(report.To) : undefined;
+    const now = new Date();
+    const error =
+      report.ErrorCode || report.ErrorMessage
+        ? `${report.ErrorCode ?? ''} ${report.ErrorMessage ?? ''}`.trim()
+        : undefined;
+
+    const byOrder = await this.prisma.smsMessage.findFirst({
+      where: { orderId: sid },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (byOrder) {
+      await this.prisma.smsMessage.update({
+        where: { id: byOrder.id },
+        data: {
+          status: mapped,
+          statusAt: now,
+          ...(error ? { error } : {}),
+          ...(toPhone ? { toPhone } : {}),
+          providerRaw: {
+            ...(typeof byOrder.providerRaw === 'object' && byOrder.providerRaw
+              ? (byOrder.providerRaw as object)
+              : {}),
+            lastWebhook: report,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      return { ok: true, updated: byOrder.id };
+    }
+
+    const created = await this.prisma.smsMessage.create({
+      data: {
+        provider: 'twilio',
+        orderId: sid,
+        toPhone: toPhone ?? 'unknown',
+        body: '',
+        status: mapped,
+        statusAt: now,
+        error: error ?? null,
+        providerRaw: { lastWebhook: report } as Prisma.InputJsonValue,
+      },
+    });
+    return { ok: true, created: created.id };
+  }
+
   private async sendIletimerkezi(
     messageId: string,
     toPhone: string,
     body: string,
     link?: string,
   ) {
-    const key = this.config.get<string>('SMS_API_USER')?.trim();
-    const hash = this.config.get<string>('SMS_API_PASS')?.trim();
+    const key = this.env('SMS_API_USER');
+    const hash = this.env('SMS_API_PASS');
     const sender = this.resolveSender();
-    const iys = this.config.get<string>('SMS_IYS') ?? '0';
+    const iys = this.env('SMS_IYS') ?? '0';
 
     if (!key || !hash) {
       const err = 'SMS_API_USER / SMS_API_PASS eksik';
@@ -129,7 +335,6 @@ export class SmsService {
       return { ok: false, mode: 'iletimerkezi', messageId };
     }
 
-    // Unique suffix: aynı text+numara kısa sürede 451 verir
     const text =
       body.length > 900
         ? body.slice(0, 900)
@@ -255,7 +460,6 @@ export class SmsService {
       return { ok: true, updated: existingByReport.id };
     }
 
-    // Match open send by orderId (packet_id == send-sms order.id)
     const byOrder = await this.prisma.smsMessage.findFirst({
       where: { orderId, reportId: null },
       orderBy: { createdAt: 'desc' },
@@ -280,7 +484,6 @@ export class SmsService {
       return { ok: true, updated: byOrder.id };
     }
 
-    // Orphan DLR (başka app veya bizden önce webhook) — yine kaydet
     const created = await this.prisma.smsMessage.create({
       data: {
         provider: 'iletimerkezi',
@@ -323,10 +526,35 @@ export class SmsService {
     return { total, items };
   }
 
-  /** Auth doğrulama — kontör harcamaz */
+  /** Auth / balance — provider’a göre */
   async getBalance(): Promise<{ ok: boolean; raw?: unknown; error?: string }> {
-    const key = this.config.get<string>('SMS_API_USER')?.trim();
-    const hash = this.config.get<string>('SMS_API_PASS')?.trim();
+    const mode = this.provider();
+    if (mode === 'twilio') {
+      try {
+        const client = this.createTwilioClient();
+        const accountSid = this.env('TWILIO_ACCOUNT_SID')!;
+        const account = await client.api.accounts(accountSid).fetch();
+        const balance = await client.balance.fetch();
+        return {
+          ok: true,
+          raw: {
+            provider: 'twilio',
+            friendlyName: account.friendlyName,
+            status: account.status,
+            balance: balance.balance,
+            currency: balance.currency,
+          },
+        };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    }
+
+    const key = this.env('SMS_API_USER');
+    const hash = this.env('SMS_API_PASS');
     if (!key || !hash) return { ok: false, error: 'credentials missing' };
     try {
       const res = await fetch(
