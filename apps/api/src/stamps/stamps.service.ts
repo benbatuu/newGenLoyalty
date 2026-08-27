@@ -125,6 +125,49 @@ export class StampsService {
     };
   }
 
+  /**
+   * Wallet pass barcode message is the customer id.
+   * Rejects invite URLs accidentally scanned at the counter.
+   */
+  parsePassCode(raw: string): string {
+    const code = raw.trim();
+    if (!code) {
+      throw new BadRequestException('QR kod boş');
+    }
+    if (/^https?:\/\//i.test(code) || /wallet\/invite/i.test(code)) {
+      throw new BadRequestException(
+        'Bu bir davet linki. Müşterinin Wallet kartındaki QR kodunu okutun.',
+      );
+    }
+    // cuid / cuid2 style ids used as barcodeMessage
+    if (!/^[a-z][a-z0-9]{20,36}$/i.test(code)) {
+      throw new BadRequestException('Geçersiz pass QR kodu');
+    }
+    return code;
+  }
+
+  async stampByPassCode(
+    tenantId: string,
+    rawCode: string,
+    actorUserId: string,
+  ) {
+    const customerId = this.parsePassCode(rawCode);
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, tenantId },
+    });
+    if (!customer) {
+      throw new NotFoundException(
+        'Bu pass bu kafeye ait değil veya müşteri bulunamadı',
+      );
+    }
+    return this.addStamp(
+      tenantId,
+      customerId,
+      actorUserId,
+      StampSource.cashier,
+    );
+  }
+
   async addStamp(
     tenantId: string,
     customerId: string,

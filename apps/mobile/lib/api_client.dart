@@ -217,6 +217,16 @@ class ApiClient {
     return StampResult.fromJson(data);
   }
 
+  /// Stamp by Wallet pass QR payload (customer id).
+  Future<StampResult> stampByScan(String code) async {
+    final data = await request(
+      'POST',
+      '/stamps/scan',
+      body: {'code': code},
+    );
+    return StampResult.fromJson(data);
+  }
+
   Future<({Customer customer, String redeemed})> redeem(
     String customerId,
   ) async {

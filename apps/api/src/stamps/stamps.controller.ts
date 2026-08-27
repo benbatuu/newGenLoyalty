@@ -24,6 +24,7 @@ import {
   FindCustomerQueryDto,
   ListCustomersQueryDto,
   RegisterCustomerDto,
+  ScanPassDto,
 } from './dto/stamps.dto';
 import { StampsService } from './stamps.service';
 
@@ -40,6 +41,17 @@ export class StampsController {
       );
     }
     return user.tenantId;
+  }
+
+  /** Scan Wallet pass QR → stamp (barcode message = customerId). */
+  @Post('scan')
+  @RequirePermissions('customer:write')
+  scanPass(@CurrentUser() user: AuthUser, @Body() dto: ScanPassDto) {
+    return this.stampsService.stampByPassCode(
+      this.tenantIdOf(user),
+      dto.code,
+      user.id,
+    );
   }
 
   @Get('customers/directory')

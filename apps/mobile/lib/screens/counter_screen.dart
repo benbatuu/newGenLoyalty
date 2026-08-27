@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../api_client.dart';
@@ -6,6 +7,7 @@ import '../auth_state.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/ui.dart';
+import 'pass_qr_scan_screen.dart';
 
 class CounterScreen extends StatefulWidget {
   const CounterScreen({super.key});
@@ -123,6 +125,36 @@ class _CounterScreenState extends State<CounterScreen> {
     }
   }
 
+  Future<void> _scanPass() async {
+    if (_busy) return;
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const PassQrScanScreen()),
+    );
+    if (!mounted || code == null || code.isEmpty) return;
+
+    setState(() => _busy = true);
+    try {
+      final r = await _api.stampByScan(code);
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _selected = r.customer;
+        _results = [r.customer];
+        _stampsRequired = r.stampsRequired;
+        _rewardLabel = r.rewardLabel;
+      });
+      _toast(
+        r.customer.rewardReady
+            ? 'QR damga — ödül hazır: ${r.rewardLabel}'
+            : 'QR damga ${r.customer.stampCount}/${r.stampsRequired}',
+      );
+      await _loadSummary();
+    } on ApiException catch (e) {
+      _toast(e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _redeem() async {
     final c = _selected;
     if (c == null) return;
@@ -200,6 +232,12 @@ class _CounterScreenState extends State<CounterScreen> {
                 onSubmitted: (_) => _busy ? null : _search(),
               ),
               const SizedBox(height: 14),
+              FilledButton.tonalIcon(
+                onPressed: _busy ? null : _scanPass,
+                icon: const Icon(Icons.qr_code_scanner_rounded),
+                label: const Text('Wallet QR ile damga'),
+              ),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(

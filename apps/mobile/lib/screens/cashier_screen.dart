@@ -7,8 +7,9 @@ import '../auth_state.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/ui.dart';
+import 'pass_qr_scan_screen.dart';
 
-/// Kasiyer ana ekranı: telefon + numpad + ara / yeni kayıt + damga.
+/// Kasiyer ana ekranı: telefon + numpad + ara / yeni kayıt + QR damga.
 class CashierScreen extends StatefulWidget {
   const CashierScreen({super.key});
 
@@ -119,12 +120,40 @@ class _CashierScreenState extends State<CashierScreen> {
       });
       if (r.walletInviteUrl != null) {
         debugPrint('[SMS mock] Wallet invite: ${r.walletInviteUrl}');
-        _toast('Kayıt OK — invite linki kopyalandı (konsol)');
-        // ignore: avoid_print
-        print('\n════════ WALLET INVITE ════════\n${r.walletInviteUrl}\n═══════════════════════════════\n');
+        _toast('Kayıt OK — Wallet invite hazır');
       } else {
-        _toast('Kayıt + ilk damga tamam (invite yok — API loga bak)');
+        _toast('Kayıt + ilk damga tamam');
       }
+    } on ApiException catch (e) {
+      _toast(e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _scanPass() async {
+    if (_busy) return;
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const PassQrScanScreen()),
+    );
+    if (!mounted || code == null || code.isEmpty) return;
+
+    setState(() => _busy = true);
+    try {
+      final r = await _api.stampByScan(code);
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _selected = r.customer;
+        _results = [r.customer];
+        _stampsRequired = r.stampsRequired;
+        _rewardLabel = r.rewardLabel;
+        _digits = '';
+      });
+      _toast(
+        r.customer.rewardReady
+            ? 'QR damga — ödül hazır: ${r.rewardLabel}'
+            : 'QR damga ${r.customer.stampCount}/${r.stampsRequired}',
+      );
     } on ApiException catch (e) {
       _toast(e.message);
     } finally {
@@ -191,9 +220,9 @@ class _CashierScreenState extends State<CashierScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
             children: [
-              // Phone display
               PremiumCard(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                 child: Row(
                   children: [
                     Expanded(
@@ -204,7 +233,10 @@ class _CashierScreenState extends State<CashierScreen> {
                           const SizedBox(height: 6),
                           Text(
                             _displayPhone,
-                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineMedium
+                                ?.copyWith(
                                   color: _digits.isEmpty ? kMuted : kInk,
                                   letterSpacing: 0.5,
                                 ),
@@ -222,6 +254,15 @@ class _CashierScreenState extends State<CashierScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              FilledButton.tonalIcon(
+                onPressed: _busy ? null : _scanPass,
+                icon: const Icon(Icons.qr_code_scanner_rounded),
+                label: const Text('Wallet QR ile damga'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
+              ),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
@@ -269,7 +310,8 @@ class _CashierScreenState extends State<CashierScreen> {
                           ),
                           Text(
                             '${c.stampCount} damga',
-                            style: const TextStyle(color: kMuted, fontSize: 13),
+                            style:
+                                const TextStyle(color: kMuted, fontSize: 13),
                           ),
                           if (c.rewardReady) ...[
                             const SizedBox(width: 8),
@@ -344,7 +386,6 @@ class _CashierScreenState extends State<CashierScreen> {
             ],
           ),
         ),
-        // Always-visible numpad
         SafeArea(
           top: false,
           child: Container(

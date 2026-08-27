@@ -3,5 +3,5 @@
 /// iOS simulator / desktop → http://localhost:3001
 const String kApiBaseUrl = String.fromEnvironment(
   'API_URL',
-  defaultValue: 'http://192.168.1.115:3001',
+  defaultValue: 'https://newgenloyalty.onrender.com',
 );

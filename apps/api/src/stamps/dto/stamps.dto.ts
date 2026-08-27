@@ -16,6 +16,12 @@ export class AddStampDto {
   source?: StampSource = StampSource.cashier;
 }
 
+/** Wallet pass barcode / QR payload (customer id) */
+export class ScanPassDto {
+  @IsString()
+  code!: string;
+}
+
 export class FindCustomerQueryDto {
   @IsString()
   @Matches(/^\d{3,11}$/, { message: 'Telefon veya son haneler gerekli' })
