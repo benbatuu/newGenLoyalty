@@ -1,0 +1,15 @@
+{
+  "name": "new-gen-loyalty",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev:api": "pnpm --filter @ngl/api start:dev",
+    "dev:web": "pnpm --filter @ngl/web dev",
+    "dev:admin": "pnpm --filter @ngl/admin dev",
+    "build": "pnpm -r --filter \"@ngl/*\" build",
+    "lint": "pnpm -r --filter \"@ngl/*\" lint"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

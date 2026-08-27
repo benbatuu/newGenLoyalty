@@ -1,0 +1,388 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  STORE_OWNER
+  CASHIER
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  CANCELLED
+  SUSPENDED
+}
+
+enum StampSource {
+  cashier
+  nfc
+}
+
+enum StampLedgerType {
+  STAMP
+  REDEEM
+  ADJUST
+}
+
+enum PassPlatform {
+  APPLE
+  GOOGLE
+}
+
+/// Apple Wallet kilit ekranı bildirimi — pass indirilirken hangi olay için metin üretilecek
+enum PassNotifyKind {
+  STAMP
+  REDEEM
+  BIRTHDAY
+}
+
+model Tenant {
+  id                      String             @id @default(cuid())
+  name                    String
+  slug                    String             @unique
+  logoUrl                 String?
+  primaryColor            String?
+  /// Apple logoText / kart üst yazısı (boşsa name)
+  logoText                String?
+  foregroundColor         String?
+  labelColor              String?
+  /// Wallet kartı arka yüz alanları
+  passDescription         String?
+  passHowItWorks          String?
+  passTerms               String?
+  passLocations           String?
+  passHours               String?
+  passWebsiteUrl          String?
+  passPhone               String?
+  stampFieldLabel         String?
+  rewardFieldLabel        String?
+  /// Ön yüz durum alanı etiketi (varsayılan DURUM)
+  statusFieldLabel        String?
+  /// Alt satır duyuru etiketi (varsayılan NOTICE / DUYURU)
+  broadcastFieldLabel     String?
+  /// Duyuru yokken gösterilecek metin
+  broadcastEmptyText      String?
+  /// Ön yüz alan görünürlüğü (owner)
+  showStampField          Boolean            @default(true)
+  showRewardField         Boolean            @default(true)
+  showStatusField         Boolean            @default(true)
+  showBroadcastField      Boolean            @default(true)
+  /// Müşteri kayıt / Wallet öncesi toplanacak alanlar (owner aç-kapa)
+  collectCustomerName     Boolean            @default(false)
+  collectCustomerBirthday Boolean            @default(false)
+  /// Doğum günü otomatik Wallet bildirimi
+  birthdayGiftEnabled     Boolean            @default(false)
+  birthdayMessage         String?
+  /// SMS davet / Wallet ekleme sayfası metinleri (boşsa varsayılan)
+  inviteHeadline          String?
+  inviteSubtitle          String?
+  inviteCtaHint           String?
+  /// Sayfa arka plan rengi (#RRGGBB); boşsa koyu varsayılan
+  inviteBgColor           String?
+  /// Kart arka planı (#RRGGBB); boşsa primaryColor
+  inviteCardColor         String?
+  /// Damga altındaki durum metni
+  inviteStatusText        String?
+  /// Apple / Google buton etiketleri
+  inviteAppleBtnLabel     String?
+  inviteGoogleBtnLabel    String?
+  /// Profil formu başlığı
+  inviteFormTitle         String?
+  /// Alt bilgi / kısa KVKK notu
+  inviteLegalText         String?
+  /// Politikalar: [{ title, body }] — KVKK, Gizlilik vb.
+  invitePolicies          Json?
+  /// Ödül hazır metni
+  rewardReadyText         String?
+  /// Kalan damga şablonu — {remaining} yer tutucu
+  stampsRemainingTemplate String?
+  /// Stack’te görünen header etiketi (boşsa header yok); değer damga sayısı
+  headerFieldLabel        String?
+  /// COFFEE | DESSERT | STAR | HEART | DONUT | CUSTOM
+  stampTheme              String             @default("COFFEE")
+  stampIconFilledUrl      String?
+  stampIconEmptyUrl       String?
+  /// Damga şeridi kenar boşluğu: TIGHT | NORMAL | WIDE
+  stampInset              String             @default("NORMAL")
+  /// Arka yüz alan etiketleri (boşsa varsayılan TR etiket)
+  passDescriptionLabel    String?
+  passHowItWorksLabel     String?
+  passTermsLabel          String?
+  passLocationsLabel      String?
+  passHoursLabel          String?
+  passWebsiteLabel        String?
+  passPhoneLabel          String?
+  /// Serbest arka yüz satırları
+  passExtra1Label         String?
+  passExtra1Value         String?
+  passExtra2Label         String?
+  passExtra2Value         String?
+  passExtra3Label         String?
+  passExtra3Value         String?
+  /// Lock-screen / bildirim ikonu (icon.png)
+  notifyIconUrl           String?
+  /// changeMessage şablonları — %@ yeni değer
+  stampChangeMessage      String?
+  rewardChangeMessage     String?
+  statusChangeMessage     String?
+  headerChangeMessage     String?
+  redeemChangeMessage     String?
+  /// QR | PDF417 | AZTEC | CODE128
+  barcodeFormat           String             @default("QR")
+  /// Owner’dan anlık duyuru (Wallet changeMessage)
+  passBroadcastMessage    String?
+  passBroadcastAt         DateTime?
+  /// Tek paket kodu — MVP'de yalnızca "cafe"
+  planCode                String             @default("cafe")
+  /// Aylık paket ücreti (TL, kuruşsuz tam lira)
+  planPriceTry            Int                @default(990)
+  subscriptionStatus      SubscriptionStatus @default(TRIAL)
+  subscriptionActivatedAt DateTime?
+  isActive                Boolean            @default(true)
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  users       User[]
+  customers   Customer[]
+  rewardRule  RewardRule?
+  stampLedger StampLedger[]
+  passes      Pass[]
+  broadcastLogs BroadcastLog[]
+
+  @@index([isActive])
+  @@index([subscriptionStatus])
+}
+
+/// Owner anlık duyuru geçmişi
+model BroadcastLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  message   String
+  synced    Int      @default(0)
+  devices   Int      @default(0)
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role
+  tenantId     String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant          Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  refreshTokens   RefreshToken[]
+  passwordResets  PasswordResetToken[]
+  stampActions    StampLedger[] @relation("StampCreatedBy")
+
+  @@index([tenantId])
+  @@index([role])
+}
+
+/// Named permissions for RBAC checks (seeded; roles map in app code + this table for fine-grained flags)
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  id           String @id @default(cuid())
+  role         Role
+  permissionId String
+
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([role, permissionId])
+  @@index([role])
+}
+
+model Customer {
+  id                     String    @id @default(cuid())
+  tenantId               String
+  phone                  String
+  stampCount             Int       @default(0)
+  rewardReady            Boolean   @default(false)
+  /// Opsiyonel — owner collectCustomerName açıksa Wallet öncesi istenir
+  displayName            String?
+  /// Opsiyonel — ay/gün (yıl tutulmaz; KVKK minimal)
+  birthMonth             Int?
+  birthDay               Int?
+  /// Aynı yıl içinde tekrar doğum günü bildirimi gitmesin
+  lastBirthdayNotifyYear Int?
+  consentAt              DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  stampLedger StampLedger[]
+  passes      Pass[]
+
+  @@unique([tenantId, phone])
+  @@index([tenantId])
+  @@index([phone])
+  @@index([tenantId, birthMonth, birthDay])
+}
+
+model RewardRule {
+  id             String   @id @default(cuid())
+  tenantId       String   @unique
+  stampsRequired Int      @default(10)
+  rewardLabel    String   @default("1 bedava kahve")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model StampLedger {
+  id              String          @id @default(cuid())
+  tenantId        String
+  customerId      String
+  type            StampLedgerType
+  source          StampSource?
+  createdByUserId String?
+  note            String?
+  createdAt       DateTime        @default(now())
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer  Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation("StampCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([customerId, createdAt])
+  @@index([createdByUserId])
+}
+
+model Pass {
+  id                   String       @id @default(cuid())
+  tenantId             String
+  customerId           String
+  platform             PassPlatform
+  externalId           String
+  /// Apple PassKit authenticationToken (sent as Authorization: ApplePass …)
+  authenticationToken  String?
+  /// Bumped on each stamp/redeem so Wallet can poll updates
+  contentVersion       Int              @default(0)
+  /// Son push için bildirim türü (PassKit GET sonrası temizlenir)
+  pendingNotifyKind    PassNotifyKind?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  tenant               Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer             Customer                  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  appleRegistrations   AppleDeviceRegistration[]
+
+  @@unique([platform, externalId])
+  @@index([tenantId])
+  @@index([customerId])
+}
+
+/// Apple Wallet device push registrations (PassKit web service)
+model AppleDeviceRegistration {
+  id                      String   @id @default(cuid())
+  deviceLibraryIdentifier String
+  passTypeIdentifier      String
+  pushToken               String
+  passId                  String
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  pass Pass @relation(fields: [passId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceLibraryIdentifier, passId])
+  @@index([passId])
+  @@index([deviceLibraryIdentifier, passTypeIdentifier])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Personel şifre sıfırlama (e-posta veya owner’ın paylaştığı link)
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Marketing site iletişim / demo talepleri
+model ContactLead {
+  id        String   @id @default(cuid())
+  name      String
+  cafe      String
+  email     String
+  phone     String?
+  sector    String?
+  message   String
+  source    String   @default("contact")
+  status    String   @default("NEW")
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([email])
+}
+
+/// SMS gönderim + iletiMerkezi teslimat raporu (webhook / get-report)
+model SmsMessage {
+  id          String    @id @default(cuid())
+  provider    String    @default("iletimerkezi")
+  /// send-sms order.id == webhook packet_id
+  orderId     String?
+  /// webhook report.id (mesaj bazlı)
+  reportId    String?   @unique
+  toPhone     String
+  body        String
+  link        String?
+  /// queued | sent | accepted | delivered | undelivered | failed
+  status      String    @default("queued")
+  error       String?
+  providerRaw Json?
+  sentAt      DateTime?
+  statusAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([toPhone])
+  @@index([status])
+  @@index([createdAt])
+}

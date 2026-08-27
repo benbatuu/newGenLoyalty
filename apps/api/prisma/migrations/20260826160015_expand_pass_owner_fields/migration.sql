@@ -1,0 +1,18 @@
+-- AlterTable
+ALTER TABLE "Tenant" ADD COLUMN     "headerFieldLabel" TEXT,
+ADD COLUMN     "passDescriptionLabel" TEXT,
+ADD COLUMN     "passExtra1Label" TEXT,
+ADD COLUMN     "passExtra1Value" TEXT,
+ADD COLUMN     "passExtra2Label" TEXT,
+ADD COLUMN     "passExtra2Value" TEXT,
+ADD COLUMN     "passExtra3Label" TEXT,
+ADD COLUMN     "passExtra3Value" TEXT,
+ADD COLUMN     "passHoursLabel" TEXT,
+ADD COLUMN     "passHowItWorksLabel" TEXT,
+ADD COLUMN     "passLocationsLabel" TEXT,
+ADD COLUMN     "passPhoneLabel" TEXT,
+ADD COLUMN     "passTermsLabel" TEXT,
+ADD COLUMN     "passWebsiteLabel" TEXT,
+ADD COLUMN     "rewardReadyText" TEXT,
+ADD COLUMN     "stampsRemainingTemplate" TEXT,
+ADD COLUMN     "statusFieldLabel" TEXT;

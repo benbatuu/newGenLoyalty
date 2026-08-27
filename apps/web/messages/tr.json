@@ -1,0 +1,323 @@
+{
+  "meta": {
+    "title": "Dokun & Kazan",
+    "description": "Küçük kafeler ve butik işletmeler için Apple/Google Wallet tabanlı dijital damga kartı. Uygulama indirmeden sadakat, SMS davet, personel paneli.",
+    "keywords": "dijital damga kartı, sadakat programı, apple wallet, google wallet, kafe sadakat, punch card, türkiye",
+    "ogImageAlt": "Dokun & Kazan — Wallet damga kartı"
+  },
+  "nav": {
+    "how": "Nasıl",
+    "features": "Özellikler",
+    "pricing": "Fiyat",
+    "sectors": "Sektörler",
+    "useCases": "Senaryolar",
+    "contact": "İletişim",
+    "login": "Giriş",
+    "language": "Dil",
+    "signup": "Kayıt"
+  },
+  "home": {
+    "brand": "Dokun & Kazan",
+    "headline": "Damga kartı, müşterinin cüzdanında.",
+    "sub": "Uygulama indirmeden sadakat. SMS ile Wallet’a eklenir; personel telefona bakarak damgalar.",
+    "ctaPrimary": "Demo iste",
+    "ctaSecondary": "Nasıl çalışır",
+    "heroAlt": "Kafe tezgâhı ve sıcak atmosfer",
+    "scrollHint": "Keşfet"
+  },
+  "sections": {
+    "proofTitle": "Neden küçük işletmeler tercih ediyor",
+    "proofItems": [
+      {
+        "stat": "0",
+        "label": "Müşteri uygulaması",
+        "hint": "Web + ilk kasiyer"
+      },
+      {
+        "stat": "10 dk",
+        "label": "Kurulum",
+        "hint": "Panel + ilk kasiyer"
+      },
+      {
+        "stat": "1",
+        "label": "Ödül kuralı",
+        "hint": "MVP’de sade"
+      },
+      {
+        "stat": "TR",
+        "label": "Türkiye first",
+        "hint": "Telefon + SMS"
+      }
+    ],
+    "productTitle": "Kart, cüzdanda yaşar",
+    "productBody": "Müşteriye yeni bir app dayatmayız. Apple Wallet veya Google Wallet’taki damga kartı; damga ve ödül durumunu gösterir. Personel tarafında web panel veya Flutter uygulama.",
+    "productPoints": [
+      "SMS ile davet linki",
+      "Tenant renk / logo ile şablon",
+      "Damga sonrası pass güncelleme",
+      "KVKK bilgilendirme metni"
+    ],
+    "productImageAlt": "Telefon cüzdanında dijital sadakat kartı",
+    "howTitle": "Dört adımda canlıya",
+    "howIntro": "CRM değil — damga ve ödül. Onboarding checklist ile pilot hazır.",
+    "featuresTitle": "İşinize yetecek kadar özellik",
+    "featuresIntro": "VIP katmanları ve e-posta otomasyonu yok. Operasyonu hızlandıran parçalar var.",
+    "sectorsTitle": "Hangi sektörlere uyuyor",
+    "sectorsIntro": "Tek veya az şubeli, tekrar ziyaret alan butik işletmeler.",
+    "plansTitle": "Tek paket, net fiyat",
+    "plansIntro": "Pilot dönemde abonelik manuel açılır. iyzico sonra gelir.",
+    "usecaseTitle": "Gerçek kullanım senaryoları",
+    "usecaseIntro": "Tezgâhtan Wallet’a kadar mutlu yol.",
+    "faqTitle": "Sık sorulanlar",
+    "ctaBandTitle": "Kafenizi dijital damgaya taşıyın",
+    "ctaBandBody": "15 dakikalık demo: kayıt, SMS mock link, Wallet davet, damga ve ödül.",
+    "ctaBandButton": "İletişime geç"
+  },
+  "howPage": {
+    "title": "Nasıl çalışır",
+    "intro": "Platform kurulumu, müşteri onboarding’i ve günlük operasyon — uçtan uca.",
+    "steps": [
+      {
+        "n": "01",
+        "title": "Kafe profilini kur",
+        "body": "İsim, renk, logo ve “X damga → ödül” kuralını panelden ayarla. Abonelik SuperAdmin ile ACTIVE yapılır."
+      },
+      {
+        "n": "02",
+        "title": "Müşteriyi kaydet",
+        "body": "Kasiyer telefonu girer. Sistem müşteri kaydı + ilk damga + Wallet davet linki üretir."
+      },
+      {
+        "n": "03",
+        "title": "Kart Wallet’a eklenir",
+        "body": "SMS’teki (veya mock log’daki) linkle müşteri Apple veya Google Wallet’a kartını ekler. Uygulama indirme yok."
+      },
+      {
+        "n": "04",
+        "title": "Damga ve ödül",
+        "body": "Her ziyarette damga eklenir; eşik dolunca ödül kullanılır, sayaç sıfırlanır. Pass güncellenir."
+      }
+    ],
+    "opsTitle": "Günlük operasyon",
+    "opsBody": "Kasiyer tek ekranda numpad + ara + kayıt. Owner müşteri listesi, raporlar ve kafe bilgisini görür. SuperAdmin tenant’ları yönetir.",
+    "imageAlt": "Personel tablette müşteri kaydı yapıyor"
+  },
+  "featuresPage": {
+    "title": "Özellikler",
+    "intro": "Wallet, SMS, RBAC panel ve rapor — küçük kafeye yetecek kadar.",
+    "items": [
+      {
+        "title": "Apple & Google Wallet",
+        "body": "Müşteri yeni uygulama indirmez; kart zaten kullandığı cüzdanda yaşar. Logo ve renk tenant’a özel."
+      },
+      {
+        "title": "SMS davet",
+        "body": "Kayıt sonrası Wallet ekleme linki. Dev’de mock/log; prod’da Netgsm / İletimerkezi hazırlığı."
+      },
+      {
+        "title": "Personel paneli & mobil",
+        "body": "Web admin + Flutter personel. Kasiyer tezgâh; owner rapor ve müşteri dizini."
+      },
+      {
+        "title": "Tek ödül kuralı",
+        "body": "X damga = bir ödül. VIP katman yok — bilinçli sadelik."
+      },
+      {
+        "title": "Raporlar",
+        "body": "Günlük / haftalık / aylık damga ve ödül, ödüle yaklaşanlar, son işlemler."
+      },
+      {
+        "title": "Türkiye first",
+        "body": "TR telefon doğrulama, Türkçe arayüz, KVKK metinleri, yerel SMS."
+      }
+    ]
+  },
+  "pricingPage": {
+    "title": "Fiyatlandırma",
+    "intro": "Tek paket. Pilot’ta manuel aktivasyon; online ödeme (iyzico) yol haritasında.",
+    "plans": [
+      {
+        "id": "cafe",
+        "name": "Kafe paketi",
+        "price": "₺990",
+        "period": "/ ay",
+        "badge": "Önerilen",
+        "note": "Pilot fiyat — onboarding’de netleşir.",
+        "includes": [
+          "Sınırsız müşteri ve damga",
+          "Apple + Google Wallet kartları",
+          "Owner + kasiyer hesapları",
+          "SMS davet (kota anlaşmaya göre)",
+          "Web panel + Flutter personel",
+          "Temel raporlar"
+        ],
+        "cta": "Demo / fiyat konuşalım"
+      },
+      {
+        "id": "pilot",
+        "name": "Pilot",
+        "price": "Ücretsiz*",
+        "period": "deneme",
+        "badge": "Sınırlı",
+        "note": "*Süre ve SMS kotası yazılı anlaşmaya bağlı.",
+        "includes": [
+          "1 tenant kurulumu",
+          "Seed / demo hesaplar",
+          "SMS mock veya sınırlı kota",
+          "Onboarding checklist desteği",
+          "Wallet sertifika kontrol listesi"
+        ],
+        "cta": "Pilotota başvur"
+      }
+    ],
+    "compareTitle": "Pakette ne var / ne yok",
+    "compareIn": [
+      "Damga + ödül",
+      "Wallet pass",
+      "RBAC",
+      "Rapor özeti"
+    ],
+    "compareOut": [
+      "VIP katman",
+      "E-posta otomasyonu",
+      "POS entegrasyonu",
+      "NFC donanım (MVP sonrası)"
+    ]
+  },
+  "sectorsPage": {
+    "title": "Sektörler",
+    "intro": "Tekrar ziyaret edilen, tezgâhı olan butik işletmeler için tasarlandı.",
+    "items": [
+      {
+        "title": "Bağımsız kafeler",
+        "body": "1–3 şube, düzenli müdavimler. Fiziksel damga kartının dijital hali.",
+        "image": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80"
+      },
+      {
+        "title": "Kahve çubukları / specialty",
+        "body": "Ödül = bedava filtre veya pastry. Marka rengi Wallet’ta görünür.",
+        "image": "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=1200&q=80"
+      },
+      {
+        "title": "Fırın & pastane",
+        "body": "Hızlı tezgâh akışı; kasiyer numpad ile saniyeler içinde damga.",
+        "image": "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1200&q=80"
+      },
+      {
+        "title": "Butik dondurma / tatlı",
+        "body": "Sezonluk ziyaretleri ödülle geri getirin — app indirtmeden.",
+        "image": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1200&q=80"
+      }
+    ]
+  },
+  "useCasesPage": {
+    "title": "Kullanım senaryoları",
+    "intro": "Mutlu yol ve tipik operasyon hikâyeleri.",
+    "items": [
+      {
+        "title": "İlk ziyaret → Wallet",
+        "body": "Müşteri ilk kez geliyor. Kasiyer telefonu girer, SMS mock link konsolda, müşteri kartı ekler. İlk damga hazır."
+      },
+      {
+        "title": "Müdavim damgası",
+        "body": "Son 4 hane ile arama, seç, damga. 30 sn idempotency çift damgayı engeller."
+      },
+      {
+        "title": "Ödül günü",
+        "body": "Eşik dolunca ödül hazır. Kasiyer ödülü kullanır; sayaç sıfırlanır, Wallet güncellenir."
+      },
+      {
+        "title": "Owner sabah kontrolü",
+        "body": "Mobil veya web’de dün/bugün damga, ödül, ödüle yaklaşanlar ve ekip listesi."
+      }
+    ]
+  },
+  "contactPage": {
+    "title": "İletişim",
+    "intro": "Demo, pilot veya fiyat için yazın. Genelde aynı gün dönüş yapıyoruz.",
+    "name": "Adınız",
+    "cafe": "İşletme adı",
+    "email": "E-posta",
+    "phone": "Telefon",
+    "sector": "Sektör",
+    "message": "Mesaj",
+    "submit": "Gönder",
+    "sending": "Gönderiliyor…",
+    "success": "Teşekkürler — en kısa sürede dönüş yapacağız.",
+    "error": "Gönderilemedi, lütfen tekrar deneyin.",
+    "asideTitle": "Türkiye ofisi",
+    "asideBody": "İstanbul · uzaktan onboarding. Sertifika ve SMS checklist’i paylaşırız."
+  },
+  "faq": {
+    "items": [
+      {
+        "q": "Müşteri uygulama indirmek zorunda mı?",
+        "a": "Hayır. Kart Apple veya Google Wallet’ta yaşar."
+      },
+      {
+        "q": "NFC var mı?",
+        "a": "MVP’de yok. Damga kasiyer paneli / mobil ile. NFC sonra adapter olarak planlandı."
+      },
+      {
+        "q": "SMS ücreti kimde?",
+        "a": "Anlaşmaya göre kota. Dev ortamında mock/log ile ücretsiz test edilir."
+      },
+      {
+        "q": "Birden fazla şube?",
+        "a": "MVP tek tenant / tek kafe odaklı. Zincir yönetimi sonra."
+      }
+    ]
+  },
+  "legal": {
+    "kvkkTitle": "KVKK Aydınlatma Metni",
+    "privacyTitle": "Gizlilik Politikası",
+    "termsTitle": "Kullanım Şartları",
+    "lastUpdated": "Son güncelleme: Ağustos 2026",
+    "kvkkBody": [
+      "Dokun & Kazan (“Platform”), 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında veri sorumlusu sıfatıyla hareket eder.",
+      "İşlenen veriler: kafe personelinin e-posta ve adı; müşterilerin telefon numarası, damga/ödül kayıtları ve Wallet pass tanımlayıcıları.",
+      "Amaçlar: sadakat programının işletilmesi, Wallet kartı üretimi/güncellemesi, SMS ile davet linki gönderimi, destek ve güvenliğin sağlanması.",
+      "Hukuki sebepler: sözleşmenin ifası, meşru menfaat ve açık rıza (ticari ileti / SMS için).",
+      "Aktarım: SMS ve Wallet altyapı sağlayıcılarına, yalnızca hizmetin gerektirdiği ölçüde.",
+      "Haklarınız: Kanun’un 11. maddesi kapsamındaki başvuru haklarınızı iletişim kanallarımız üzerinden kullanabilirsiniz."
+    ],
+    "privacyBody": [
+      "Bu politika, web sitemizi ve Platform’u ziyaret edenlerin verilerinin nasıl işlendiğini açıklar.",
+      "Topladığımız bilgiler: iletişim formundaki ad, işletme adı, e-posta, telefon ve mesaj; teknik loglar (IP, tarayıcı) güvenlik için kısa süre tutulabilir.",
+      "Çerezler: oturum ve dil tercihi için zorunlu çerezler; pazarlama çerezi yok (MVP).",
+      "Üçüncü taraflar: barındırma, SMS ve Wallet servisleri; veriler hizmet sözleşmeleri çerçevesinde işlenir.",
+      "Saklama: müşteri sadakat verileri tenant aktifken; silme taleplerinde makul süre içinde silinir veya anonimleştirilir."
+    ],
+    "termsBody": [
+      "Platform, küçük işletmeler için dijital damga kartı SaaS hizmetidir. Müşteri mobil uygulaması sunulmaz.",
+      "Hesap güvenliği aboneye aittir; kasiyer hesaplarını abone yönetir.",
+      "MVP kapsamı: tek ödül kuralı, Wallet kartları, SMS davet, operasyon paneli. NFC donanımı ve POS entegrasyonu dahil değildir.",
+      "Abonelik pilot dönemde manuel onaylanabilir; ücret iadesi yazılı anlaşmaya tabidir.",
+      "Hizmet “olduğu gibi” sunulur; kesinti ve üçüncü taraf (Apple/Google/SMS) kesintilerinden doğan dolaylı zararlardan sorumlu tutulmayız.",
+      "Türkiye hukuku uygulanır; uyuşmazlıklarda İstanbul mahkemeleri yetkilidir."
+    ]
+  },
+  "footer": {
+    "tagline": "Küçük işletmeler için Wallet tabanlı sadakat.",
+    "product": "Ürün",
+    "legal": "Yasal",
+    "admin": "Giriş",
+    "rights": "© {year} Dokun & Kazan · Türkiye"
+  },
+  "demoModal": {
+    "eyebrow": "Demo",
+    "title": "15 dakikalık demo talep et",
+    "body": "Kafe bilgilerinizi bırakın — aynı gün dönüş yapıyoruz.",
+    "submit": "Talebi gönder",
+    "close": "Kapat"
+  },
+  "authPages": {
+    "loginTitle": "Giriş yap",
+    "loginIntro": "Personel ve kafe hesabınızla yönetim paneline girin.",
+    "loginCta": "Panele git",
+    "loginHint": "Mevcut hesaplar admin uygulamasında oturum açar.",
+    "signupTitle": "Kayıt ol",
+    "signupIntro": "Kafe hesabını hemen aç — 14 günlük deneme, ödeme yok.",
+    "signupAside": "Self-serve trial: hesap anında hazır; abonelik ödeme sonra."
+  }
+}

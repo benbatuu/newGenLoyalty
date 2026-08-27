@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "inviteCardColor" TEXT;
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "inviteStatusText" TEXT;
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "inviteAppleBtnLabel" TEXT;
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "inviteGoogleBtnLabel" TEXT;
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "inviteFormTitle" TEXT;
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "inviteLegalText" TEXT;
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "invitePolicies" JSONB;

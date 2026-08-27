@@ -1,0 +1,323 @@
+{
+  "meta": {
+    "title": "Dokun & Kazan",
+    "description": "Wallet-based digital stamp cards for small cafés and boutiques in Turkey. No customer app — SMS invite, staff panel, Apple & Google Wallet.",
+    "keywords": "digital stamp card, loyalty program, apple wallet, google wallet, cafe loyalty, punch card, turkey",
+    "ogImageAlt": "Dokun & Kazan — Wallet stamp card"
+  },
+  "nav": {
+    "how": "How",
+    "features": "Features",
+    "pricing": "Pricing",
+    "sectors": "Sectors",
+    "useCases": "Use cases",
+    "contact": "Contact",
+    "login": "Log in",
+    "language": "Language",
+    "signup": "Sign up"
+  },
+  "home": {
+    "brand": "Dokun & Kazan",
+    "headline": "Your stamp card lives in their wallet.",
+    "sub": "Loyalty without another app. SMS adds the pass; staff stamps by phone.",
+    "ctaPrimary": "Request demo",
+    "ctaSecondary": "How it works",
+    "heroAlt": "Café counter and warm atmosphere",
+    "scrollHint": "Explore"
+  },
+  "sections": {
+    "proofTitle": "Why small businesses choose us",
+    "proofItems": [
+      {
+        "stat": "0",
+        "label": "Customer apps",
+        "hint": "Web + first cashier"
+      },
+      {
+        "stat": "10 min",
+        "label": "Setup",
+        "hint": "Panel + first cashier"
+      },
+      {
+        "stat": "1",
+        "label": "Reward rule",
+        "hint": "Simple by design"
+      },
+      {
+        "stat": "TR",
+        "label": "Turkey first",
+        "hint": "Phone + SMS"
+      }
+    ],
+    "productTitle": "The card lives in the wallet",
+    "productBody": "We don’t force a new app. The stamp card sits in Apple or Google Wallet and shows progress. Staff use the web panel or Flutter app.",
+    "productPoints": [
+      "SMS invite link",
+      "Tenant logo & color template",
+      "Pass updates after stamps",
+      "KVKK consent copy"
+    ],
+    "productImageAlt": "Digital loyalty card in a phone wallet",
+    "howTitle": "Live in four steps",
+    "howIntro": "Not a CRM — stamps and rewards. Pilot-ready onboarding.",
+    "featuresTitle": "Features that fit",
+    "featuresIntro": "No VIP tiers or email automation. Just what speeds up the counter.",
+    "sectorsTitle": "Built for these sectors",
+    "sectorsIntro": "Repeat-visit boutiques with a real counter.",
+    "plansTitle": "One clear plan",
+    "plansIntro": "During pilot, activation is manual. iyzico comes later.",
+    "usecaseTitle": "Real use cases",
+    "usecaseIntro": "From counter to Wallet — the happy path.",
+    "faqTitle": "FAQ",
+    "ctaBandTitle": "Move your café to digital stamps",
+    "ctaBandBody": "15-minute demo: signup, SMS mock link, Wallet invite, stamp & redeem.",
+    "ctaBandButton": "Get in touch"
+  },
+  "howPage": {
+    "title": "How it works",
+    "intro": "Platform setup, guest onboarding, and daily ops — end to end.",
+    "steps": [
+      {
+        "n": "01",
+        "title": "Set up the café",
+        "body": "Name, color, logo, and “X stamps → reward”. SuperAdmin marks the subscription ACTIVE."
+      },
+      {
+        "n": "02",
+        "title": "Register the guest",
+        "body": "Cashier enters a phone number. The system creates the customer, first stamp, and Wallet invite."
+      },
+      {
+        "n": "03",
+        "title": "Add to Wallet",
+        "body": "Via SMS (or mock log) the guest saves the pass to Apple or Google Wallet. No app install."
+      },
+      {
+        "n": "04",
+        "title": "Stamp & redeem",
+        "body": "Each visit adds a stamp; at the threshold the reward is redeemed and the counter resets. Pass syncs."
+      }
+    ],
+    "opsTitle": "Daily operations",
+    "opsBody": "Cashiers get a single numpad screen. Owners see customers, reports, and café details. SuperAdmins manage tenants.",
+    "imageAlt": "Staff registering a guest on a tablet"
+  },
+  "featuresPage": {
+    "title": "Features",
+    "intro": "Wallet, SMS, RBAC panel, and reports — enough for a small café.",
+    "items": [
+      {
+        "title": "Apple & Google Wallet",
+        "body": "Guests don’t install another app. Brand color and logo on the pass."
+      },
+      {
+        "title": "SMS invite",
+        "body": "Wallet add link after signup. Mock/log in dev; Netgsm / İletimerkezi ready for prod."
+      },
+      {
+        "title": "Staff panel & mobile",
+        "body": "Web admin + Flutter. Cashier counter; owner reports and directory."
+      },
+      {
+        "title": "One reward rule",
+        "body": "X stamps = one reward. No VIP tiers — intentional simplicity."
+      },
+      {
+        "title": "Reports",
+        "body": "Daily / weekly / monthly stamps & redemptions, near-reward guests, recent activity."
+      },
+      {
+        "title": "Turkey first",
+        "body": "TR phone validation, Turkish UI, KVKK copy, local SMS."
+      }
+    ]
+  },
+  "pricingPage": {
+    "title": "Pricing",
+    "intro": "One plan. Manual activation in pilot; online payments (iyzico) on the roadmap.",
+    "plans": [
+      {
+        "id": "cafe",
+        "name": "Café plan",
+        "price": "₺990",
+        "period": "/ month",
+        "badge": "Recommended",
+        "note": "Pilot pricing — confirmed at onboarding.",
+        "includes": [
+          "Unlimited customers & stamps",
+          "Apple + Google Wallet passes",
+          "Owner + cashier accounts",
+          "SMS invites (quota per agreement)",
+          "Web panel + Flutter staff app",
+          "Core reports"
+        ],
+        "cta": "Talk demo & pricing"
+      },
+      {
+        "id": "pilot",
+        "name": "Pilot",
+        "price": "Free*",
+        "period": "trial",
+        "badge": "Limited",
+        "note": "*Duration and SMS quota per written agreement.",
+        "includes": [
+          "1 tenant setup",
+          "Seed / demo accounts",
+          "SMS mock or limited quota",
+          "Onboarding checklist support",
+          "Wallet certificate checklist"
+        ],
+        "cta": "Apply for pilot"
+      }
+    ],
+    "compareTitle": "What’s in / out",
+    "compareIn": [
+      "Stamps + rewards",
+      "Wallet passes",
+      "RBAC",
+      "Report summary"
+    ],
+    "compareOut": [
+      "VIP tiers",
+      "Email automation",
+      "POS integration",
+      "NFC hardware (post-MVP)"
+    ]
+  },
+  "sectorsPage": {
+    "title": "Sectors",
+    "intro": "Designed for boutiques with a counter and repeat visits.",
+    "items": [
+      {
+        "title": "Independent cafés",
+        "body": "1–3 locations, regulars. The digital version of a paper punch card.",
+        "image": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80"
+      },
+      {
+        "title": "Specialty coffee",
+        "body": "Reward = free filter or pastry. Brand color shows on the Wallet pass.",
+        "image": "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=1200&q=80"
+      },
+      {
+        "title": "Bakery & pastry",
+        "body": "Fast counter flow; cashier stamps in seconds with a numpad.",
+        "image": "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1200&q=80"
+      },
+      {
+        "title": "Ice cream & sweets",
+        "body": "Bring seasonal guests back with rewards — no app install.",
+        "image": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1200&q=80"
+      }
+    ]
+  },
+  "useCasesPage": {
+    "title": "Use cases",
+    "intro": "Happy-path stories from the counter to Wallet.",
+    "items": [
+      {
+        "title": "First visit → Wallet",
+        "body": "New guest. Cashier enters phone, SMS mock link in logs, guest adds the card. First stamp done."
+      },
+      {
+        "title": "Regular stamp",
+        "body": "Search by last digits, select, stamp. 30s idempotency blocks doubles."
+      },
+      {
+        "title": "Reward day",
+        "body": "Threshold hit → reward ready. Cashier redeems; counter resets; Wallet syncs."
+      },
+      {
+        "title": "Owner morning check",
+        "body": "On mobile or web: stamps, redemptions, near-reward guests, and staff list."
+      }
+    ]
+  },
+  "contactPage": {
+    "title": "Contact",
+    "intro": "Ask for a demo, pilot, or pricing. We usually reply the same day.",
+    "name": "Your name",
+    "cafe": "Business name",
+    "email": "Email",
+    "phone": "Phone",
+    "sector": "Sector",
+    "message": "Message",
+    "submit": "Send",
+    "sending": "Sending…",
+    "success": "Thanks — we’ll get back to you shortly.",
+    "error": "Couldn’t send. Please try again.",
+    "asideTitle": "Turkey office",
+    "asideBody": "Istanbul · remote onboarding. We’ll share certificate and SMS checklists."
+  },
+  "faq": {
+    "items": [
+      {
+        "q": "Do guests need an app?",
+        "a": "No. The card lives in Apple or Google Wallet."
+      },
+      {
+        "q": "Is NFC included?",
+        "a": "Not in the MVP. Stamps go through the cashier panel/mobile. NFC is planned as a later adapter."
+      },
+      {
+        "q": "Who pays for SMS?",
+        "a": "Quota per agreement. Dev uses free mock/log mode."
+      },
+      {
+        "q": "Multi-location chains?",
+        "a": "MVP is single-tenant / single café focused. Chain management comes later."
+      }
+    ]
+  },
+  "legal": {
+    "kvkkTitle": "KVKK Notice",
+    "privacyTitle": "Privacy Policy",
+    "termsTitle": "Terms of Use",
+    "lastUpdated": "Last updated: August 2026",
+    "kvkkBody": [
+      "Dokun & Kazan (“Platform”) acts as data controller under Turkey’s Personal Data Protection Law (KVKK No. 6698).",
+      "Data processed: staff email and name; customer phone numbers, stamp/reward records, and Wallet pass identifiers.",
+      "Purposes: running the loyalty program, issuing/updating Wallet passes, sending invite SMS, support and security.",
+      "Legal bases: performance of a contract, legitimate interest, and explicit consent (for commercial SMS).",
+      "Transfers: to SMS and Wallet infrastructure providers only as required to provide the service.",
+      "Your rights: you may exercise rights under Article 11 of the Law via our contact channels."
+    ],
+    "privacyBody": [
+      "This policy explains how we process data from visitors of our website and the Platform.",
+      "We collect: contact-form name, business name, email, phone, and message; short-lived technical logs (IP, browser) for security.",
+      "Cookies: essential cookies for session and language; no marketing cookies in the MVP.",
+      "Third parties: hosting, SMS, and Wallet services under their service agreements.",
+      "Retention: loyalty data while the tenant is active; deletion or anonymization on request within a reasonable time."
+    ],
+    "termsBody": [
+      "The Platform is a digital stamp-card SaaS for small businesses. There is no customer mobile app.",
+      "Account security is the subscriber’s responsibility; the subscriber manages cashier accounts.",
+      "MVP scope: one reward rule, Wallet passes, SMS invite, operations panel. NFC hardware and POS integrations are out of scope.",
+      "During pilot, subscriptions may be activated manually; refunds follow written agreement.",
+      "Service is provided “as is”; we are not liable for indirect damages from outages or third-party (Apple/Google/SMS) failures.",
+      "Turkish law applies; Istanbul courts have jurisdiction."
+    ]
+  },
+  "footer": {
+    "tagline": "Wallet-based loyalty for small businesses.",
+    "product": "Product",
+    "legal": "Legal",
+    "admin": "Log in",
+    "rights": "© {year} Dokun & Kazan · Turkey"
+  },
+  "demoModal": {
+    "eyebrow": "Demo",
+    "title": "Request a 15-minute demo",
+    "body": "Leave your café details — we usually reply the same day.",
+    "submit": "Send request",
+    "close": "Close"
+  },
+  "authPages": {
+    "loginTitle": "Log in",
+    "loginIntro": "Sign in to the staff console with your café account.",
+    "loginCta": "Go to console",
+    "loginHint": "Existing accounts authenticate in the admin app.",
+    "signupTitle": "Sign up",
+    "signupIntro": "Open your café account now — 14-day trial, no payment.",
+    "signupAside": "Self-serve trial: account ready instantly; billing comes later."
+  }
+}

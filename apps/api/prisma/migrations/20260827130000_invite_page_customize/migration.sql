@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "inviteHeadline" TEXT;
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "inviteSubtitle" TEXT;
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "inviteCtaHint" TEXT;
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "inviteBgColor" TEXT;
