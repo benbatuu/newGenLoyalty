@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PKPass } from 'passkit-generator';
-import { resolveRepoPath } from './resolve-path';
+import { applePassMaterials } from './wallet-materials';
 
 export type PassUpdateKind = 'stamp' | 'redeem' | 'birthday' | 'sync';
 
@@ -72,17 +72,10 @@ export class ApplePassService {
 
   isConfigured(): boolean {
     try {
-      const cert = this.config.get<string>('APPLE_PASS_CERT_PATH');
-      const key = this.config.get<string>('APPLE_PASS_KEY_PATH');
-      const wwdr = this.config.get<string>('APPLE_WWDR_CERT_PATH');
-      const passTypeId = this.config.get<string>('APPLE_PASS_TYPE_ID');
-      const teamId = this.config.get<string>('APPLE_TEAM_ID');
-      if (!cert || !key || !wwdr || !passTypeId || !teamId) return false;
-      return (
-        fs.existsSync(resolveRepoPath(cert)) &&
-        fs.existsSync(resolveRepoPath(key)) &&
-        fs.existsSync(resolveRepoPath(wwdr))
-      );
+      const passTypeId = this.config.get<string>('APPLE_PASS_TYPE_ID')?.trim();
+      const teamId = this.config.get<string>('APPLE_TEAM_ID')?.trim();
+      if (!passTypeId || !teamId) return false;
+      return applePassMaterials(this.config) !== null;
     } catch {
       return false;
     }
@@ -209,7 +202,8 @@ export class ApplePassService {
   }
 
   async createPkPass(input: ApplePassInput): Promise<Buffer> {
-    if (!this.isConfigured()) {
+    const materials = applePassMaterials(this.config);
+    if (!materials) {
       throw new Error('Apple Wallet sertifikaları yapılandırılmamış');
     }
 
@@ -217,17 +211,7 @@ export class ApplePassService {
       'APPLE_PASS_TYPE_ID',
     );
     const teamIdentifier = this.config.getOrThrow<string>('APPLE_TEAM_ID');
-    const signerCert = fs.readFileSync(
-      resolveRepoPath(this.config.getOrThrow('APPLE_PASS_CERT_PATH')),
-    );
-    const signerKey = fs.readFileSync(
-      resolveRepoPath(this.config.getOrThrow('APPLE_PASS_KEY_PATH')),
-    );
-    const wwdr = fs.readFileSync(
-      resolveRepoPath(this.config.getOrThrow('APPLE_WWDR_CERT_PATH')),
-    );
-    const passphrase =
-      this.config.get<string>('APPLE_PASS_KEY_PASSPHRASE') || undefined;
+    const { cert: signerCert, key: signerKey, wwdr, passphrase } = materials;
 
     const bg = this.hexToRgb(input.backgroundColor || '#1B4332');
     const fg = this.hexToRgb(input.foregroundColor || '#FFFFFF');

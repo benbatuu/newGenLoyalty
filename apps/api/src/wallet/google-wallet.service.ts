@@ -1,9 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as fs from 'fs';
 import { GoogleAuth } from 'google-auth-library';
 import * as jwt from 'jsonwebtoken';
-import { resolveRepoPath } from './resolve-path';
+import { googleSaJson } from './wallet-materials';
 
 export type GooglePassInput = {
   tenantSlug: string;
@@ -43,15 +42,12 @@ export class GoogleWalletService {
 
   isConfigured(): boolean {
     try {
-      const issuerId = this.config.get<string>('GOOGLE_WALLET_ISSUER_ID');
-      const email = this.config.get<string>(
-        'GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL',
-      );
-      const keyPath = this.config.get<string>(
-        'GOOGLE_WALLET_SERVICE_ACCOUNT_KEY_PATH',
-      );
-      if (!issuerId || !email || !keyPath) return false;
-      return fs.existsSync(resolveRepoPath(keyPath));
+      const issuerId = this.config.get<string>('GOOGLE_WALLET_ISSUER_ID')?.trim();
+      const email = this.config
+        .get<string>('GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL')
+        ?.trim();
+      if (!issuerId || !email) return false;
+      return googleSaJson(this.config) !== null;
     } catch {
       return false;
     }
@@ -61,10 +57,18 @@ export class GoogleWalletService {
     return this.config.getOrThrow<string>('GOOGLE_WALLET_ISSUER_ID');
   }
 
-  private keyFile(): string {
-    return resolveRepoPath(
-      this.config.getOrThrow<string>('GOOGLE_WALLET_SERVICE_ACCOUNT_KEY_PATH'),
-    );
+  private saCredentials(): {
+    private_key: string;
+    client_email: string;
+  } {
+    const raw = googleSaJson(this.config);
+    if (!raw) {
+      throw new Error('Google Wallet service account key yok');
+    }
+    return JSON.parse(raw.toString('utf8')) as {
+      private_key: string;
+      client_email: string;
+    };
   }
 
   private saEmail(): string {
@@ -184,7 +188,7 @@ export class GoogleWalletService {
   private getAuth(): GoogleAuth {
     if (!this.auth) {
       this.auth = new GoogleAuth({
-        keyFile: this.keyFile(),
+        credentials: this.saCredentials(),
         scopes: ['https://www.googleapis.com/auth/wallet_object.issuer'],
       });
     }
@@ -254,10 +258,7 @@ export class GoogleWalletService {
       throw new Error('Google Wallet yapılandırılmamış');
     }
 
-    const keyJson = JSON.parse(fs.readFileSync(this.keyFile(), 'utf8')) as {
-      private_key: string;
-      client_email: string;
-    };
+    const keyJson = this.saCredentials();
 
     const claims = {
       iss: keyJson.client_email || this.saEmail(),

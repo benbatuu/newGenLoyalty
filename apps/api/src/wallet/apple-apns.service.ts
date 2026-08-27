@@ -1,8 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as apn from '@parse/node-apn';
-import * as fs from 'fs';
-import { resolveRepoPath } from './resolve-path';
+import { applePassMaterials } from './wallet-materials';
 
 /**
  * PassKit update push via APNs (production).
@@ -19,18 +18,13 @@ export class AppleApnsService implements OnModuleDestroy {
   private getProvider(): apn.Provider | null {
     if (this.provider) return this.provider;
     try {
-      const certPath = this.config.get<string>('APPLE_PASS_CERT_PATH');
-      const keyPath = this.config.get<string>('APPLE_PASS_KEY_PATH');
-      if (!certPath || !keyPath) return null;
-      const cert = resolveRepoPath(certPath);
-      const key = resolveRepoPath(keyPath);
-      if (!fs.existsSync(cert) || !fs.existsSync(key)) return null;
+      const materials = applePassMaterials(this.config);
+      if (!materials) return null;
 
       this.provider = new apn.Provider({
-        cert: fs.readFileSync(cert),
-        key: fs.readFileSync(key),
-        passphrase:
-          this.config.get<string>('APPLE_PASS_KEY_PASSPHRASE') || undefined,
+        cert: materials.cert,
+        key: materials.key,
+        passphrase: materials.passphrase,
         production: true,
       });
       return this.provider;
