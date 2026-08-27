@@ -16,7 +16,10 @@ import { PublicModule } from './public/public.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      // Render injects secrets via process.env — do not let a missing/empty
+      // .env file shadow them. Local still loads .env when present.
       envFilePath: ['.env', '../../.env'],
+      ignoreEnvVars: false,
     }),
     ScheduleModule.forRoot(),
     PrismaModule,

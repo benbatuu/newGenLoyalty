@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PKPass } from 'passkit-generator';
-import { applePassMaterials } from './wallet-materials';
+import { appleMaterialStatus, applePassMaterials } from './wallet-materials';
 
 export type PassUpdateKind = 'stamp' | 'redeem' | 'birthday' | 'sync';
 
@@ -65,20 +65,30 @@ export type ApplePassInput = {
 };
 
 @Injectable()
-export class ApplePassService {
+export class ApplePassService implements OnModuleInit {
   private readonly logger = new Logger(ApplePassService.name);
 
   constructor(private readonly config: ConfigService) {}
 
-  isConfigured(): boolean {
-    try {
-      const passTypeId = this.config.get<string>('APPLE_PASS_TYPE_ID')?.trim();
-      const teamId = this.config.get<string>('APPLE_TEAM_ID')?.trim();
-      if (!passTypeId || !teamId) return false;
-      return applePassMaterials(this.config) !== null;
-    } catch {
-      return false;
+  onModuleInit() {
+    const s = appleMaterialStatus(this.config);
+    if (s.ready) {
+      this.logger.log('Apple Wallet materials OK');
+      return;
     }
+    const missing: string[] = [];
+    if (!s.passTypeId) missing.push('APPLE_PASS_TYPE_ID');
+    if (!s.teamId) missing.push('APPLE_TEAM_ID');
+    if (!s.cert) missing.push('cert (B64/path/secret file)');
+    if (!s.key) missing.push('key (B64/path/secret file)');
+    if (!s.wwdr) missing.push('wwdr (B64/path/secret file)');
+    this.logger.warn(
+      `Apple Wallet NOT ready — missing: ${missing.join(', ')} | env=${JSON.stringify(s.env)}`,
+    );
+  }
+
+  isConfigured(): boolean {
+    return appleMaterialStatus(this.config).ready;
   }
 
   private hexToRgb(hex: string): string {
