@@ -254,11 +254,22 @@ export async function login(email: string, password: string) {
     }
     throw new ApiError(res.status, message);
   }
-  const data = (await res.json()) as {
-    accessToken: string;
-    refreshToken: string;
-    user: AuthUser;
+
+  let data: {
+    accessToken?: string;
+    refreshToken?: string;
+    user?: AuthUser;
   };
+  try {
+    data = (await res.json()) as typeof data;
+  } catch {
+    throw new ApiError(res.status, "Giriş yanıtı okunamadı");
+  }
+
+  if (!data.accessToken || !data.refreshToken || !data.user?.role) {
+    throw new ApiError(res.status, "Giriş yanıtı eksik (token/user)");
+  }
+
   storeSession(
     { accessToken: data.accessToken, refreshToken: data.refreshToken },
     data.user,

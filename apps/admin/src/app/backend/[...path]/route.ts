@@ -42,17 +42,20 @@ async function proxy(
     };
 
     if (req.method !== "GET" && req.method !== "HEAD") {
-      init.body = await req.arrayBuffer();
+      init.body = Buffer.from(await req.arrayBuffer());
     }
 
     const upstream = await fetch(target, init);
-    const outHeaders = new Headers();
-    for (const key of ["content-type", "content-disposition", "content-length"]) {
-      const v = upstream.headers.get(key);
-      if (v) outHeaders.set(key, v);
-    }
+    // Buffer the body — streaming + forwarded content-length breaks JSON on Vercel.
+    const body = Buffer.from(await upstream.arrayBuffer());
 
-    return new NextResponse(upstream.body, {
+    const outHeaders = new Headers();
+    const upstreamType = upstream.headers.get("content-type");
+    if (upstreamType) outHeaders.set("content-type", upstreamType);
+    const disposition = upstream.headers.get("content-disposition");
+    if (disposition) outHeaders.set("content-disposition", disposition);
+
+    return new NextResponse(body, {
       status: upstream.status,
       headers: outHeaders,
     });

@@ -32,7 +32,7 @@ export default function LoginPage() {
       const next = await login(email.trim(), password);
       router.replace(homePathForRole(next.role));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Giriş başarısız");
+      setError(err instanceof Error ? err.message : "Giriş başarısız");
     } finally {
       setLoading(false);
     }
