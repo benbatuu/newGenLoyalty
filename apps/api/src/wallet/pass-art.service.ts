@@ -158,8 +158,32 @@ export class PassArtService {
         }
       }
       if (!buf) {
-        if (!/^https?:\/\//i.test(url)) return null;
-        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        let fetchUrl = url;
+        // Prefer /media proxy over private R2 S3 API host
+        try {
+          const u = new URL(url);
+          if (u.hostname.endsWith('.r2.cloudflarestorage.com')) {
+            let key = u.pathname.replace(/^\//, '');
+            if (!key.startsWith('tenants/')) {
+              const parts = key.split('/');
+              if (parts.length >= 2 && parts[1] === 'tenants') {
+                key = parts.slice(1).join('/');
+              }
+            }
+            if (key.startsWith('tenants/')) {
+              const api =
+                process.env.API_URL?.replace(/\/$/, '') ||
+                process.env.APPLE_WEB_SERVICE_URL?.replace(/\/$/, '');
+              if (api) fetchUrl = `${api}/media/${key}`;
+            }
+          }
+        } catch {
+          /* keep url */
+        }
+        if (!/^https?:\/\//i.test(fetchUrl)) return null;
+        const res = await fetch(fetchUrl, {
+          signal: AbortSignal.timeout(8000),
+        });
         if (!res.ok) return null;
         buf = Buffer.from(await res.arrayBuffer());
       }

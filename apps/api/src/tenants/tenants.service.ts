@@ -258,7 +258,17 @@ export class TenantsService {
     if (!tenant) {
       throw new NotFoundException('Kafe bulunamadı');
     }
-    return tenant;
+    return {
+      ...tenant,
+      logoUrl: this.assets.rewriteStoredAssetUrl(tenant.logoUrl),
+      notifyIconUrl: this.assets.rewriteStoredAssetUrl(tenant.notifyIconUrl),
+      stampIconFilledUrl: this.assets.rewriteStoredAssetUrl(
+        tenant.stampIconFilledUrl,
+      ),
+      stampIconEmptyUrl: this.assets.rewriteStoredAssetUrl(
+        tenant.stampIconEmptyUrl,
+      ),
+    };
   }
 
   private async pushWalletDesign(tenantId: string) {

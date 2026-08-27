@@ -761,6 +761,25 @@ export class WalletService {
   private resolvePublicAssetUrl(url: string | null | undefined): string | null {
     const raw = url?.trim();
     if (!raw) return null;
+    // Private R2 S3 endpoint → public API /media proxy
+    try {
+      const u = new URL(raw);
+      if (u.hostname.endsWith('.r2.cloudflarestorage.com')) {
+        let key = u.pathname.replace(/^\//, '');
+        if (!key.startsWith('tenants/')) {
+          const parts = key.split('/');
+          if (parts.length >= 2 && parts[1] === 'tenants') {
+            key = parts.slice(1).join('/');
+          }
+        }
+        if (key.startsWith('tenants/')) {
+          const base = this.publicApiUrl().replace(/\/$/, '');
+          return `${base}/media/${key}${u.search || ''}`;
+        }
+      }
+    } catch {
+      /* fall through */
+    }
     if (/^https?:\/\//i.test(raw)) return raw;
     const base = this.publicApiUrl().replace(/\/$/, '');
     return raw.startsWith('/') ? `${base}${raw}` : `${base}/${raw}`;

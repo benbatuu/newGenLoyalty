@@ -36,17 +36,48 @@ export class AssetsService {
     private readonly objects: ObjectStorageService,
   ) {}
 
-  /** Absolute public URL base for local-disk assets only. */
-  publicBaseUrl(): string {
+  /** Rewrite private R2 S3 API URLs to public /media proxy URLs. */
+  rewriteStoredAssetUrl(url: string | null | undefined): string | null {
+    const raw = url?.trim();
+    if (!raw) return null;
+    try {
+      const u = new URL(raw);
+      if (u.hostname.endsWith('.r2.cloudflarestorage.com')) {
+        let key = u.pathname.replace(/^\//, '');
+        // path-style: /bucket/tenants/...
+        if (!key.startsWith('tenants/')) {
+          const parts = key.split('/');
+          if (parts.length >= 2 && parts[1] === 'tenants') {
+            key = parts.slice(1).join('/');
+          }
+        }
+        if (key.startsWith('tenants/')) {
+          const base = this.apiPublicBase();
+          const q = u.search || `?v=${Date.now()}`;
+          return `${base}/media/${key}${q.startsWith('?') ? q : `?${q}`}`;
+        }
+      }
+    } catch {
+      /* keep original */
+    }
+    return raw;
+  }
+
+  private apiPublicBase(): string {
     const raw =
-      this.config.get<string>('API_URL')?.trim() ||
       process.env.API_URL?.trim() ||
+      this.config.get<string>('API_URL')?.trim() ||
       this.config.get<string>('APPLE_WEB_SERVICE_URL')?.trim();
     if (raw) return raw.replace(/\/$/, '');
     if (process.env.NODE_ENV === 'production') {
       throw new Error('API_URL is required in production');
     }
     return `http://localhost:${this.config.get('API_PORT') ?? 3001}`;
+  }
+
+  /** Absolute public URL base for local-disk assets only. */
+  publicBaseUrl(): string {
+    return this.apiPublicBase();
   }
 
   tenantDir(tenantId: string): string {
