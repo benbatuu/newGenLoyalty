@@ -1,46 +1,77 @@
-/** Public URLs for marketing site — no production localhost fallbacks. */
+/** Public URLs — accepts API_URL / ADMIN_URL / WEB_URL (Vercel) or NEXT_PUBLIC_* */
 
 function stripSlash(url: string) {
   return url.replace(/\/$/, "");
 }
 
-function vercelHttpsUrl(): string | undefined {
-  const raw =
-    process.env.NEXT_PUBLIC_VERCEL_URL ||
-    process.env.VERCEL_URL ||
-    process.env.NEXT_PUBLIC_SITE_URL;
-  if (!raw) return undefined;
-  if (raw.startsWith("http://") || raw.startsWith("https://")) {
-    return stripSlash(raw);
+function firstEnv(...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const v = process.env[key]?.trim();
+    if (v) return stripSlash(v);
   }
-  return `https://${stripSlash(raw)}`;
+  return undefined;
+}
+
+function vercelHttpsUrl(): string | undefined {
+  const raw = firstEnv(
+    "NEXT_PUBLIC_SITE_URL",
+    "SITE_URL",
+    "WEB_URL",
+    "NEXT_PUBLIC_VERCEL_URL",
+    "VERCEL_URL",
+  );
+  if (!raw) return undefined;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  return `https://${raw}`;
 }
 
 const isProd = process.env.NODE_ENV === "production";
 
+/** Avoid crashing SSG/prerender when env is only available at runtime. */
+function missingInProd(label: string): string {
+  if (
+    process.env.NEXT_PHASE === "phase-production-build" ||
+    process.env.VERCEL === "1"
+  ) {
+    console.warn(`[urls] ${label} missing at build time — set it in Vercel (Build + Runtime)`);
+    return "";
+  }
+  throw new Error(`${label} is required in production (set API_URL / ADMIN_URL / WEB_URL on Vercel)`);
+}
+
 export function getSiteUrl(): string {
-  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (fromEnv) return stripSlash(fromEnv);
+  const fromEnv = firstEnv("NEXT_PUBLIC_SITE_URL", "SITE_URL", "WEB_URL");
+  if (fromEnv) {
+    if (fromEnv.startsWith("http")) return fromEnv;
+    return `https://${fromEnv}`;
+  }
   const vercel = vercelHttpsUrl();
   if (vercel) return vercel;
   if (!isProd) return "http://localhost:3000";
-  throw new Error("NEXT_PUBLIC_SITE_URL (or VERCEL_URL) is required in production");
+  return missingInProd("WEB_URL / SITE_URL");
 }
 
 export function getAdminUrl(): string {
-  const fromEnv = process.env.NEXT_PUBLIC_ADMIN_URL?.trim();
-  if (fromEnv) return stripSlash(fromEnv);
+  const fromEnv = firstEnv("NEXT_PUBLIC_ADMIN_URL", "ADMIN_URL");
+  if (fromEnv) {
+    if (fromEnv.startsWith("http")) return fromEnv;
+    return `https://${fromEnv}`;
+  }
   if (!isProd) return "http://localhost:3002";
-  throw new Error("NEXT_PUBLIC_ADMIN_URL is required in production");
+  return missingInProd("ADMIN_URL");
 }
 
 export function getAdminLoginUrl(): string {
-  return `${getAdminUrl()}/login`;
+  const base = getAdminUrl();
+  return base ? `${base}/login` : "/login";
 }
 
 export function getApiUrl(): string {
-  const fromEnv = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (fromEnv) return stripSlash(fromEnv);
+  const fromEnv = firstEnv("NEXT_PUBLIC_API_URL", "API_URL");
+  if (fromEnv) {
+    if (fromEnv.startsWith("http")) return fromEnv;
+    return `https://${fromEnv}`;
+  }
   if (!isProd) return "http://localhost:3001";
-  throw new Error("NEXT_PUBLIC_API_URL is required in production");
+  return missingInProd("API_URL");
 }

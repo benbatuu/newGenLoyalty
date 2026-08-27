@@ -1,7 +1,5 @@
 import { getApiUrl } from "./public-urls";
 
-const API_URL = getApiUrl();
-
 export type Role = "SUPER_ADMIN" | "STORE_OWNER" | "CASHIER";
 
 export type AuthUser = {
@@ -92,7 +90,7 @@ async function refreshAccess(): Promise<string | null> {
     if (!tokens?.refreshToken) return null;
 
     try {
-      const res = await fetch(`${API_URL}/auth/refresh`, {
+      const res = await fetch(`${getApiUrl()}/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken: tokens.refreshToken }),
@@ -163,7 +161,7 @@ export async function api<T>(
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const res = await fetch(`${getApiUrl()}${path}`, { ...options, headers });
 
   if (res.status === 401 && retry) {
     accessToken = await refreshAccess();
@@ -208,7 +206,7 @@ export async function apiDownload(
   const headers = new Headers();
   if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
 
-  const res = await fetch(`${API_URL}${path}`, { headers });
+  const res = await fetch(`${getApiUrl()}${path}`, { headers });
 
   if (res.status === 401 && retry) {
     accessToken = await refreshAccess();
@@ -240,7 +238,7 @@ export async function apiDownload(
 }
 
 export async function login(email: string, password: string) {
-  const res = await fetch(`${API_URL}/auth/login`, {
+  const res = await fetch(`${getApiUrl()}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
