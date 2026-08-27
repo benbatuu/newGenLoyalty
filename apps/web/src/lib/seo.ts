@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
 import { getPathname } from "@/i18n/navigation";
 import { routing, type Locale, type Pathnames } from "@/i18n/routing";
-
-const SITE =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
-  "http://localhost:3000";
+import { getSiteUrl } from "@/lib/public-urls";
 
 function localizedPath(locale: Locale, pathname: Pathnames) {
   return getPathname({
@@ -26,6 +23,7 @@ export function buildPageMetadata({
   pathname: Pathnames;
   keywords?: string;
 }): Metadata {
+  const SITE = getSiteUrl();
   const loc = locale as Locale;
   const url = `${SITE}${localizedPath(loc, pathname)}`;
 
@@ -69,7 +67,5 @@ export function buildPageMetadata({
 }
 
 export function absoluteUrl(locale: Locale, pathname: Pathnames) {
-  return `${SITE}${localizedPath(locale, pathname)}`;
+  return `${getSiteUrl()}${localizedPath(locale, pathname)}`;
 }
-
-export { SITE };

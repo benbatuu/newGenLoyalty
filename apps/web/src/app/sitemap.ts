@@ -1,10 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getPathname } from "@/i18n/navigation";
 import { routing, type Pathnames } from "@/i18n/routing";
-
-const SITE =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
-  "http://localhost:3000";
+import { getSiteUrl } from "@/lib/public-urls";
 
 const pathnames: Pathnames[] = [
   "/",
@@ -23,6 +20,7 @@ const pathnames: Pathnames[] = [
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
+  const SITE = getSiteUrl();
 
   return routing.locales.flatMap((locale) =>
     pathnames.map((pathname) => ({

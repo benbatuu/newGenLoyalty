@@ -11,8 +11,7 @@ import {
   inputClassName,
 } from "../../components/ui";
 import { ApiError } from "../../lib/api";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { getApiUrl } from "../../lib/public-urls";
 
 export default function ResetPasswordPage() {
   return (
@@ -23,6 +22,7 @@ export default function ResetPasswordPage() {
 }
 
 function ResetPasswordForm() {
+  const API_URL = getApiUrl();
   const params = useSearchParams();
   const router = useRouter();
   const token = params.get("token") ?? "";

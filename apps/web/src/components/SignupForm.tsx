@@ -4,11 +4,11 @@ import { FormEvent, useState } from "react";
 import { useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-const ADMIN_URL = process.env.NEXT_PUBLIC_ADMIN_URL ?? "http://localhost:3002";
+import { getAdminUrl, getApiUrl } from "@/lib/public-urls";
 
 export function SignupForm() {
+  const API_URL = getApiUrl();
+  const ADMIN_URL = getAdminUrl();
   const locale = useLocale();
   const tr = locale === "tr";
   const [status, setStatus] = useState<"idle" | "sending" | "ok" | "err">(

@@ -35,10 +35,13 @@ export class AssetsService {
   /** Absolute public URL base for stored assets (admin preview + optional fetch). */
   publicBaseUrl(): string {
     const raw =
-      this.config.get<string>('API_URL') ||
-      this.config.get<string>('APPLE_WEB_SERVICE_URL') ||
-      `http://localhost:${this.config.get('API_PORT') ?? 3001}`;
-    return raw.replace(/\/$/, '');
+      this.config.get<string>('API_URL')?.trim() ||
+      this.config.get<string>('APPLE_WEB_SERVICE_URL')?.trim();
+    if (raw) return raw.replace(/\/$/, '');
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('API_URL is required in production');
+    }
+    return `http://localhost:${this.config.get('API_PORT') ?? 3001}`;
   }
 
   tenantDir(tenantId: string): string {

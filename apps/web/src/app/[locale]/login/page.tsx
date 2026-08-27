@@ -4,13 +4,8 @@ import { Link } from "@/i18n/navigation";
 import { PageShell } from "@/components/PageShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getAdminLoginUrl } from "@/lib/public-urls";
 import { buildPageMetadata } from "@/lib/seo";
-
-const ADMIN_LOGIN =
-  (process.env.NEXT_PUBLIC_ADMIN_URL ?? "http://localhost:3002").replace(
-    /\/$/,
-    "",
-  ) + "/login";
 
 export async function generateMetadata({
   params,
@@ -36,6 +31,7 @@ export default async function LoginPage({
   setRequestLocale(locale);
   const t = await getTranslations("authPages");
   const nav = await getTranslations("nav");
+  const adminLogin = getAdminLoginUrl();
 
   return (
     <PageShell
@@ -53,7 +49,7 @@ export default async function LoginPage({
               {t("loginHint")}
             </CardDescription>
             <Button asChild className="mt-8 w-full sm:w-auto" size="lg">
-              <a href={ADMIN_LOGIN}>
+              <a href={adminLogin}>
                 <span className="relative z-10 inline-flex items-center gap-2">
                   {t("loginCta")}
                   <span className="btn-arrow" aria-hidden>

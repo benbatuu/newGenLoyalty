@@ -139,9 +139,23 @@ export class TenantsController {
       Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto
     )?.split(',')[0]?.trim() || req.protocol || 'http';
     const forwardedHost = req.headers['x-forwarded-host'];
-    const host = (
-      Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost
-    )?.split(',')[0]?.trim() || req.get('host') || 'localhost:3001';
+    const fromRequest =
+      (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost)
+        ?.split(',')[0]
+        ?.trim() || req.get('host');
+    const fromEnv = process.env.API_URL?.replace(/^https?:\/\//, '').replace(
+      /\/$/,
+      '',
+    );
+    const host =
+      fromRequest ||
+      fromEnv ||
+      (process.env.NODE_ENV !== 'production' ? 'localhost:3001' : undefined);
+    if (!host) {
+      throw new BadRequestException(
+        'Unable to resolve host for invite preview URL',
+      );
+    }
     return { url: `${proto}://${host}/wallet/invite-preview/${token}` };
   }
 

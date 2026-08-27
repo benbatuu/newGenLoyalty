@@ -1,4 +1,4 @@
-import { SITE } from "@/lib/seo";
+import { getSiteUrl } from "@/lib/public-urls";
 
 type JsonLdProps = {
   data: Record<string, unknown> | Record<string, unknown>[];
@@ -14,6 +14,7 @@ export function JsonLd({ data }: JsonLdProps) {
 }
 
 export function organizationJsonLd(locale: string) {
+  const SITE = getSiteUrl();
   return {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -32,6 +33,7 @@ export function organizationJsonLd(locale: string) {
 }
 
 export function softwareJsonLd(locale: string) {
+  const SITE = getSiteUrl();
   return {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",

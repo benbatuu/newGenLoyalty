@@ -10,10 +10,10 @@ import {
   inputClassName,
 } from "../../components/ui";
 import { ApiError } from "../../lib/api";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { getApiUrl } from "../../lib/public-urls";
 
 export default function ForgotPasswordPage() {
+  const API_URL = getApiUrl();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);

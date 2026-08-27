@@ -4,8 +4,7 @@ import { FormEvent, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { getApiUrl } from "@/lib/public-urls";
 
 export function ContactForm({
   compact = false,
@@ -20,6 +19,7 @@ export function ContactForm({
 }) {
   const t = useTranslations("contactPage");
   const locale = useLocale();
+  const API_URL = getApiUrl();
   const [status, setStatus] = useState<"idle" | "sending" | "ok" | "err">(
     "idle",
   );

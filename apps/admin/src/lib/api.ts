@@ -1,5 +1,6 @@
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { getApiUrl } from "./public-urls";
+
+const API_URL = getApiUrl();
 
 export type Role = "SUPER_ADMIN" | "STORE_OWNER" | "CASHIER";
 

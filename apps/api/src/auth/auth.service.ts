@@ -137,12 +137,16 @@ export class AuthService {
         expiresAt,
       },
     });
-    const adminBase = (
-      this.config.get<string>('ADMIN_URL') ?? 'http://localhost:3002'
-    ).replace(/\/$/, '');
+    const adminBase = this.config.get<string>('ADMIN_URL')?.trim();
+    if (!adminBase) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('ADMIN_URL is required in production');
+      }
+    }
+    const base = (adminBase || 'http://localhost:3002').replace(/\/$/, '');
     return {
       token,
-      resetUrl: `${adminBase}/reset-password?token=${token}`,
+      resetUrl: `${base}/reset-password?token=${token}`,
       expiresAt,
     };
   }

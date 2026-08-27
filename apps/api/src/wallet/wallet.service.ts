@@ -45,10 +45,12 @@ export class WalletService {
   ) {}
 
   private apiUrl(): string {
-    return (
-      this.config.get<string>('API_URL') ??
-      `http://localhost:${this.config.get('API_PORT') ?? 3001}`
-    ).replace(/\/$/, '');
+    const fromEnv = this.config.get<string>('API_URL')?.trim();
+    if (fromEnv) return fromEnv.replace(/\/$/, '');
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('API_URL is required in production');
+    }
+    return `http://localhost:${this.config.get('API_PORT') ?? 3001}`;
   }
 
   /**
