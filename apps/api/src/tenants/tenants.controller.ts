@@ -8,12 +8,10 @@ import {
   Patch,
   Post,
   Query,
-  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import type { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Role } from '@prisma/client';
 import { memoryStorage } from 'multer';
@@ -129,34 +127,8 @@ export class TenantsController {
   @Post('me/invite-preview-link')
   @Roles(Role.STORE_OWNER, Role.SUPER_ADMIN)
   @RequirePermissions('tenant:update')
-  invitePreviewLink(
-    @CurrentUser() user: AuthUser,
-    @Req() req: Request,
-  ) {
-    const token = this.wallet.createInvitePreviewToken(this.tenantIdOf(user));
-    const forwardedProto = req.headers['x-forwarded-proto'];
-    const proto = (
-      Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto
-    )?.split(',')[0]?.trim() || req.protocol || 'http';
-    const forwardedHost = req.headers['x-forwarded-host'];
-    const fromRequest =
-      (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost)
-        ?.split(',')[0]
-        ?.trim() || req.get('host');
-    const fromEnv = process.env.API_URL?.replace(/^https?:\/\//, '').replace(
-      /\/$/,
-      '',
-    );
-    const host =
-      fromRequest ||
-      fromEnv ||
-      (process.env.NODE_ENV !== 'production' ? 'localhost:3001' : undefined);
-    if (!host) {
-      throw new BadRequestException(
-        'Unable to resolve host for invite preview URL',
-      );
-    }
-    return { url: `${proto}://${host}/wallet/invite-preview/${token}` };
+  invitePreviewLink(@CurrentUser() user: AuthUser) {
+    return { url: this.wallet.invitePreviewUrl(this.tenantIdOf(user)) };
   }
 
   @Patch('me/reward-rule')

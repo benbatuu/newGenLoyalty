@@ -113,7 +113,6 @@ function BusinessContent() {
   const [ok, setOk] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [section, setSection] = useState<"biz" | "invite" | "bday">("invite");
 
   useEffect(() => {
@@ -257,7 +256,6 @@ function BusinessContent() {
   async function openRealPreview() {
     setPreviewBusy(true);
     setError(null);
-    setPreviewUrl(null);
 
     // Popup engelini aşmak için sekme kullanıcı tıklamasında hemen açılmalı
     const tab = window.open("about:blank", "_blank");
@@ -268,14 +266,16 @@ function BusinessContent() {
         "/tenants/me/invite-preview-link",
         { method: "POST" },
       );
-      setPreviewUrl(res.url);
-      setOk("Önizleme hazır");
+      setOk("Önizleme açıldı");
       if (tab && !tab.closed) {
         tab.location.href = res.url;
       } else {
-        setError(
-          "Tarayıcı yeni sekmeyi engelledi — aşağıdaki linke tıkla.",
-        );
+        const opened = window.open(res.url, "_blank", "noopener,noreferrer");
+        if (!opened) {
+          setError(
+            "Tarayıcı pop-up engelledi — bu site için pop-up’a izin verip tekrar dene.",
+          );
+        }
       }
     } catch (err) {
       if (tab && !tab.closed) tab.close();
@@ -340,21 +340,6 @@ function BusinessContent() {
       />
       <ErrorBanner message={error || loadError} />
       <SuccessBanner message={ok} />
-      {previewUrl ? (
-        <SoftBox>
-          <p className="text-sm text-[var(--muted)]">
-            Önizleme linki:{" "}
-            <a
-              href={previewUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="break-all font-medium text-[var(--accent)] underline"
-            >
-              {previewUrl}
-            </a>
-          </p>
-        </SoftBox>
-      ) : null}
 
       <SoftBox>
         <p className="text-sm text-[var(--muted)]">
