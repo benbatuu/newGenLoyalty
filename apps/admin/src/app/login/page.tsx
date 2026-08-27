@@ -9,7 +9,6 @@ import {
   btnPrimary,
   inputClassName,
 } from "../../components/ui";
-import { ApiError } from "../../lib/api";
 import { homePathForRole, useAuth } from "../../lib/auth";
 
 export default function LoginPage() {
