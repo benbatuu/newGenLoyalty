@@ -9,6 +9,7 @@ import { Role, StampLedgerType, SubscriptionStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
+import { OwnerPushService } from '../owner-push/owner-push.service';
 import { WalletService } from '../wallet/wallet.service';
 import { AssetsService, type AssetSlot } from './assets.service';
 import {
@@ -54,6 +55,7 @@ export class TenantsService {
     private readonly wallet: WalletService,
     private readonly assets: AssetsService,
     private readonly auth: AuthService,
+    private readonly ownerPush: OwnerPushService,
   ) {}
 
   list() {
@@ -240,7 +242,7 @@ export class TenantsService {
       nextStatus === SubscriptionStatus.ACTIVE &&
       tenant.subscriptionStatus !== SubscriptionStatus.ACTIVE;
 
-    return this.prisma.tenant.update({
+    const updated = await this.prisma.tenant.update({
       where: { id },
       data: {
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
@@ -248,6 +250,25 @@ export class TenantsService {
         ...(activating ? { subscriptionActivatedAt: new Date() } : {}),
       },
     });
+
+    void this.ownerPush
+      .notifyTenantAccountChange(
+        tenant.id,
+        {
+          subscriptionStatus: tenant.subscriptionStatus,
+          isActive: tenant.isActive,
+        },
+        {
+          subscriptionStatus: updated.subscriptionStatus,
+          isActive: updated.isActive,
+          name: updated.name,
+        },
+      )
+      .catch((err: Error) =>
+        this.logger.warn(`Owner account push başarısız: ${err.message}`),
+      );
+
+    return updated;
   }
 
   async getById(tenantId: string) {

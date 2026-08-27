@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { OwnerPushModule } from '../owner-push/owner-push.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { AssetsService } from './assets.service';
 import { TenantsController } from './tenants.controller';
 import { TenantsService } from './tenants.service';
 
 @Module({
-  imports: [WalletModule, AuthModule],
+  imports: [WalletModule, AuthModule, OwnerPushModule],
   controllers: [TenantsController],
   providers: [TenantsService, AssetsService],
   exports: [TenantsService, AssetsService],

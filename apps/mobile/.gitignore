@@ -44,5 +44,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Widget Preview related
-.widget_preview/
+# Firebase (owner push) — gerçek dosyalar repoya eklenmez
+ios/Runner/GoogleService-Info.plist
+android/app/google-services.json
+*.p8

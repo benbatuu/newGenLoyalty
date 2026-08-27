@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'api_client.dart';
 import 'models.dart';
+import 'push_service.dart';
 
 class AuthState extends ChangeNotifier {
   AuthState(this.api);
@@ -17,6 +18,9 @@ class AuthState extends ChangeNotifier {
     await api.loadSession();
     ready = true;
     notifyListeners();
+    if (user?.isOwner == true) {
+      await PushService.syncForOwner(api, user);
+    }
   }
 
   Future<bool> login(String email, String password) async {
@@ -24,6 +28,9 @@ class AuthState extends ChangeNotifier {
     try {
       await api.login(email.trim(), password);
       notifyListeners();
+      if (user?.isOwner == true) {
+        await PushService.syncForOwner(api, user);
+      }
       return true;
     } on ApiException catch (e) {
       error = e.message;
@@ -37,6 +44,9 @@ class AuthState extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    if (user?.isOwner == true) {
+      await PushService.teardown(api);
+    }
     await api.clearSession();
     notifyListeners();
   }

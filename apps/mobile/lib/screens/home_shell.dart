@@ -4,11 +4,10 @@ import 'package:provider/provider.dart';
 import '../auth_state.dart';
 import '../theme.dart';
 import 'account_screen.dart';
-import 'cafe_screen.dart';
 import 'cashier_screen.dart';
-import 'counter_screen.dart';
 import 'customers_screen.dart';
-import 'reports_screen.dart';
+import 'metrics_screen.dart';
+import 'program_screen.dart';
 
 class _TabSpec {
   const _TabSpec({
@@ -34,38 +33,38 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
-  static const _ownerTabs = [
-    _TabSpec(
-      label: 'Tezgâh',
-      icon: Icons.storefront_outlined,
-      selectedIcon: Icons.storefront_rounded,
-      page: CounterScreen(),
-    ),
-    _TabSpec(
-      label: 'Müşteriler',
-      icon: Icons.groups_outlined,
-      selectedIcon: Icons.groups_rounded,
-      page: CustomersScreen(),
-    ),
-    _TabSpec(
-      label: 'Raporlar',
-      icon: Icons.insights_outlined,
-      selectedIcon: Icons.insights_rounded,
-      page: ReportsScreen(),
-    ),
-    _TabSpec(
-      label: 'Kafe',
-      icon: Icons.coffee_outlined,
-      selectedIcon: Icons.coffee_rounded,
-      page: CafeScreen(),
-    ),
-    _TabSpec(
-      label: 'Hesap',
-      icon: Icons.person_outline_rounded,
-      selectedIcon: Icons.person_rounded,
-      page: AccountScreen(),
-    ),
-  ];
+  List<_TabSpec> get _ownerTabs => [
+        const _TabSpec(
+          label: 'Özet',
+          icon: Icons.dashboard_outlined,
+          selectedIcon: Icons.dashboard_rounded,
+          page: MetricsScreen(),
+        ),
+        const _TabSpec(
+          label: 'Tezgâh',
+          icon: Icons.storefront_outlined,
+          selectedIcon: Icons.storefront_rounded,
+          page: CashierScreen(),
+        ),
+        const _TabSpec(
+          label: 'Müşteriler',
+          icon: Icons.groups_outlined,
+          selectedIcon: Icons.groups_rounded,
+          page: CustomersScreen(),
+        ),
+        const _TabSpec(
+          label: 'Program',
+          icon: Icons.tune_outlined,
+          selectedIcon: Icons.tune_rounded,
+          page: ProgramScreen(),
+        ),
+        const _TabSpec(
+          label: 'Hesap',
+          icon: Icons.person_outline_rounded,
+          selectedIcon: Icons.person_rounded,
+          page: AccountScreen(),
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +87,6 @@ class _HomeShellState extends State<HomeShell> {
       );
     }
 
-    // Cashier: tek ekran — numpad tezgâh, alt menü yok
     if (user.isCashier) {
       return Scaffold(
         appBar: AppBar(

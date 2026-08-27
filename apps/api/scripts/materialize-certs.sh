@@ -30,5 +30,8 @@ fi
 if write_b64 GOOGLE_WALLET_SA_B64 "$CERT_DIR/google-wallet-sa.json"; then
   export GOOGLE_WALLET_SERVICE_ACCOUNT_KEY_PATH="$CERT_DIR/google-wallet-sa.json"
 fi
+if write_b64 FCM_SERVICE_ACCOUNT_B64 "$CERT_DIR/fcm-sa.json"; then
+  export FCM_SERVICE_ACCOUNT_PATH="$CERT_DIR/fcm-sa.json"
+fi
 
 exec "$@"

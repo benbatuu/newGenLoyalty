@@ -10,6 +10,7 @@ import { BillingModule } from './billing/billing.module';
 import { StampsModule } from './stamps/stamps.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { WalletModule } from './wallet/wallet.module';
+import { OwnerPushModule } from './owner-push/owner-push.module';
 import { PublicModule } from './public/public.module';
 import { StorageModule } from './storage/storage.module';
 
@@ -30,6 +31,7 @@ import { StorageModule } from './storage/storage.module';
     WalletModule,
     StampsModule,
     TenantsModule,
+    OwnerPushModule,
     BillingModule,
     PublicModule,
   ],

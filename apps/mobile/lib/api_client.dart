@@ -133,6 +133,12 @@ class ApiClient {
           headers: headers,
           body: body == null ? null : jsonEncode(body),
         );
+      case 'DELETE':
+        res = await _http.delete(
+          uri,
+          headers: headers,
+          body: body == null ? null : jsonEncode(body),
+        );
       default:
         throw ApiException(0, 'Unsupported method $method');
     }
@@ -247,6 +253,76 @@ class ApiClient {
     return OwnerMetrics.fromJson(data);
   }
 
+  Future<NotifyStatus> notificationStatus() async {
+    final data = await request('GET', '/tenants/me/notifications');
+    return NotifyStatus.fromJson(data);
+  }
+
+  Future<({String message, int synced, int devices})> sendNotification(
+    String message,
+  ) async {
+    final data = await request('POST', '/tenants/me/notifications', body: {
+      'message': message,
+    });
+    return (
+      message: data['message'] as String? ?? message,
+      synced: data['synced'] as int? ?? 0,
+      devices: data['devices'] as int? ?? 0,
+    );
+  }
+
+  Future<TenantRewardSettings> tenantRewardSettings() async {
+    final data = await request('GET', '/tenants/me');
+    return TenantRewardSettings.fromTenantJson(data);
+  }
+
+  Future<void> updateRewardRule({
+    required int stampsRequired,
+    required String rewardLabel,
+  }) async {
+    await request('PATCH', '/tenants/me/reward-rule', body: {
+      'stampsRequired': stampsRequired,
+      'rewardLabel': rewardLabel,
+    });
+  }
+
+  Future<void> patchTenant(Map<String, dynamic> body) async {
+    await request('PATCH', '/tenants/me', body: body);
+  }
+
+  Future<String> walletInviteLink(String customerId) async {
+    final data = await request(
+      'GET',
+      '/stamps/customers/$customerId/wallet-invite',
+    );
+    return data['walletInviteUrl'] as String;
+  }
+
+  Future<String> invitePreviewLink() async {
+    final data = await request('POST', '/tenants/me/invite-preview-link');
+    return data['url'] as String;
+  }
+
+  Future<void> inviteStaff({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    await request('POST', '/tenants/me/staff', body: {
+      'name': name,
+      'email': email,
+      'password': password,
+    });
+  }
+
+  Future<String> staffResetLink(String userId) async {
+    final data = await request(
+      'POST',
+      '/tenants/me/staff/$userId/reset-link',
+    );
+    return data['resetUrl'] as String;
+  }
+
   Future<CustomerDirectory> customerDirectory({
     String? q,
     String filter = 'all',
@@ -278,5 +354,30 @@ class ApiClient {
     return list
         .map((e) => StaffMember.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<PushSettings> pushSettings() async {
+    final data = await request('GET', '/users/me/push/settings');
+    return PushSettings.fromJson(data);
+  }
+
+  Future<PushSettings> updatePushSettings(bool enabled) async {
+    final data = await request('PATCH', '/users/me/push/settings', body: {
+      'enabled': enabled,
+    });
+    return PushSettings.fromJson(data);
+  }
+
+  Future<void> registerPushDevice(String fcmToken, String platform) async {
+    await request('POST', '/users/me/push/devices', body: {
+      'fcmToken': fcmToken,
+      'platform': platform,
+    });
+  }
+
+  Future<void> unregisterPushDevice([String? fcmToken]) async {
+    await request('DELETE', '/users/me/push/devices', body: {
+      if (fcmToken != null) 'fcmToken': fcmToken,
+    });
   }
 }

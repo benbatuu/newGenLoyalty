@@ -6,6 +6,7 @@ import '../api_client.dart';
 import '../auth_state.dart';
 import '../models.dart';
 import '../theme.dart';
+import '../widgets/invite_qr_sheet.dart';
 import '../widgets/ui.dart';
 import 'pass_qr_scan_screen.dart';
 
@@ -118,9 +119,13 @@ class _CashierScreenState extends State<CashierScreen> {
         _stampsRequired = r.stampsRequired;
         _rewardLabel = r.rewardLabel;
       });
-      if (r.walletInviteUrl != null) {
-        debugPrint('[SMS mock] Wallet invite: ${r.walletInviteUrl}');
-        _toast('Kayıt OK — Wallet invite hazır');
+      if (r.walletInviteUrl != null && mounted) {
+        await showInviteQrSheet(
+          context,
+          url: r.walletInviteUrl!,
+          phoneLabel: formatPhone(r.customer.phone),
+        );
+        _toast('Kayıt OK — Wallet davet QR gösterildi');
       } else {
         _toast('Kayıt + ilk damga tamam');
       }
@@ -180,6 +185,24 @@ class _CashierScreenState extends State<CashierScreen> {
             ? 'Ödül hazır: ${r.rewardLabel}'
             : 'Damga ${r.customer.stampCount}/${r.stampsRequired}',
       );
+    } on ApiException catch (e) {
+      _toast(e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _showWalletInvite(Customer c) async {
+    setState(() => _busy = true);
+    try {
+      final link = await _api.walletInviteLink(c.id);
+      if (mounted) {
+        await showInviteQrSheet(
+          context,
+          url: link,
+          phoneLabel: formatPhone(c.phone),
+        );
+      }
     } on ApiException catch (e) {
       _toast(e.message);
     } finally {
@@ -379,6 +402,12 @@ class _CashierScreenState extends State<CashierScreen> {
                           label: const Text('Ödül kullan'),
                         ),
                       ],
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: _busy ? null : () => _showWalletInvite(_selected!),
+                        icon: const Icon(Icons.qr_code_2_rounded),
+                        label: const Text('Wallet davet QR'),
+                      ),
                     ],
                   ),
                 ),

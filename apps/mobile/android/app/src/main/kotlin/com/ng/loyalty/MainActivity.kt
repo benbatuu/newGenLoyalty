@@ -1,4 +1,4 @@
-package com.dokunkazan.ngl_mobile
+package com.ng.loyalty
 
 import io.flutter.embedding.android.FlutterActivity
 
