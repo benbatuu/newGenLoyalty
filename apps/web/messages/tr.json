@@ -319,5 +319,11 @@
     "signupTitle": "Kayıt ol",
     "signupIntro": "Kafe hesabını hemen aç — 14 günlük deneme, ödeme yok.",
     "signupAside": "Self-serve trial: hesap anında hazır; abonelik ödeme sonra."
+  },
+  "notFound": {
+    "title": "Sayfa bulunamadı",
+    "intro": "Aradığınız sayfa taşınmış, silinmiş veya hiç var olmamış olabilir.",
+    "home": "Ana sayfaya dön",
+    "contact": "İletişim"
   }
 }

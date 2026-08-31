@@ -41,17 +41,24 @@ export function getSiteUrl(): string {
   );
 }
 
+/**
+ * Admin panel base URL.
+ * Server: reads ADMIN_URL at request time (Vercel Runtime).
+ * Client: only NEXT_PUBLIC_ADMIN_URL (inlined at build) — never throws; pass from server when possible.
+ */
 export function getAdminUrl(): string {
-  const fromEnv = firstEnv("NEXT_PUBLIC_ADMIN_URL", "ADMIN_URL");
+  const onServer = typeof window === "undefined";
+  const fromEnv = onServer
+    ? firstEnv("ADMIN_URL", "NEXT_PUBLIC_ADMIN_URL")
+    : firstEnv("NEXT_PUBLIC_ADMIN_URL");
   if (fromEnv) return withHttps(fromEnv);
 
   if (!isProd) return "http://localhost:3002";
 
-  throw new Error(
-    "ADMIN_URL is required in production — set it in Vercel (Build + Runtime for client links)",
-  );
+  return "";
 }
 
 export function getAdminLoginUrl(): string {
-  return `${getAdminUrl()}/login`;
+  const base = getAdminUrl();
+  return base ? `${base}/login` : "";
 }

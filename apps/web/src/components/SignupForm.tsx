@@ -4,11 +4,10 @@ import { FormEvent, useState } from "react";
 import { useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
-import { getAdminUrl, getApiUrl } from "@/lib/public-urls";
+import { getApiUrl } from "@/lib/public-urls";
 
-export function SignupForm() {
+export function SignupForm({ adminUrl }: { adminUrl: string }) {
   const API_URL = getApiUrl();
-  const ADMIN_URL = getAdminUrl();
   const locale = useLocale();
   const tr = locale === "tr";
   const [status, setStatus] = useState<"idle" | "sending" | "ok" | "err">(
@@ -82,13 +81,21 @@ export function SignupForm() {
             </>
           ) : null}
         </p>
-        <Button asChild size="lg">
-          <a href={ADMIN_URL}>
-            <span className="relative z-10">
-              {tr ? "Admin paneline git" : "Go to admin panel"}
-            </span>
-          </a>
-        </Button>
+        {adminUrl ? (
+          <Button asChild size="lg">
+            <a href={adminUrl}>
+              <span className="relative z-10">
+                {tr ? "Admin paneline git" : "Go to admin panel"}
+              </span>
+            </a>
+          </Button>
+        ) : (
+          <p className="text-sm text-[var(--muted)]">
+            {tr
+              ? "Giriş için size gönderilen admin panel bağlantısını kullanın."
+              : "Use the admin panel link we sent you to sign in."}
+          </p>
+        )}
       </div>
     );
   }

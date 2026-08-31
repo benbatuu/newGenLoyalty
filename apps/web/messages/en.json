@@ -319,5 +319,11 @@
     "signupTitle": "Sign up",
     "signupIntro": "Open your café account now — 14-day trial, no payment.",
     "signupAside": "Self-serve trial: account ready instantly; billing comes later."
+  },
+  "notFound": {
+    "title": "Page not found",
+    "intro": "The page you're looking for may have moved, been removed, or never existed.",
+    "home": "Back to home",
+    "contact": "Contact us"
   }
 }

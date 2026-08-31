@@ -5,6 +5,7 @@ import { PageShell } from "@/components/PageShell";
 import { SignupForm } from "@/components/SignupForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getAdminUrl } from "@/lib/public-urls";
 import { buildPageMetadata } from "@/lib/seo";
 
 export async function generateMetadata({
@@ -31,6 +32,7 @@ export default async function SignupPage({
   setRequestLocale(locale);
   const t = await getTranslations("authPages");
   const nav = await getTranslations("nav");
+  const adminUrl = getAdminUrl();
 
   return (
     <PageShell
@@ -41,7 +43,7 @@ export default async function SignupPage({
       heroAlt={t("signupTitle")}
     >
       <div className="grid gap-10 lg:grid-cols-[1.15fr_0.85fr]">
-        <SignupForm />
+        <SignupForm adminUrl={adminUrl} />
         <Card className="h-fit">
           <CardHeader>
             <CardTitle className="text-2xl">{t("signupAside")}</CardTitle>

@@ -48,16 +48,20 @@ export default async function LoginPage({
             <CardDescription className="text-base">
               {t("loginHint")}
             </CardDescription>
-            <Button asChild className="mt-8 w-full sm:w-auto" size="lg">
-              <a href={adminLogin}>
-                <span className="relative z-10 inline-flex items-center gap-2">
-                  {t("loginCta")}
-                  <span className="btn-arrow" aria-hidden>
-                    →
+            {adminLogin ? (
+              <Button asChild className="mt-8 w-full sm:w-auto" size="lg">
+                <a href={adminLogin}>
+                  <span className="relative z-10 inline-flex items-center gap-2">
+                    {t("loginCta")}
+                    <span className="btn-arrow" aria-hidden>
+                      →
+                    </span>
                   </span>
-                </span>
-              </a>
-            </Button>
+                </a>
+              </Button>
+            ) : (
+              <p className="mt-8 text-sm text-[var(--muted)]">{t("loginHint")}</p>
+            )}
           </CardHeader>
         </Card>
         <Card>
