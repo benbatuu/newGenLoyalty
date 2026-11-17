@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -8,7 +9,9 @@ import '../theme.dart';
 
 /// Full-screen Wallet pass barcode scanner. Pops with raw payload or null.
 class PassQrScanScreen extends StatefulWidget {
-  const PassQrScanScreen({super.key});
+  const PassQrScanScreen({super.key, this.title = 'Pass QR okut'});
+
+  final String title;
 
   @override
   State<PassQrScanScreen> createState() => _PassQrScanScreenState();
@@ -50,9 +53,9 @@ class _PassQrScanScreenState extends State<PassQrScanScreen> {
     for (final b in capture.barcodes) {
       final raw = (b.rawValue ?? b.displayValue)?.trim();
       if (raw == null || raw.isEmpty) continue;
-      debugPrint(
-        '[pass-scan] format=${b.format} value=$raw',
-      );
+      if (kDebugMode) {
+        debugPrint('[pass-scan] format=${b.format}');
+      }
       _handled = true;
       HapticFeedback.heavyImpact();
       setState(() => _hint = 'Okundu…');
@@ -79,12 +82,13 @@ class _PassQrScanScreenState extends State<PassQrScanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: const Text('Pass QR okut'),
+        title: Text(widget.title),
         actions: [
           IconButton(
             tooltip: 'Yenile',
@@ -113,7 +117,7 @@ class _PassQrScanScreenState extends State<PassQrScanScreen> {
           ),
           IgnorePointer(
             child: CustomPaint(
-              painter: _ScanFramePainter(),
+              painter: _ScanFramePainter(frameColor: c.scanFrame),
               child: const SizedBox.expand(),
             ),
           ),
@@ -133,14 +137,14 @@ class _PassQrScanScreenState extends State<PassQrScanScreen> {
                           vertical: 10,
                         ),
                         decoration: BoxDecoration(
-                          color: kAccent,
+                          color: c.accent,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           _hint!,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: c.accentForeground,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -208,6 +212,10 @@ class _CameraError extends StatelessWidget {
 }
 
 class _ScanFramePainter extends CustomPainter {
+  _ScanFramePainter({required this.frameColor});
+
+  final Color frameColor;
+
   @override
   void paint(Canvas canvas, Size size) {
     final overlay = Paint()..color = Colors.black.withValues(alpha: 0.5);
@@ -226,12 +234,13 @@ class _ScanFramePainter extends CustomPainter {
     canvas.drawPath(path, overlay);
 
     final border = Paint()
-      ..color = kAccent
+      ..color = frameColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3;
     canvas.drawRRect(hole, border);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _ScanFramePainter oldDelegate) =>
+      oldDelegate.frameColor != frameColor;
 }

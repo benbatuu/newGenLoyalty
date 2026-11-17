@@ -217,6 +217,21 @@ export class OwnerPushService {
     return { sent, owners: owners.length };
   }
 
+  /** Kampanya / win-back gibi owner bildirimleri */
+  async notifyCampaignAlert(
+    tenantId: string,
+    title: string,
+    body: string,
+    dedupeKey: string,
+  ) {
+    return this.notifyTenantOwners(tenantId, {
+      kind: OwnerPushKind.ACCOUNT,
+      title,
+      body,
+      dedupeKey,
+    });
+  }
+
   private async sendToOwner(
     userId: string,
     payload: {

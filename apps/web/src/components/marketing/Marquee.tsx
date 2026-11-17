@@ -14,7 +14,7 @@ export function Marquee({
   const row = [...items, ...items];
   return (
     <div
-      className={cn("marquee relative overflow-hidden border-y border-[var(--line)]", className)}
+      className={cn("marquee relative overflow-hidden border-y border-border", className)}
       style={{ "--marquee-duration": `${speed}s` } as React.CSSProperties}
     >
       <div className="marquee-track">

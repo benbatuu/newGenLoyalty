@@ -1,4 +1,11 @@
+import { presetIconSvg } from './stamp-presets';
 import { Injectable, Logger } from '@nestjs/common';
+import {
+  MAX_WALLET_STAMP_SLOTS,
+  computeStampGrid,
+  getStampThemeIconUrls,
+  type GroupStampStyle,
+} from '@ngl/shared';
 import sharp from 'sharp';
 
 export type StampTheme =
@@ -21,11 +28,25 @@ export type StampArtInput = {
   stampIconEmptyUrl?: string | null;
   /** Kenar boşluğu — owner ayarı */
   inset?: StampInset | string | null;
+  /** Multi-stamp: grup bazlı dolu/boş slot dizisi */
+  slotFilled?: boolean[];
+  /** Multi-stamp: slot başına tema / ikon */
+  slotStyles?: GroupStampStyle[];
+  /** Özel tam şerit görseli — varsa damga kompoziti yerine kullanılır */
+  customStripUrl?: string | null;
 };
 
 const STRIP_W = 750;
-/** Apple storeCard strip @2x — enough height for 2–3 icon rows */
+/** Apple storeCard strip @2x — PassKit [750×246](https://developer.apple.com/documentation/walletpasses) */
 const STRIP_H = 246;
+const STRIP_3X_W = 1125;
+const STRIP_3X_H = 369;
+const BG_1X_W = 180;
+const BG_1X_H = 220;
+const BG_2X_W = 360;
+const BG_2X_H = 440;
+const BG_3X_W = 540;
+const BG_3X_H = 660;
 const LOGO_W = 320;
 const LOGO_H = 100;
 /** PassKit notification icon @1x / @2x / @3x */
@@ -51,32 +72,15 @@ export function normalizeStampInset(
 }
 
 /**
- * Damga ikonlarını satır/sütun ızgarasına böler.
- * Örn. 10 → 2×5, 8 → 2×4, 9 → 3×3, ≤5 → tek satır.
- * Admin önizleme ile aynı mantık tutulmalı.
+ * Re-export — admin önizleme ile aynı mantık (@ngl/shared).
  */
-export function computeStampGrid(stampsRequired: number): {
-  cols: number;
-  rows: number;
-} {
-  const n = Math.max(1, Math.min(Math.floor(stampsRequired) || 1, 16));
-  if (n <= 5) return { cols: n, rows: 1 };
-
-  // Tam bölünen, strip için geniş (çok sütun) tercih
-  for (const cols of [5, 4, 3] as const) {
-    if (n % cols === 0) {
-      const rows = n / cols;
-      if (rows <= 4) return { cols, rows };
-    }
-  }
-
-  if (n <= 8) return { cols: 4, rows: Math.ceil(n / 4) };
-  return { cols: 5, rows: Math.ceil(n / 5) };
-}
+export { computeStampGrid, MAX_WALLET_STAMP_SLOTS };
 
 @Injectable()
 export class PassArtService {
   private readonly logger = new Logger(PassArtService.name);
+  /** Aynı Thiings URL'sini strip başına tekrar indirmeyi önler */
+  private readonly remotePngCache = new Map<string, Promise<Buffer | null>>();
 
   normalizeTheme(theme: string | undefined | null): StampTheme {
     const t = (theme || 'COFFEE').toUpperCase();
@@ -94,46 +98,7 @@ export class PassArtService {
   }
 
   private iconSvg(theme: StampTheme, filled: boolean, color: string): string {
-    const stroke = color;
-    const fill = filled ? color : 'none';
-    const opacity = filled ? '1' : '0.32';
-
-    switch (theme) {
-      case 'DESSERT':
-        return `<g opacity="${opacity}">
-          <ellipse cx="32" cy="48" rx="22" ry="8" fill="${filled ? color : 'none'}" stroke="${stroke}" stroke-width="3"/>
-          <path d="M14 48 C14 28 50 28 50 48" fill="${filled ? color : 'none'}" stroke="${stroke}" stroke-width="3"/>
-          <circle cx="24" cy="30" r="3" fill="${stroke}"/>
-          <circle cx="32" cy="26" r="3" fill="${stroke}"/>
-          <circle cx="40" cy="30" r="3" fill="${stroke}"/>
-        </g>`;
-      case 'STAR':
-        return `<g opacity="${opacity}">
-          <path d="M32 10 L38 24 L54 26 L42 36 L46 52 L32 44 L18 52 L22 36 L10 26 L26 24 Z"
-            fill="${fill}" stroke="${stroke}" stroke-width="2.5" stroke-linejoin="round"/>
-        </g>`;
-      case 'HEART':
-        return `<g opacity="${opacity}">
-          <path d="M32 50 C32 50 12 36 12 24 C12 16 18 12 24 12 C28 12 31 14 32 18 C33 14 36 12 40 12 C46 12 52 16 52 24 C52 36 32 50 32 50 Z"
-            fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>
-        </g>`;
-      case 'DONUT':
-        return `<g opacity="${opacity}">
-          <circle cx="32" cy="32" r="20" fill="${fill}" stroke="${stroke}" stroke-width="3"/>
-          <circle cx="32" cy="32" r="8" fill="none" stroke="${stroke}" stroke-width="3"/>
-          <circle cx="22" cy="22" r="2.5" fill="${stroke}"/>
-          <circle cx="40" cy="20" r="2.5" fill="${stroke}"/>
-          <circle cx="44" cy="34" r="2.5" fill="${stroke}"/>
-        </g>`;
-      case 'COFFEE':
-      default:
-        return `<g opacity="${opacity}">
-          <path d="M18 22 h28 v22 c0 10 -8 16 -14 16 s-14 -6 -14 -16 z" fill="${fill}" stroke="${stroke}" stroke-width="3" stroke-linejoin="round"/>
-          <path d="M46 28 h6 c6 0 10 4 10 10 s-4 10 -10 10 h-6" fill="none" stroke="${stroke}" stroke-width="3"/>
-          <path d="M26 12 c0 6 4 6 4 12" fill="none" stroke="${stroke}" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
-          <path d="M34 10 c0 6 4 6 4 12" fill="none" stroke="${stroke}" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
-        </g>`;
-    }
+    return presetIconSvg(theme, filled, color);
   }
 
   private async loadRemotePng(
@@ -141,6 +106,19 @@ export class PassArtService {
     size: number,
   ): Promise<Buffer | null> {
     if (!url) return null;
+    const cacheKey = `${url}@${size}`;
+    const cached = this.remotePngCache.get(cacheKey);
+    if (cached) return cached;
+
+    const task = this.fetchRemotePng(url, size);
+    this.remotePngCache.set(cacheKey, task);
+    return task;
+  }
+
+  private async fetchRemotePng(
+    url: string,
+    size: number,
+  ): Promise<Buffer | null> {
     try {
       let buf: Buffer | null = null;
       const uploadsIdx = url.indexOf('/uploads/');
@@ -159,7 +137,6 @@ export class PassArtService {
       }
       if (!buf) {
         let fetchUrl = url;
-        // Prefer /media proxy over private R2 S3 API host
         try {
           const u = new URL(url);
           if (u.hostname.endsWith('.r2.cloudflarestorage.com')) {
@@ -182,9 +159,12 @@ export class PassArtService {
         }
         if (!/^https?:\/\//i.test(fetchUrl)) return null;
         const res = await fetch(fetchUrl, {
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(20_000),
         });
-        if (!res.ok) return null;
+        if (!res.ok) {
+          this.logger.warn(`İkon HTTP ${res.status}: ${fetchUrl.slice(0, 80)}`);
+          return null;
+        }
         buf = Buffer.from(await res.arrayBuffer());
       }
       return sharp(buf)
@@ -198,6 +178,43 @@ export class PassArtService {
       this.logger.warn(`İkon indirilemedi: ${(err as Error).message}`);
       return null;
     }
+  }
+
+  /** Strip üretiminden önce tüm benzersiz ikon URL'lerini paralel indir */
+  private async prefetchStripIcons(
+    total: number,
+    slotFilled: boolean[] | null,
+    filled: number,
+    defaultTheme: StampTheme,
+    defaultFilledUrl?: string | null,
+    defaultEmptyUrl?: string | null,
+    slotStyles?: GroupStampStyle[],
+  ): Promise<void> {
+    const urls = new Set<string>();
+    for (let i = 0; i < total; i++) {
+      const style = slotStyles?.[i];
+      const slotTheme = this.normalizeTheme(style?.stampTheme ?? defaultTheme);
+      const isFilled = slotFilled ? slotFilled[i]! : i < filled;
+      const themeIcons =
+        slotTheme !== 'CUSTOM' ? getStampThemeIconUrls(slotTheme) : null;
+      const filledUrl =
+        slotTheme === 'CUSTOM'
+          ? style?.stampIconFilledUrl ?? defaultFilledUrl
+          : themeIcons?.filledUrl;
+      const emptyUrl =
+        slotTheme === 'CUSTOM'
+          ? style?.stampIconEmptyUrl ?? defaultEmptyUrl
+          : themeIcons?.emptyUrl;
+      const pick = isFilled
+        ? filledUrl || emptyUrl
+        : emptyUrl || filledUrl;
+      if (pick) urls.add(pick);
+      if (filledUrl) urls.add(filledUrl);
+      if (emptyUrl) urls.add(emptyUrl);
+    }
+    await Promise.all(
+      [...urls].map((url) => this.loadRemotePng(url, 128)),
+    );
   }
 
   private async withOpacity(png: Buffer, opacity: number): Promise<Buffer> {
@@ -251,87 +268,224 @@ export class PassArtService {
     return positions;
   }
 
+  private async renderSlotIconBuffer(
+    theme: StampTheme,
+    filled: boolean,
+    fg: string,
+    iconSize: number,
+    filledUrl?: string | null,
+    emptyUrl?: string | null,
+  ): Promise<Buffer> {
+    const themeIcons = theme !== 'CUSTOM' ? getStampThemeIconUrls(theme) : null;
+    const resolvedFilled =
+      theme === 'CUSTOM'
+        ? filledUrl || themeIcons?.filledUrl
+        : themeIcons?.filledUrl;
+    const resolvedEmpty =
+      theme === 'CUSTOM'
+        ? emptyUrl || themeIcons?.emptyUrl
+        : themeIcons?.emptyUrl;
+
+    if (resolvedFilled || resolvedEmpty) {
+      const customFilled = await this.loadRemotePng(resolvedFilled, 128);
+      const customEmpty = await this.loadRemotePng(resolvedEmpty, 128);
+      if (customFilled || customEmpty) {
+        let icon = filled
+          ? customFilled || customEmpty!
+          : customEmpty || customFilled!;
+        icon = await sharp(icon)
+          .resize(iconSize, iconSize, {
+            fit: 'contain',
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+          })
+          .png()
+          .toBuffer();
+        if (
+          !filled &&
+          !customEmpty &&
+          customFilled &&
+          !themeIcons?.emptyUrl
+        ) {
+          icon = await this.withOpacity(icon, 0.35);
+        }
+        return icon;
+      }
+    }
+
+    const drawTheme = theme === 'CUSTOM' ? 'COFFEE' : theme;
+    const scale = iconSize / 64;
+    const svg = `<svg width="${iconSize}" height="${iconSize}" xmlns="http://www.w3.org/2000/svg">
+      <g transform="scale(${scale})">${this.iconSvg(drawTheme, filled, fg)}</g>
+    </svg>`;
+    return sharp(Buffer.from(svg)).png().toBuffer();
+  }
+
+  private async buildStripComposite(
+    total: number,
+    positions: { x: number; y: number; iconSize: number }[],
+    slotFilled: boolean[] | null,
+    filled: number,
+    fg: string,
+    bg: string,
+    defaultTheme: StampTheme,
+    defaultFilledUrl?: string | null,
+    defaultEmptyUrl?: string | null,
+    slotStyles?: GroupStampStyle[],
+  ): Promise<{ strip: Buffer; strip2x: Buffer; strip3x: Buffer }> {
+    this.remotePngCache.clear();
+    await this.prefetchStripIcons(
+      total,
+      slotFilled,
+      filled,
+      defaultTheme,
+      defaultFilledUrl,
+      defaultEmptyUrl,
+      slotStyles,
+    );
+
+    const layers: sharp.OverlayOptions[] = [];
+    for (let i = 0; i < total; i++) {
+      const style = slotStyles?.[i];
+      const slotTheme = this.normalizeTheme(
+        style?.stampTheme ?? defaultTheme,
+      );
+      const isFilled = slotFilled ? slotFilled[i]! : i < filled;
+      const { x, y, iconSize } = positions[i]!;
+      const useCustomIcons = slotTheme === 'CUSTOM';
+      const icon = await this.renderSlotIconBuffer(
+        slotTheme,
+        isFilled,
+        fg,
+        iconSize,
+        useCustomIcons
+          ? style?.stampIconFilledUrl ?? defaultFilledUrl
+          : null,
+        useCustomIcons ? style?.stampIconEmptyUrl ?? defaultEmptyUrl : null,
+      );
+      layers.push({ input: icon, left: x, top: y });
+    }
+    const strip2x = await sharp({
+      create: {
+        width: STRIP_W,
+        height: STRIP_H,
+        channels: 4,
+        background: this.hexToRgba(bg),
+      },
+    })
+      .composite(layers)
+      .png()
+      .toBuffer();
+    const strip = await sharp(strip2x)
+      .resize(Math.floor(STRIP_W / 2), Math.floor(STRIP_H / 2))
+      .png()
+      .toBuffer();
+    const strip3x = await sharp(strip2x)
+      .resize(STRIP_3X_W, STRIP_3X_H, { fit: 'fill' })
+      .png()
+      .toBuffer();
+    return { strip, strip2x, strip3x };
+  }
+
+  /** Özel strip görselini Apple boyutlarına sığdır */
+  async buildCustomStripAssets(
+    stripUrl: string | null | undefined,
+  ): Promise<{ strip: Buffer; strip2x: Buffer; strip3x: Buffer } | null> {
+    const buf = await this.loadImageBuffer(stripUrl);
+    if (!buf) return null;
+    try {
+      const strip2x = await sharp(buf)
+        .resize(STRIP_W, STRIP_H, {
+          fit: 'cover',
+          position: 'centre',
+        })
+        .png()
+        .toBuffer();
+      const strip = await sharp(strip2x)
+        .resize(Math.floor(STRIP_W / 2), Math.floor(STRIP_H / 2))
+        .png()
+        .toBuffer();
+      const strip3x = await sharp(strip2x)
+        .resize(STRIP_3X_W, STRIP_3X_H, { fit: 'cover', position: 'centre' })
+        .png()
+        .toBuffer();
+      return { strip, strip2x, strip3x };
+    } catch (err) {
+      this.logger.warn(`Özel strip işlenemedi: ${(err as Error).message}`);
+      return null;
+    }
+  }
+
+  /** storeCard background @1x/@2x/@3x */
+  async buildBackgroundAssets(
+    backgroundUrl: string | null | undefined,
+  ): Promise<{ background: Buffer; background2x: Buffer; background3x: Buffer } | null> {
+    const buf = await this.loadImageBuffer(backgroundUrl);
+    if (!buf) return null;
+    try {
+      const background3x = await sharp(buf)
+        .resize(BG_3X_W, BG_3X_H, { fit: 'cover', position: 'centre' })
+        .png()
+        .toBuffer();
+      const background2x = await sharp(background3x)
+        .resize(BG_2X_W, BG_2X_H)
+        .png()
+        .toBuffer();
+      const background = await sharp(background3x)
+        .resize(BG_1X_W, BG_1X_H)
+        .png()
+        .toBuffer();
+      return { background, background2x, background3x };
+    } catch (err) {
+      this.logger.warn(`Arka plan işlenemedi: ${(err as Error).message}`);
+      return null;
+    }
+  }
+
   async buildStampStrip(input: StampArtInput): Promise<{
     strip: Buffer;
     strip2x: Buffer;
+    strip3x: Buffer;
   }> {
+    if (input.customStripUrl?.trim()) {
+      const custom = await this.buildCustomStripAssets(input.customStripUrl);
+      if (custom) return custom;
+    }
+
     const theme = this.normalizeTheme(input.theme);
-    const total = Math.max(1, Math.min(input.stampsRequired || 1, 16));
-    const filled = Math.max(0, Math.min(input.stampCount || 0, total));
+    const slotFilled = input.slotFilled?.length
+      ? input.slotFilled.slice(0, MAX_WALLET_STAMP_SLOTS)
+      : null;
+    const total = slotFilled
+      ? slotFilled.length
+      : Math.max(
+          1,
+          Math.min(input.stampsRequired || 1, MAX_WALLET_STAMP_SLOTS),
+        );
+    const filled = slotFilled
+      ? slotFilled.filter(Boolean).length
+      : Math.max(0, Math.min(input.stampCount || 0, total));
     const fg = input.foregroundColor || '#FFFFFF';
     const bg = input.backgroundColor || '#1B4332';
     const inset = normalizeStampInset(input.inset);
     const { cols, rows } = computeStampGrid(total);
     const positions = this.stampPositions(total, cols, rows, inset);
 
-    if (theme === 'CUSTOM') {
-      const customFilled = await this.loadRemotePng(
-        input.stampIconFilledUrl,
-        128,
-      );
-      const customEmpty = await this.loadRemotePng(
-        input.stampIconEmptyUrl,
-        128,
-      );
-      if (customFilled || customEmpty) {
-        const layers: sharp.OverlayOptions[] = [];
-        for (let i = 0; i < total; i++) {
-          const isFilled = i < filled;
-          const { x, y, iconSize } = positions[i]!;
-          let icon = isFilled
-            ? customFilled || customEmpty!
-            : customEmpty || customFilled!;
-          icon = await sharp(icon)
-            .resize(iconSize, iconSize, {
-              fit: 'contain',
-              background: { r: 0, g: 0, b: 0, alpha: 0 },
-            })
-            .png()
-            .toBuffer();
-          if (!isFilled && !customEmpty && customFilled) {
-            icon = await this.withOpacity(icon, 0.35);
-          }
-          layers.push({ input: icon, left: x, top: y });
-        }
-        const strip2x = await sharp({
-          create: {
-            width: STRIP_W,
-            height: STRIP_H,
-            channels: 4,
-            background: this.hexToRgba(bg),
-          },
-        })
-          .composite(layers)
-          .png()
-          .toBuffer();
-        const strip = await sharp(strip2x)
-          .resize(Math.floor(STRIP_W / 2), Math.floor(STRIP_H / 2))
-          .png()
-          .toBuffer();
-        return { strip, strip2x };
-      }
-    }
+    const perSlotStyles = input.slotStyles?.length
+      ? input.slotStyles.slice(0, total)
+      : undefined;
 
-    const drawTheme = theme === 'CUSTOM' ? 'COFFEE' : theme;
-    const icons: string[] = [];
-    for (let i = 0; i < total; i++) {
-      const isFilled = i < filled;
-      const { x, y, iconSize } = positions[i]!;
-      const scale = iconSize / 64;
-      icons.push(
-        `<g transform="translate(${x} ${y}) scale(${scale})">${this.iconSvg(drawTheme, isFilled, fg)}</g>`,
-      );
-    }
-    const svg = `<svg width="${STRIP_W}" height="${STRIP_H}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100%" height="100%" fill="${bg}"/>
-      ${icons.join('\n')}
-    </svg>`;
-    const strip2x = await sharp(Buffer.from(svg)).png().toBuffer();
-    const strip = await sharp(strip2x)
-      .resize(Math.floor(STRIP_W / 2), Math.floor(STRIP_H / 2))
-      .png()
-      .toBuffer();
-    return { strip, strip2x };
+    return this.buildStripComposite(
+      total,
+      positions,
+      slotFilled,
+      filled,
+      fg,
+      bg,
+      theme,
+      theme === 'CUSTOM' ? input.stampIconFilledUrl : null,
+      theme === 'CUSTOM' ? input.stampIconEmptyUrl : null,
+      perSlotStyles,
+    );
   }
 
   /**
@@ -447,26 +601,61 @@ export class PassArtService {
   ): Promise<Buffer | null> {
     if (!url) return null;
     try {
+      const { promises: fs } = await import('fs');
+      const { join } = await import('path');
+
+      const tryLocalKey = async (key: string): Promise<Buffer | null> => {
+        if (!key || key.includes('..')) return null;
+        const local = join(
+          process.cwd(),
+          'uploads',
+          ...key.split('/').filter(Boolean),
+        );
+        try {
+          return await fs.readFile(local);
+        } catch {
+          return null;
+        }
+      };
+
+      const mediaIdx = url.indexOf('/media/');
+      if (mediaIdx >= 0) {
+        const key = url.slice(mediaIdx + '/media/'.length).split('?')[0]!;
+        const local = await tryLocalKey(key);
+        if (local) return local;
+      }
+
       const uploadsIdx = url.indexOf('/uploads/');
       if (uploadsIdx >= 0) {
         const rel = url.slice(uploadsIdx + '/uploads/'.length).split('?')[0]!;
-        if (rel && !rel.includes('..')) {
-          const { promises: fs } = await import('fs');
-          const { join } = await import('path');
-          const local = join(
-            process.cwd(),
-            'uploads',
-            ...rel.split('/').filter(Boolean),
-          );
-          try {
-            return await fs.readFile(local);
-          } catch {
-            /* fall through */
+        const local = await tryLocalKey(rel);
+        if (local) return local;
+      }
+
+      let fetchUrl = url;
+      try {
+        const u = new URL(url);
+        if (u.hostname.endsWith('.r2.cloudflarestorage.com')) {
+          let key = u.pathname.replace(/^\//, '');
+          if (!key.startsWith('tenants/')) {
+            const parts = key.split('/');
+            if (parts.length >= 2 && parts[1] === 'tenants') {
+              key = parts.slice(1).join('/');
+            }
+          }
+          if (key.startsWith('tenants/')) {
+            const api =
+              process.env.API_URL?.replace(/\/$/, '') ||
+              process.env.APPLE_WEB_SERVICE_URL?.replace(/\/$/, '');
+            if (api) fetchUrl = `${api}/media/${key}`;
           }
         }
+      } catch {
+        /* keep url */
       }
-      if (!/^https?:\/\//i.test(url)) return null;
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+
+      if (!/^https?:\/\//i.test(fetchUrl)) return null;
+      const res = await fetch(fetchUrl, { signal: AbortSignal.timeout(8000) });
       if (!res.ok) return null;
       return Buffer.from(await res.arrayBuffer());
     } catch (err) {

@@ -1,0 +1,647 @@
+"use client";
+
+import { FormEvent, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  ErrorBanner,
+  Field,
+  FormSkeleton,
+  Panel,
+  PanelHeader,
+  SoftBox,
+  SuccessBanner,
+  btnGhost,
+  btnPrimary,
+  inputClassName,
+} from "../../components/ui";
+import { ApiError, api } from "../../lib/api";
+import { useApiQuery } from "../../lib/use-api-query";
+import { SettingsSectionHeader } from "../../app/settings/_components/settings-section-header";
+import { TableTentPanel } from "./table-tent-panel";
+
+type InvitePolicy = { title: string; body: string };
+
+type TenantProfile = {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  logoText: string | null;
+  primaryColor: string | null;
+  foregroundColor: string | null;
+  passPhone: string | null;
+  passHours: string | null;
+  passLocations: string | null;
+  passWebsiteUrl: string | null;
+  passDescription: string | null;
+  passPhoneLabel: string | null;
+  passHoursLabel: string | null;
+  passLocationsLabel: string | null;
+  passWebsiteLabel: string | null;
+  passDescriptionLabel: string | null;
+  collectCustomerName: boolean;
+  collectCustomerBirthday: boolean;
+  birthdayGiftEnabled: boolean;
+  birthdayMessage: string | null;
+  inviteHeadline: string | null;
+  inviteSubtitle: string | null;
+  inviteCtaHint: string | null;
+  inviteBgColor: string | null;
+  inviteCardColor: string | null;
+  inviteStatusText: string | null;
+  inviteAppleBtnLabel: string | null;
+  inviteGoogleBtnLabel: string | null;
+  inviteFormTitle: string | null;
+  inviteLegalText: string | null;
+  invitePolicies: InvitePolicy[] | null;
+  rewardRule?: { stampsRequired: number; rewardLabel: string } | null;
+};
+
+const DEFAULT_LEGAL =
+  "KVKK: Bu sayfa sadakat kartı ekleme davetidir. Girdiğiniz bilgiler yalnızca bu kafe sadakat programı içindir.\nDamga sonrası Wallet güncellemesi için kartı buradan eklemiş olmanız gerekir.";
+
+function parsePolicies(raw: unknown): InvitePolicy[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((p) => ({
+      title: String((p as InvitePolicy)?.title ?? "").trim(),
+      body: String((p as InvitePolicy)?.body ?? "").trim(),
+    }))
+    .filter((p) => p.title && p.body)
+    .slice(0, 8);
+}
+
+
+
+type BusinessSection = "invite" | "biz" | "bday" | "qr";
+
+export function BusinessSettingsPanel() {
+  const searchParams = useSearchParams();
+  const sectionParam = searchParams.get("section");
+  const { data, error: loadError, loading, reload } = useApiQuery<TenantProfile>(
+    "settings:me",
+    "/tenants/me",
+  );
+
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [hours, setHours] = useState("");
+  const [locations, setLocations] = useState("");
+  const [website, setWebsite] = useState("");
+  const [about, setAbout] = useState("");
+  const [collectName, setCollectName] = useState(false);
+  const [collectBirthday, setCollectBirthday] = useState(false);
+  const [birthdayGift, setBirthdayGift] = useState(false);
+  const [birthdayMessage, setBirthdayMessage] = useState(
+    "İyi ki doğdun {name}! Bugün hediye kahven bizden.",
+  );
+  const [inviteHeadline, setInviteHeadline] = useState("");
+  const [inviteSubtitle, setInviteSubtitle] = useState("");
+  const [inviteCtaHint, setInviteCtaHint] = useState("");
+  const [inviteBgColor, setInviteBgColor] = useState("");
+  const [inviteCardColor, setInviteCardColor] = useState("");
+  const [inviteStatusText, setInviteStatusText] = useState("");
+  const [inviteAppleBtn, setInviteAppleBtn] = useState("");
+  const [inviteGoogleBtn, setInviteGoogleBtn] = useState("");
+  const [inviteFormTitle, setInviteFormTitle] = useState("");
+  const [inviteLegalText, setInviteLegalText] = useState("");
+  const [policies, setPolicies] = useState<InvitePolicy[]>([]);
+  const [policyDraft, setPolicyDraft] = useState<InvitePolicy | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [section, setSection] = useState<BusinessSection>("biz");
+
+  useEffect(() => {
+    if (sectionParam === "qr") setSection("qr");
+    else if (sectionParam === "biz") setSection("biz");
+    else if (sectionParam === "bday") setSection("bday");
+    else if (sectionParam === "invite") setSection("invite");
+  }, [sectionParam]);
+
+  useEffect(() => {
+    if (!data) return;
+    setName(data.name ?? "");
+    setPhone(data.passPhone ?? "");
+    setHours(data.passHours ?? "");
+    setLocations(data.passLocations ?? "");
+    setWebsite(data.passWebsiteUrl ?? "");
+    setAbout(data.passDescription ?? "");
+    setCollectName(data.collectCustomerName ?? false);
+    setCollectBirthday(data.collectCustomerBirthday ?? false);
+    setBirthdayGift(data.birthdayGiftEnabled ?? false);
+    setBirthdayMessage(
+      data.birthdayMessage ??
+        "İyi ki doğdun {name}! Bugün hediye kahven bizden.",
+    );
+    setInviteHeadline(data.inviteHeadline ?? "");
+    setInviteSubtitle(data.inviteSubtitle ?? "");
+    setInviteCtaHint(data.inviteCtaHint ?? "");
+    setInviteBgColor(data.inviteBgColor ?? "");
+    setInviteCardColor(data.inviteCardColor ?? "");
+    setInviteStatusText(data.inviteStatusText ?? "");
+    setInviteAppleBtn(data.inviteAppleBtnLabel ?? "");
+    setInviteGoogleBtn(data.inviteGoogleBtnLabel ?? "");
+    setInviteFormTitle(data.inviteFormTitle ?? "");
+    setInviteLegalText(data.inviteLegalText ?? "");
+    setPolicies(parsePolicies(data.invitePolicies));
+  }, [data]);
+
+  const brandColor = data?.primaryColor || "#1B4332";
+  const fg = data?.foregroundColor || "#FFFFFF";
+  const pageBg = inviteBgColor.trim() || "#0f1412";
+  const cardBg = inviteCardColor.trim() || brandColor;
+  const stampsReq = data?.rewardRule?.stampsRequired ?? 10;
+  const rewardLabel = data?.rewardRule?.rewardLabel || "Ödül";
+
+  const display = useMemo(
+    () => ({
+      title: inviteHeadline.trim() || data?.logoText || name || "Kafe adı",
+      sub:
+        inviteSubtitle.trim() || `Dijital damga kartı · ${rewardLabel}`,
+      status:
+        inviteStatusText.trim() || "Damgalarını tamamla, ödülünü kap.",
+      cta:
+        inviteCtaHint.trim() ||
+        "Kartını Wallet’a ekle — uygulama indirmene gerek yok.",
+      apple: inviteAppleBtn.trim() || "Apple Wallet’a Ekle",
+      google: inviteGoogleBtn.trim() || "Google Wallet’a Ekle",
+      formTitle: inviteFormTitle.trim() || "Kartını eklemeden önce",
+      legal: inviteLegalText.trim() || DEFAULT_LEGAL,
+    }),
+    [
+      inviteHeadline,
+      inviteSubtitle,
+      inviteStatusText,
+      inviteCtaHint,
+      inviteAppleBtn,
+      inviteGoogleBtn,
+      inviteFormTitle,
+      inviteLegalText,
+      data?.logoText,
+      name,
+      rewardLabel,
+    ],
+  );
+
+  async function save(e?: FormEvent) {
+    e?.preventDefault();
+    setSaving(true);
+    setError(null);
+    setOk(null);
+    try {
+      await api("/tenants/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: name.trim(),
+          passPhone: phone.trim() || null,
+          passHours: hours.trim() || null,
+          passLocations: locations.trim() || null,
+          passWebsiteUrl: website.trim() || null,
+          passDescription: about.trim() || null,
+          passPhoneLabel: data?.passPhoneLabel || "Telefon",
+          passHoursLabel: data?.passHoursLabel || "Çalışma saatleri",
+          passLocationsLabel: data?.passLocationsLabel || "Adres",
+          passWebsiteLabel: data?.passWebsiteLabel || "Web",
+          passDescriptionLabel: data?.passDescriptionLabel || "Hakkında",
+          collectCustomerName: collectName,
+          collectCustomerBirthday: collectBirthday,
+          birthdayGiftEnabled: birthdayGift && collectBirthday,
+          birthdayMessage: birthdayMessage.trim() || null,
+          inviteHeadline: inviteHeadline.trim() || null,
+          inviteSubtitle: inviteSubtitle.trim() || null,
+          inviteCtaHint: inviteCtaHint.trim() || null,
+          inviteBgColor: inviteBgColor.trim() || null,
+          inviteCardColor: inviteCardColor.trim() || null,
+          inviteStatusText: inviteStatusText.trim() || null,
+          inviteAppleBtnLabel: inviteAppleBtn.trim() || null,
+          inviteGoogleBtnLabel: inviteGoogleBtn.trim() || null,
+          inviteFormTitle: inviteFormTitle.trim() || null,
+          inviteLegalText: inviteLegalText.trim() || null,
+          invitePolicies: policies,
+        }),
+      });
+      setOk("Kaydedildi");
+      await reload(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Kayıt başarısız");
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveInviteFields() {
+    await api("/tenants/me", {
+      method: "PATCH",
+      body: JSON.stringify({
+        collectCustomerName: collectName,
+        collectCustomerBirthday: collectBirthday,
+        birthdayGiftEnabled: birthdayGift && collectBirthday,
+        birthdayMessage: birthdayMessage.trim() || null,
+        inviteHeadline: inviteHeadline.trim() || null,
+        inviteSubtitle: inviteSubtitle.trim() || null,
+        inviteCtaHint: inviteCtaHint.trim() || null,
+        inviteBgColor: inviteBgColor.trim() || null,
+        inviteCardColor: inviteCardColor.trim() || null,
+        inviteStatusText: inviteStatusText.trim() || null,
+        inviteAppleBtnLabel: inviteAppleBtn.trim() || null,
+        inviteGoogleBtnLabel: inviteGoogleBtn.trim() || null,
+        inviteFormTitle: inviteFormTitle.trim() || null,
+        inviteLegalText: inviteLegalText.trim() || null,
+        invitePolicies: policies,
+      }),
+    });
+  }
+
+  async function openRealPreview() {
+    setPreviewBusy(true);
+    setError(null);
+
+    // Popup engelini aşmak için sekme kullanıcı tıklamasında hemen açılmalı
+    const tab = window.open("about:blank", "_blank");
+
+    try {
+      await saveInviteFields();
+      const res = await api<{ url: string }>(
+        "/tenants/me/invite-preview-link",
+        { method: "POST" },
+      );
+      setOk("Önizleme açıldı");
+      if (tab && !tab.closed) {
+        tab.location.href = res.url;
+      } else {
+        const opened = window.open(res.url, "_blank", "noopener,noreferrer");
+        if (!opened) {
+          setError(
+            "Tarayıcı pop-up engelledi — bu site için pop-up’a izin verip tekrar dene.",
+          );
+        }
+      }
+    } catch (err) {
+      if (tab && !tab.closed) tab.close();
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Önizleme açılamadı — kaydı kontrol edip tekrar dene",
+      );
+    } finally {
+      setPreviewBusy(false);
+    }
+  }
+
+  function addOrUpdatePolicy() {
+    if (!policyDraft) return;
+    const title = policyDraft.title.trim();
+    const body = policyDraft.body.trim();
+    if (!title || !body) return;
+    const idx = policies.findIndex(
+      (p) => p.title.toLowerCase() === title.toLowerCase(),
+    );
+    if (idx >= 0) {
+      const next = [...policies];
+      next[idx] = { title, body };
+      setPolicies(next);
+    } else if (policies.length < 8) {
+      setPolicies([...policies, { title, body }]);
+    }
+    setPolicyDraft(null);
+  }
+
+  if (loading && !data) {
+    return <FormSkeleton rows={5} />;
+  }
+
+  return (
+    <div className="space-y-5">
+      <SettingsSectionHeader
+        title="Kayıt sayfası"
+        subtitle="Müşterilerin kart eklerken gördüğü sayfayı düzenleyin; masa QR kartını indirin."
+        help="Davet sayfası metinleri, iletişim bilgileri ve yazdırılacak QR kartı burada. Wallet kart renkleri için Ayarlar → Marka veya Wallet kartı bölümünü kullanın."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={btnGhost()}
+              disabled={previewBusy || saving}
+              onClick={() => void openRealPreview()}
+            >
+              {previewBusy ? "Açılıyor…" : "Gerçek önizlemeyi aç"}
+            </button>
+            <button
+              type="button"
+              className={btnPrimary()}
+              disabled={saving}
+              onClick={() => void save()}
+            >
+              {saving ? "Kaydediliyor…" : "Kaydet"}
+            </button>
+          </div>
+        }
+      />
+      <ErrorBanner message={error || loadError} />
+      <SuccessBanner message={ok} />
+
+      <SoftBox>
+        <p className="text-sm text-[var(--muted)]">
+          Slug:{" "}
+          <span className="font-medium text-[var(--ink)]">/{data?.slug}</span>
+          {" · "}
+          Logo &amp; kart renkleri{" "}
+          <a
+            href="/settings/brand"
+            className="text-[var(--accent)] underline"
+          >
+            Ayarlar → Marka
+          </a>
+          . Davet kart rengi buradan override edilebilir.
+        </p>
+      </SoftBox>
+
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            ["invite", "Davet sayfası"],
+            ["biz", "İletişim"],
+            ["bday", "Doğum günü"],
+            ["qr", "Masa QR"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setSection(id)}
+            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+              section === id
+                ? "bg-[var(--accent)] text-white"
+                : "border border-[var(--line)] bg-[var(--panel)] text-[var(--muted)] hover:bg-[var(--surface)]"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {section === "invite" ? (
+        <Panel>
+          <PanelHeader
+            title="Müşteri davet sayfası"
+            description="Davet sayfasını tam ekran editörde blok blok tasarlayın; önizleme canlı güncellenir."
+          />
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Link
+              href="/settings/invite-design"
+              className="inline-flex h-10 items-center rounded-lg bg-[var(--accent)] px-5 text-sm font-semibold text-white hover:bg-[var(--accent-deep)]"
+            >
+              Davet sayfası editörünü aç
+            </Link>
+            <p className="text-xs text-[var(--muted)]">
+              Müşteri bilgileri ve politikalar burada; görünüm editörde.
+            </p>
+          </div>
+        </Panel>
+      ) : null}
+
+      {section === "biz" ? (
+        <Panel>
+          <PanelHeader title="İletişim & işletme bilgileri" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Kafe adı">
+              <input
+                className={inputClassName()}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                minLength={2}
+              />
+            </Field>
+            <Field label="Telefon">
+              <input
+                className={inputClassName()}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </Field>
+            <Field label="Web sitesi">
+              <input
+                className={inputClassName()}
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+              />
+            </Field>
+            <Field label="Adres / şubeler">
+              <textarea
+                className={inputClassName() + " min-h-24"}
+                value={locations}
+                onChange={(e) => setLocations(e.target.value)}
+              />
+            </Field>
+            <Field label="Çalışma saatleri">
+              <textarea
+                className={inputClassName() + " min-h-20"}
+                value={hours}
+                onChange={(e) => setHours(e.target.value)}
+              />
+            </Field>
+            <Field label="Hakkında">
+              <textarea
+                className={inputClassName() + " min-h-28"}
+                value={about}
+                onChange={(e) => setAbout(e.target.value)}
+              />
+            </Field>
+          </div>
+        </Panel>
+      ) : null}
+
+      {section === "bday" ? (
+        <Panel>
+          <PanelHeader
+            title="Doğum günü sürprizi"
+            description="Wallet push — SMS değil. Önce davet sekmesinden doğum günü toplamayı aç."
+          />
+          <div className="space-y-4">
+            <label
+              className={`flex items-start gap-3 ${collectBirthday ? "cursor-pointer" : "opacity-50"}`}
+            >
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={birthdayGift}
+                disabled={!collectBirthday}
+                onChange={(e) => setBirthdayGift(e.target.checked)}
+              />
+              <span className="font-medium text-[var(--ink)]">
+                Otomatik doğum günü bildirimi (09:05 TR)
+              </span>
+            </label>
+            {collectBirthday && birthdayGift ? (
+              <Field label="Bildirim metni">
+                <input
+                  className={inputClassName()}
+                  value={birthdayMessage}
+                  onChange={(e) => setBirthdayMessage(e.target.value)}
+                  maxLength={120}
+                />
+              </Field>
+            ) : null}
+            {!collectBirthday ? (
+              <p className="text-sm text-[var(--muted)]">
+                Doğum günü alanı kapalı. Davet sekmesinden aç.
+              </p>
+            ) : null}
+          </div>
+        </Panel>
+      ) : null}
+
+      {section === "qr" ? <TableTentPanel /> : null}
+    </div>
+  );
+}
+
+function EditableLine({
+  value,
+  display,
+  onChange,
+  className,
+  placeholder,
+}: {
+  value: string;
+  display: string;
+  onChange: (v: string) => void;
+  className?: string;
+  placeholder?: string;
+}) {
+  return (
+    <input
+      className={`w-full border-0 bg-transparent p-0 ${className ?? ""}`}
+      value={value || display}
+      placeholder={placeholder}
+      onFocus={() => {
+        if (!value) onChange(display);
+      }}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={() => {
+        if (value.trim() === display.trim() || !value.trim()) onChange("");
+      }}
+    />
+  );
+}
+
+function EditableArea({
+  value,
+  display,
+  onChange,
+  className,
+  placeholder,
+}: {
+  value: string;
+  display: string;
+  onChange: (v: string) => void;
+  className?: string;
+  placeholder?: string;
+}) {
+  return (
+    <textarea
+      className={`w-full resize-y border-0 bg-transparent p-0 ${className ?? ""}`}
+      rows={3}
+      value={value || display}
+      placeholder={placeholder}
+      onFocus={() => {
+        if (!value) onChange(display);
+      }}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={() => {
+        if (value.trim() === display.trim() || !value.trim()) onChange("");
+      }}
+    />
+  );
+}
+
+type LiveDraft = {
+  inviteHeadline: string;
+  inviteSubtitle: string;
+  inviteCtaHint: string;
+  inviteStatusText: string;
+  inviteAppleBtnLabel: string;
+  inviteGoogleBtnLabel: string;
+  inviteFormTitle: string;
+  inviteLegalText: string;
+  inviteBgColor: string;
+  inviteCardColor: string;
+};
+
+const DEVICES = [
+  { key: "mobile", label: "Telefon", width: 375 },
+  { key: "tablet", label: "Tablet", width: 768 },
+  { key: "desktop", label: "Masaüstü", width: 0 },
+] as const;
+
+/** Taslağı sunucuda gerçek davet sayfası olarak render eder; kaydetmez */
+function LiveInvitePreview({ draft }: { draft: LiveDraft }) {
+  const [device, setDevice] = useState<(typeof DEVICES)[number]["key"]>("mobile");
+  const [html, setHtml] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const seq = useRef(0);
+
+  const key = JSON.stringify(draft);
+  useEffect(() => {
+    const id = ++seq.current;
+    const timer = window.setTimeout(() => {
+      setBusy(true);
+      api<{ html: string }>("/tenants/me/invite-draft-preview", {
+        method: "POST",
+        body: key,
+      })
+        .then((res) => {
+          if (id === seq.current) {
+            setHtml(res.html);
+            setError(null);
+          }
+        })
+        .catch((err) => {
+          if (id === seq.current) setError(err instanceof ApiError ? err.message : "Önizleme yüklenemedi");
+        })
+        .finally(() => {
+          if (id === seq.current) setBusy(false);
+        });
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [key]);
+
+  const width = DEVICES.find((d) => d.key === device)?.width ?? 0;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-1 rounded-full border border-[var(--line)] bg-[var(--surface)] p-1">
+          {DEVICES.map((d) => (
+            <button
+              key={d.key}
+              type="button"
+              onClick={() => setDevice(d.key)}
+              className={`h-7 rounded-full px-3 text-xs font-medium transition ${
+                device === d.key ? "bg-[var(--accent)] text-white" : "text-[var(--muted)] hover:text-[var(--ink)]"
+              }`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+        <span className="text-[11px] text-[var(--muted)]">{busy ? "Güncelleniyor…" : "Canlı"}</span>
+      </div>
+      {error ? <p className="text-xs text-[var(--accent)]">{error}</p> : null}
+      <div className="flex justify-center overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--background)] p-2">
+        <iframe
+          title="Davet sayfası önizlemesi"
+          srcDoc={html ?? "<p style='font-family:sans-serif;color:#999;padding:24px'>Yükleniyor…</p>"}
+          style={{ width: width ? `${width}px` : "100%", maxWidth: "100%", height: 640, border: 0, borderRadius: 16 }}
+          sandbox="allow-scripts allow-same-origin"
+        />
+      </div>
+    </div>
+  );
+}

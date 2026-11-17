@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
-import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { AuroraField } from "@/components/marketing/AuroraField";
 
 export function PageShell({
   title,
@@ -9,80 +7,66 @@ export function PageShell({
   children,
   narrow = false,
   wide = false,
-  heroImage,
-  heroAlt = "",
+  eyebrow = "StampWell",
+  align = "left",
+  flush = false,
 }: {
   title: string;
   intro?: string;
   children: ReactNode;
   narrow?: boolean;
   wide?: boolean;
-  heroImage?: string;
-  heroAlt?: string;
+  eyebrow?: string;
+  align?: "left" | "center";
+  /** Skip outer content padding — for full-bleed scroll sections */
+  flush?: boolean;
 }) {
+  const containerWidth = wide || !narrow ? "max-w-7xl" : "max-w-2xl";
+
   return (
-    <main className="page-enter relative">
-      {heroImage ? (
-        <div className="relative h-[46vh] min-h-[280px] max-h-[460px] overflow-hidden bg-[var(--bg-deep)]">
-          <AuroraField className="opacity-50" />
-          <Image
-            src={heroImage}
-            alt={heroAlt}
-            fill
-            priority
-            className="object-cover opacity-45 mix-blend-luminosity"
-            sizes="100vw"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)] via-[var(--bg)]/50 to-transparent" />
-          <div
+    <main className="page-enter">
+      <header className="border-b border-foreground/[0.08] pb-8 pt-8 sm:pb-14 sm:pt-14">
+        <div
+          className={cn(
+            "mx-auto px-5 sm:px-8",
+            containerWidth,
+            align === "center" && "text-center",
+          )}
+        >
+          <span className="attio-eyebrow">{eyebrow}</span>
+          <h1
             className={cn(
-              "absolute inset-x-0 bottom-0 mx-auto px-5 pb-10 sm:px-8",
-              wide || !narrow ? "max-w-7xl" : "max-w-2xl",
+              "mt-5 font-display text-[clamp(1.85rem,6vw,4rem)] leading-[1.04] tracking-tight text-foreground sm:mt-6",
+              align === "center" && "mx-auto max-w-3xl",
             )}
           >
-            <p className="section-label mb-4">Dokun &amp; Kazan</p>
-            <h1 className="font-display text-[clamp(2.6rem,6vw,4.6rem)] font-light leading-[1.02] tracking-[-0.04em] text-white">
-              {title}
-            </h1>
-            <span className="mt-6 block h-px w-16 bg-gradient-to-r from-[var(--brass)] to-transparent" />
-            {intro ? (
-              <p className="mt-5 max-w-2xl text-[1.05rem] font-light leading-relaxed text-[var(--muted)]">
-                {intro}
-              </p>
-            ) : null}
-          </div>
+            {title}
+          </h1>
+          {intro ? (
+            <p
+              className={cn(
+                "mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:mt-4 sm:text-base sm:text-[1.05rem]",
+                align === "center" && "mx-auto",
+              )}
+            >
+              {intro}
+            </p>
+          ) : null}
         </div>
+      </header>
+
+      {flush ? (
+        children
       ) : (
         <div
           className={cn(
-            "relative mx-auto px-5 pt-32 sm:px-8 sm:pt-36",
-            wide ? "max-w-7xl" : narrow ? "max-w-2xl" : "max-w-4xl",
+            "mx-auto px-5 py-10 sm:px-8 sm:py-16",
+            containerWidth,
           )}
         >
-          <AuroraField className="opacity-25" />
-          <header className="relative max-w-2xl">
-            <p className="section-label mb-4">Dokun &amp; Kazan</p>
-            <h1 className="font-display text-[clamp(2.8rem,6vw,4.8rem)] font-light leading-[1.02] tracking-[-0.04em] text-white">
-              {title}
-            </h1>
-            <span className="mt-6 block h-px w-16 bg-gradient-to-r from-[var(--brass)] to-transparent" />
-            {intro ? (
-              <p className="mt-6 text-[1.05rem] font-light leading-relaxed text-[var(--muted)]">
-                {intro}
-              </p>
-            ) : null}
-          </header>
+          {children}
         </div>
       )}
-      <div
-        className={cn(
-          "relative mx-auto px-5 pb-24 sm:px-8",
-          heroImage ? "pt-12 sm:pt-16" : "mt-14 sm:mt-16",
-          wide ? "max-w-7xl" : narrow ? "max-w-2xl" : "max-w-4xl",
-        )}
-      >
-        {children}
-      </div>
     </main>
   );
 }

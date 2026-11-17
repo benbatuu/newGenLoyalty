@@ -1,22 +1,27 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
-  PageHeader,
+  ErrorBanner,
   Panel,
   PanelHeader,
-  RequireAuth,
   SoftBox,
+  SuccessBanner,
   btnGhost,
   btnPrimary,
+  inputClassName,
 } from "../../components/ui";
+import { ApiError, api } from "../../lib/api";
+import { SettingsSectionHeader } from "../settings/_components/settings-section-header";
 
 const STEPS = [
   {
     title: "1 · Davet sayfasını ayarla",
     body: "Kafe adı, iletişim, davet metinleri, form alanları ve KVKK politikalarını düzenle.",
-    href: "/business",
-    cta: "Davet sayfası",
+    href: "/settings/business",
+    cta: "Kayıt sayfası",
   },
   {
     title: "2 · Ödül kuralını ayarla",
@@ -27,14 +32,14 @@ const STEPS = [
   {
     title: "3 · Kartı tasarla",
     body: "Logo, renk, damga ikonu ve ön yüz alanlarını seç. Canlı önizleme ile kontrol et.",
-    href: "/settings",
-    cta: "Kart tasarımı",
+    href: "/settings/card",
+    cta: "Wallet kartı",
   },
   {
     title: "4 · Kasiyer ekle",
     body: "Personeline e-posta ve geçici şifre ver. Tezgâh ekranından damga basabilirler.",
-    href: "/staff",
-    cta: "Kasiyerler",
+    href: "/settings/staff",
+    cta: "Çalışanlar",
   },
   {
     title: "5 · Müşteri kaydet",
@@ -73,25 +78,116 @@ const FAQ = [
   },
 ] as const;
 
-export default function HelpPage() {
+const FEEDBACK_CATEGORIES = [
+  { value: "bug", label: "Hata / sorun" },
+  { value: "feature", label: "Özellik isteği" },
+  { value: "feedback", label: "Genel geri bildirim" },
+] as const;
+
+function OwnerFeedbackPanel() {
+  const [category, setCategory] = useState("feedback");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setSending(true);
+    setError(null);
+    setOk(null);
+    try {
+      await api("/tenants/me/feedback", {
+        method: "POST",
+        body: JSON.stringify({ category, message }),
+      });
+      setOk("Geri bildirimin alındı — teşekkürler.");
+      setMessage("");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Gönderilemedi");
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
-    <RequireAuth roles={["STORE_OWNER"]}>
-      <div className="w-full space-y-6">
-        <PageHeader
-          eyebrow="Destek"
-          title="Yardım"
-          subtitle="Sistemi 6 adımda ayağa kaldır. Takıldığın yerde SSS’e bak."
-          actions={
-            <Link href="/counter" className={btnPrimary()}>
-              Tezgâha git
-            </Link>
-          }
-        />
+    <Panel>
+      <PanelHeader
+        title="Geri bildirim gönder"
+        description="Pilot sırasında gördüğün sorunları veya önerilerini doğrudan ilet."
+      />
+      <ErrorBanner message={error} />
+      <SuccessBanner message={ok} />
+      <form onSubmit={(e) => void submit(e)} className="mt-4 space-y-4">
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">
+            Kategori
+          </span>
+          <select
+            className={inputClassName()}
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            {FEEDBACK_CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">
+            Mesaj
+          </span>
+          <textarea
+            className={inputClassName() + " min-h-28"}
+            rows={4}
+            required
+            minLength={3}
+            maxLength={2000}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Ne yaşadın veya neyi geliştirmek istersin?"
+          />
+        </label>
+        <button type="submit" className={btnPrimary()} disabled={sending}>
+          {sending ? "Gönderiliyor…" : "Gönder"}
+        </button>
+      </form>
+    </Panel>
+  );
+}
+
+export default function HelpPage() {
+  return <HelpRedirect />;
+}
+
+function HelpRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/settings/help");
+  }, [router]);
+  return null;
+}
+
+export function HelpSettingsPanel() {
+  return (
+    <div className="space-y-6">
+      <SettingsSectionHeader
+        title="Yardım & SSS"
+        subtitle="İlk kurulum adımları, sık sorulan sorular ve geri bildirim."
+        help="Müşterileriniz ayrı bir uygulama indirmek zorunda değil — kart telefon cüzdanına eklenir."
+        actions={
+          <Link href="/counter" className={btnPrimary()}>
+            Kasaya git
+          </Link>
+        }
+      />
 
         <SoftBox>
           <p className="text-sm leading-relaxed text-[var(--muted)]">
-            Dokun &amp; Kazan, kafeler için Wallet tabanlı damga kartıdır. Müşteriye
-            app indirtmezsiniz; personel tezgâhtan damga basar, kart telefonda
+            Dokun &amp; Kazan ile müşterileriniz telefona sadakat kartı ekler.
+            Ayrı uygulama gerekmez; siz kasadan damga verirsiniz, kart anında
             güncellenir.
           </p>
         </SoftBox>
@@ -129,6 +225,8 @@ export default function HelpPage() {
           </dl>
         </Panel>
 
+        <OwnerFeedbackPanel />
+
         <SoftBox className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
@@ -138,11 +236,10 @@ export default function HelpPage() {
               destek@dokunkazan.com
             </p>
           </div>
-          <Link href="/billing" className={btnGhost()}>
+          <Link href="/settings/billing" className={btnGhost()}>
             Aboneliğime bak
           </Link>
         </SoftBox>
-      </div>
-    </RequireAuth>
+    </div>
   );
 }

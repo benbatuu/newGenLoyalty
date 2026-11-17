@@ -7,7 +7,10 @@ export function Card({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("panel-editorial overflow-hidden", className)}
+      className={cn(
+        "rounded-xl border border-border bg-card text-card-foreground shadow-sm transition-shadow hover:shadow-md",
+        className,
+      )}
       {...props}
     />
   );
@@ -27,7 +30,7 @@ export function CardTitle({
   return (
     <h3
       className={cn(
-        "font-display text-[1.45rem] font-medium tracking-[-0.02em] text-[var(--ink)] sm:text-[1.65rem]",
+        "font-display text-[1.45rem] tracking-tight text-card-foreground sm:text-[1.65rem]",
         className,
       )}
       {...props}
@@ -42,7 +45,7 @@ export function CardDescription({
   return (
     <p
       className={cn(
-        "mt-3 text-[0.95rem] font-light leading-[1.75] text-[var(--muted)]",
+        "mt-3 text-[0.95rem] leading-relaxed text-muted-foreground",
         className,
       )}
       {...props}

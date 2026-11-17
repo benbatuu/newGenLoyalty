@@ -10,6 +10,17 @@ export type AuthUser = {
   tenantId: string | null;
 };
 
+export type SubscriptionCookieStatus = "ACTIVE" | "SUSPENDED";
+
+export type SubscriptionSnapshot = {
+  status?: string;
+  needsReactivation?: boolean;
+  daysRemaining?: number;
+  trialExpired?: boolean;
+  trialEndsAt?: string | null;
+  accessEndsAt?: string | null;
+};
+
 type Tokens = {
   accessToken: string;
   refreshToken: string;
@@ -19,9 +30,13 @@ const ACCESS_KEY = "ngl_access";
 const REFRESH_KEY = "ngl_refresh";
 const USER_KEY = "ngl_user";
 const SESSION_EXPIRED_EVENT = "ngl:session-expired";
+/** session-data.ts ile aynı anahtar ve olay (döngüsel import olmasın diye burada sabit) */
+const SESSION_DATA_KEY = "ngl_session_data_v1";
+const TOKENS_REFRESHED_EVENT = "ngl:tokens-refreshed";
 
 /** Paralel 401'lerde refresh token rotation yarışını önler. */
 let refreshInFlight: Promise<string | null> | null = null;
+let sessionExpiredNotified = false;
 
 export function getStoredTokens(): Tokens | null {
   if (typeof window === "undefined") return null;
@@ -42,21 +57,83 @@ export function getStoredUser(): AuthUser | null {
   }
 }
 
-export function storeSession(tokens: Tokens, user: AuthUser) {
+export function subscriptionCookieStatus(
+  subscription?: SubscriptionSnapshot | null,
+): SubscriptionCookieStatus {
+  if (!subscription) return "ACTIVE";
+  if (subscription.needsReactivation) return "SUSPENDED";
+  // Deneme bitti: işletme ekranları kapalı, yalnız faturalandırma sayfası açık
+  if (subscription.trialExpired) return "SUSPENDED";
+  if (subscription.status === "SUSPENDED") return "SUSPENDED";
+  return "ACTIVE";
+}
+
+function writeSessionCookie(role: Role, subscription?: SubscriptionSnapshot | null) {
+  if (typeof document === "undefined") return;
+  const payload = {
+    role,
+    subscription: subscriptionCookieStatus(subscription),
+  };
+  document.cookie = `ngl_session=${encodeURIComponent(
+    JSON.stringify(payload),
+  )}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+}
+
+export function updateSessionSubscription(
+  subscription?: SubscriptionSnapshot | null,
+) {
+  const user = getStoredUser();
+  if (!user) return;
+  writeSessionCookie(user.role, subscription);
+}
+
+export function storeSession(
+  tokens: Tokens,
+  user: AuthUser,
+  subscription?: SubscriptionSnapshot | null,
+) {
+  // Başarılı girişte pasif işareti kalkar
+  clearAccountPassive();
+  sessionExpiredNotified = false;
   localStorage.setItem(ACCESS_KEY, tokens.accessToken);
   localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+  writeSessionCookie(user.role, subscription);
+}
+
+/** Pasif hesap: middleware bu çerez varken panel sayfalarını doğrudan /passive'e yönlendirir */
+export function markAccountPassive() {
+  if (typeof document === "undefined") return;
+  document.cookie = "ngl_passive=1; path=/; max-age=604800; SameSite=Lax";
+}
+
+export function clearAccountPassive() {
+  if (typeof document === "undefined") return;
+  document.cookie = "ngl_passive=; path=/; max-age=0";
 }
 
 export function clearSession() {
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(SESSION_DATA_KEY);
+  if (typeof document !== "undefined") {
+    document.cookie = "ngl_session=; path=/; max-age=0";
+  }
 }
 
 function notifySessionExpired() {
   if (typeof window === "undefined") return;
+  if (sessionExpiredNotified) return;
+  sessionExpiredNotified = true;
   window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+}
+
+/** Oturum bitti — login yönlendirmesi tetiklenir; UI overlay için işaretle. */
+function expireSession(): never {
+  clearSession();
+  notifySessionExpired();
+  throw new SessionExpiredError();
 }
 
 export function onSessionExpired(handler: () => void): () => void {
@@ -98,20 +175,34 @@ async function refreshAccess(): Promise<string | null> {
 
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) {
-          clearSession();
-          notifySessionExpired();
+          return null;
         }
-        return null;
+        let message = `Token yenilenemedi (${res.status})`;
+        try {
+          const body = (await res.json()) as { message?: string | string[] };
+          if (Array.isArray(body.message)) message = body.message.join(", ");
+          else if (body.message) message = body.message;
+        } catch {
+          /* ignore */
+        }
+        throw new ApiError(res.status, message);
       }
 
-      const data = (await res.json()) as Tokens & { user: AuthUser };
+      const data = (await res.json()) as Tokens & {
+        user: AuthUser;
+        subscription?: SubscriptionSnapshot | null;
+      };
       storeSession(
         { accessToken: data.accessToken, refreshToken: data.refreshToken },
         data.user,
+        data.subscription,
       );
+      // Paket / kurulum gibi oturum verileri arka planda tazelensin
+      window.dispatchEvent(new CustomEvent(TOKENS_REFRESHED_EVENT));
       return data.accessToken;
-    } catch {
-      return null;
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError(0, "API bağlantısı kurulamadı — sunucu çalışıyor mu?");
     } finally {
       refreshInFlight = null;
     }
@@ -164,9 +255,13 @@ export async function api<T>(
   const res = await fetch(`${getApiUrl()}${path}`, { ...options, headers });
 
   if (res.status === 401 && retry) {
-    accessToken = await refreshAccess();
+    try {
+      accessToken = await refreshAccess();
+    } catch (err) {
+      throw err;
+    }
     if (accessToken) return api<T>(path, options, false);
-    throw new SessionExpiredError();
+    expireSession();
   }
 
   if (!res.ok) {
@@ -177,6 +272,19 @@ export async function api<T>(
       else if (body.message) message = body.message;
     } catch {
       /* ignore */
+    }
+    // Hesap pasife alındıysa her ekranda destek/pasif sayfasına yönlendir
+    if (
+      res.status === 403 &&
+      /pasif|erişim|askıda|dondurul/i.test(message) &&
+      typeof window !== "undefined" &&
+      !window.location.pathname.startsWith("/passive")
+    ) {
+      // Oturumu kapat (logout) ve pasif sayfasına geç
+      clearSession();
+      markAccountPassive();
+      window.location.assign(`/passive?reason=${encodeURIComponent(message)}`);
+      return new Promise<T>(() => undefined);
     }
     throw new ApiError(res.status, message);
   }
@@ -209,9 +317,13 @@ export async function apiDownload(
   const res = await fetch(`${getApiUrl()}${path}`, { headers });
 
   if (res.status === 401 && retry) {
-    accessToken = await refreshAccess();
+    try {
+      accessToken = await refreshAccess();
+    } catch (err) {
+      throw err;
+    }
     if (accessToken) return apiDownload(path, filename, false);
-    throw new SessionExpiredError();
+    expireSession();
   }
 
   if (!res.ok) {
@@ -259,6 +371,7 @@ export async function login(email: string, password: string) {
     accessToken?: string;
     refreshToken?: string;
     user?: AuthUser;
+    subscription?: SubscriptionSnapshot | null;
   };
   try {
     data = (await res.json()) as typeof data;
@@ -270,10 +383,18 @@ export async function login(email: string, password: string) {
     throw new ApiError(res.status, "Giriş yanıtı eksik (token/user)");
   }
 
+  // Yeni giriş → oturum verisi sıfırdan bir kez çekilsin
+  localStorage.removeItem(SESSION_DATA_KEY);
   storeSession(
     { accessToken: data.accessToken, refreshToken: data.refreshToken },
     data.user,
+    data.subscription,
   );
+  if (data.subscription?.needsReactivation) {
+    sessionStorage.setItem("subscription:needsReactivation", "1");
+  } else {
+    sessionStorage.removeItem("subscription:needsReactivation");
+  }
   return data.user;
 }
 
@@ -282,7 +403,7 @@ export function homePathForRole(role: Role): string {
     case "SUPER_ADMIN":
       return "/platform";
     case "STORE_OWNER":
-      return "/metrics";
+      return "/reports";
     case "CASHIER":
       return "/counter";
     default:

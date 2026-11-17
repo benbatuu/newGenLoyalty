@@ -5,6 +5,7 @@ import { useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { getApiUrl } from "@/lib/public-urls";
+import { HONEYPOT_FIELD, honeypotFilled } from "@/lib/honeypot";
 
 export function SignupForm({ adminUrl }: { adminUrl: string }) {
   const API_URL = getApiUrl();
@@ -26,6 +27,18 @@ export function SignupForm({ adminUrl }: { adminUrl: string }) {
     setError(null);
     const form = e.currentTarget;
     const raw = Object.fromEntries(new FormData(form).entries());
+
+    // Never show a fake “account ready” if honeypot was filled (autofill / bot)
+    if (honeypotFilled(raw[HONEYPOT_FIELD])) {
+      setError(
+        tr
+          ? "Kayıt tamamlanamadı, lütfen tekrar deneyin."
+          : "Sign-up couldn’t complete. Please try again.",
+      );
+      setStatus("err");
+      return;
+    }
+
     try {
       const res = await fetch(`${API_URL}/public/signup`, {
         method: "POST",
@@ -36,13 +49,24 @@ export function SignupForm({ adminUrl }: { adminUrl: string }) {
           ownerName: String(raw.ownerName ?? ""),
           ownerEmail: String(raw.ownerEmail ?? ""),
           ownerPassword: String(raw.ownerPassword ?? ""),
+          [HONEYPOT_FIELD]: "",
         }),
       });
       const body = (await res.json().catch(() => ({}))) as {
         message?: string | string[];
-        tenant?: { name: string; slug: string };
+        discarded?: boolean;
+        tenant?: { id?: string; name: string; slug: string };
         owner?: { email: string };
       };
+
+      if (res.status === 429) {
+        throw new Error(
+          tr
+            ? "Çok fazla istek. Biraz bekleyip tekrar deneyin."
+            : "Too many requests. Please wait a moment and try again.",
+        );
+      }
+
       if (!res.ok) {
         const msg = Array.isArray(body.message)
           ? body.message.join(", ")
@@ -50,6 +74,15 @@ export function SignupForm({ adminUrl }: { adminUrl: string }) {
             (tr ? "Kayıt başarısız" : "Sign-up failed");
         throw new Error(msg);
       }
+
+      if (body.discarded || !body.tenant?.id || body.tenant.id === "ok") {
+        throw new Error(
+          tr
+            ? "Kayıt tamamlanamadı, lütfen tekrar deneyin."
+            : "Sign-up couldn’t complete. Please try again.",
+        );
+      }
+
       setResult({
         cafe: body.tenant?.name ?? String(raw.cafeName),
         slug: body.tenant?.slug ?? "",
@@ -65,32 +98,32 @@ export function SignupForm({ adminUrl }: { adminUrl: string }) {
 
   if (status === "ok" && result) {
     return (
-      <div className="space-y-6 border-l-2 border-[var(--brass)] pl-5">
-        <p className="text-lg font-light text-[var(--ink)]">
+      <div className="space-y-6 border-l-2 border-primary pl-5">
+        <p className="text-lg text-foreground">
           {tr
             ? `${result.cafe} hesabı hazır. 14 günlük deneme başladı.`
             : `${result.cafe} is ready. Your 14-day trial has started.`}
         </p>
-        <p className="text-sm text-[var(--muted)]">
+        <p className="text-sm text-muted-foreground">
           {tr ? "Giriş e-postası:" : "Login email:"}{" "}
-          <span className="text-[var(--ink)]">{result.email}</span>
+          <span className="text-foreground">{result.email}</span>
           {result.slug ? (
             <>
               <br />
-              slug: <span className="text-[var(--ink)]">/{result.slug}</span>
+              slug: <span className="text-foreground">/{result.slug}</span>
             </>
           ) : null}
         </p>
         {adminUrl ? (
           <Button asChild size="lg">
-            <a href={adminUrl}>
+            <a href={adminUrl} rel="noopener noreferrer">
               <span className="relative z-10">
                 {tr ? "Admin paneline git" : "Go to admin panel"}
               </span>
             </a>
           </Button>
         ) : (
-          <p className="text-sm text-[var(--muted)]">
+          <p className="text-sm text-muted-foreground">
             {tr
               ? "Giriş için size gönderilen admin panel bağlantısını kullanın."
               : "Use the admin panel link we sent you to sign in."}
@@ -101,9 +134,26 @@ export function SignupForm({ adminUrl }: { adminUrl: string }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
+    <form onSubmit={onSubmit} className="relative space-y-6">
+      <div
+        className="absolute -left-[9999px] h-0 w-0 overflow-hidden opacity-0"
+        aria-hidden="true"
+      >
+        <label htmlFor="hp-signup">
+          Fax
+          <input
+            id="hp-signup"
+            type="text"
+            name={HONEYPOT_FIELD}
+            tabIndex={-1}
+            autoComplete="off"
+            defaultValue=""
+          />
+        </label>
+      </div>
+
       {status === "err" && error ? (
-        <p className="border-l-2 border-red-400 pl-4 text-sm text-red-300">
+        <p className="border-l-2 border-red-400 pl-4 text-sm text-red-600">
           {error}
         </p>
       ) : null}
@@ -123,7 +173,7 @@ export function SignupForm({ adminUrl }: { adminUrl: string }) {
         ] as const
       ).map(([name, type, label, required]) => (
         <label key={name} className="block">
-          <span className="text-[0.7rem] font-medium tracking-[0.14em] uppercase text-[var(--muted)]">
+          <span className="text-[0.7rem] font-medium tracking-[0.14em] uppercase text-muted-foreground">
             {label}
           </span>
           <input
@@ -143,7 +193,7 @@ export function SignupForm({ adminUrl }: { adminUrl: string }) {
         </label>
       ))}
 
-      <p className="text-xs leading-relaxed text-[var(--muted)]">
+      <p className="text-xs leading-relaxed text-muted-foreground">
         {tr
           ? "Kayıt ile deneme hesabı açılır. Ödeme yok — abonelik sonra."
           : "Creates a trial account. No payment — billing comes later."}{" "}

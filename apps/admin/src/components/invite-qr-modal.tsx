@@ -49,14 +49,14 @@ export function InviteQrModal({ url, phoneLabel, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="invite-qr-title"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-[var(--radius)] border border-[var(--line)] bg-white p-5 shadow-xl"
+        className="w-full max-w-sm rounded-[var(--radius)] border border-[var(--line)] bg-[var(--panel)] p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <h2

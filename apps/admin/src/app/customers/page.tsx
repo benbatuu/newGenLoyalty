@@ -1,24 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Badge,
   EmptyState,
   ErrorBanner,
-  Field,
-  FormSkeleton,
+  ListSkeleton,
   PageHeader,
   Panel,
-  PanelHeader,
   RequireAuth,
-  SoftBox,
   SuccessBanner,
   btnGhost,
   inputClassName,
 } from "../../components/ui";
 import { ApiError, api, apiDownload } from "../../lib/api";
-import { bustCache, useApiQuery } from "../../lib/use-api-query";
+import { displayPhone } from "../../lib/pii-display";
+import { useApiQuery } from "../../lib/use-api-query";
+import { CustomerDetailDrawer } from "./customer-detail-drawer";
+import { ConfirmDialog } from "../../components/confirm-dialog";
 
 const PAGE_SIZE = 20;
 
@@ -60,18 +60,26 @@ type Directory = {
   page: number;
   pageSize: number;
   totalPages: number;
+  /** Arama/filtreden bağımsız, tüm müşteriler için sayılar */
+  summary?: { all: number; ready: number; wallet: number };
   customers: CustomerRow[];
 };
 
 type Filter = "all" | "ready" | "wallet";
 
-function formatPhone(phone: string) {
-  return phone.startsWith("0") ? phone : `0${phone}`;
-}
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: "all", label: "Tümü" },
+  { id: "ready", label: "Ödül hazır" },
+  { id: "wallet", label: "Kartı telefonunda" },
+];
 
 function formatBirthday(month: number | null, day: number | null) {
   if (!month || !day) return null;
   return `${day} ${MONTHS[month] ?? month}`;
+}
+
+function nameOf(c: CustomerRow) {
+  return c.displayName?.trim() || "İsimsiz müşteri";
 }
 
 function initials(name: string | null, phone: string) {
@@ -83,7 +91,15 @@ function initials(name: string | null, phone: string) {
     }
     return n.slice(0, 2).toUpperCase();
   }
-  return formatPhone(phone).slice(-2);
+  if (phone.includes("**")) return phone.trim().split(/\s+/).pop() ?? "??";
+  return displayPhone(phone).slice(-2);
+}
+
+function lastSeen(iso: string) {
+  return new Date(iso).toLocaleDateString("tr-TR", {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 export default function CustomersPage() {
@@ -100,9 +116,12 @@ function CustomersContent() {
   const [filter, setFilter] = useState<Filter>("all");
   const [page, setPage] = useState(1);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null);
   const [actionOk, setActionOk] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailPhone, setDetailPhone] = useState<string | null>(null);
 
   const path =
     `/stamps/customers/directory?filter=${filter}&take=${PAGE_SIZE}&page=${page}` +
@@ -111,40 +130,44 @@ function CustomersContent() {
   const { data, error, loading, refreshing, reload } = useApiQuery<Directory>(
     `customers:directory:${filter}:${query}:${page}`,
     path,
-    { ttlMs: 20_000 },
   );
 
-  const search = useCallback((e: FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    setQuery(q.trim());
-  }, [q]);
-
+  // Arama: yazarken 350 ms sonra uygulanır. Tek harfte istek atılmaz.
   useEffect(() => {
     const t = setTimeout(() => {
-      if (q.trim().length >= 2 || q.trim().length === 0) {
-        setPage(1);
-        setQuery(q.trim());
-      }
+      const next = q.trim();
+      if (next.length === 1) return;
+      setPage(1);
+      setQuery(next);
     }, 350);
     return () => clearTimeout(t);
   }, [q]);
 
   useEffect(() => {
+    if (!actionOk) return;
+    const t = setTimeout(() => setActionOk(null), 4000);
+    return () => clearTimeout(t);
+  }, [actionOk]);
+
+  function pickFilter(next: Filter) {
+    setFilter(next);
     setPage(1);
-  }, [filter]);
+  }
+
+  function clearSearch() {
+    setQ("");
+    setQuery("");
+    setPage(1);
+  }
 
   async function exportAllCsv() {
     setExporting(true);
     setActionError(null);
-    setActionOk(null);
     try {
       await apiDownload("/stamps/customers/export.csv", "customers.csv");
       setActionOk("Müşteri listesi indirildi");
     } catch (err) {
-      setActionError(
-        err instanceof ApiError ? err.message : "CSV indirilemedi",
-      );
+      setActionError(err instanceof ApiError ? err.message : "Liste indirilemedi");
     } finally {
       setExporting(false);
     }
@@ -153,11 +176,8 @@ function CustomersContent() {
   async function exportOne(customerId: string, phone: string) {
     setBusyId(customerId);
     setActionError(null);
-    setActionOk(null);
     try {
-      const payload = await api<unknown>(
-        `/stamps/customers/${customerId}/export`,
-      );
+      const payload = await api<unknown>(`/stamps/customers/${customerId}/export`);
       const blob = new Blob([JSON.stringify(payload, null, 2)], {
         type: "application/json",
       });
@@ -169,60 +189,52 @@ function CustomersContent() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      setActionOk("KVKK veri paketi indirildi");
+      setActionOk("Müşterinin verisi indirildi");
     } catch (err) {
-      setActionError(
-        err instanceof ApiError ? err.message : "Veri export başarısız",
-      );
+      setActionError(err instanceof ApiError ? err.message : "Veri indirilemedi");
     } finally {
       setBusyId(null);
     }
   }
 
-  async function deleteOne(customerId: string, label: string) {
-    if (
-      !window.confirm(
-        `${label} kaydını silmek istediğine emin misin? Damga geçmişi ve Wallet pass’leri de silinir (KVKK).`,
-      )
-    ) {
-      return;
-    }
+  /** Silme önce uygulama içi onay penceresini açar */
+  function deleteOne(customerId: string, label: string) {
+    setPendingDelete({ id: customerId, label });
+  }
+
+  async function confirmDelete() {
+    const target = pendingDelete;
+    if (!target) return;
+    const customerId = target.id;
+    setPendingDelete(null);
     setBusyId(customerId);
     setActionError(null);
-    setActionOk(null);
     try {
       await api(`/stamps/customers/${customerId}`, { method: "DELETE" });
       setActionOk("Müşteri silindi");
-      bustCache("customers");
-      bustCache("metrics");
-      bustCache("reports");
       await reload(true);
     } catch (err) {
-      setActionError(
-        err instanceof ApiError ? err.message : "Silme başarısız",
-      );
+      setActionError(err instanceof ApiError ? err.message : "Silinemedi. Tekrar deneyin.");
     } finally {
       setBusyId(null);
     }
-  }
-
-  if (loading && !data) {
-    return <FormSkeleton rows={2} />;
   }
 
   const list = data?.customers ?? [];
   const stampsRequired = data?.stampsRequired ?? 10;
-  const total = data?.total ?? list.length;
   const totalPages = data?.totalPages ?? 1;
-  const readyOnPage = list.filter((c) => c.rewardReady).length;
-  const walletOnPage = list.filter((c) => c.hasWallet).length;
+  const total = data?.total ?? 0;
+  const summary = data?.summary;
+  const firstLoad = loading && !data;
+  const searching = query.length > 0;
 
   return (
-    <div className="w-full space-y-5">
+    <div className="w-full space-y-6">
       <PageHeader
         eyebrow="Müşteriler"
-        title="Müşteri listesi"
-        subtitle="İsim, telefon, damga ve Wallet durumunu tek bakışta gör."
+        title="Müşterilerim"
+        subtitle="Müşterilerinizi bulun ve her birinin durumunu görün."
+        help="Ödül hazır olan müşteriler kasada ödülünü alabilir. Kartı telefonunda olanlar her damgayı anında görür."
         actions={
           <div className="flex flex-wrap gap-2">
             <button
@@ -231,297 +243,448 @@ function CustomersContent() {
               disabled={exporting}
               onClick={() => void exportAllCsv()}
             >
-              {exporting ? "İndiriliyor…" : "CSV indir"}
+              {exporting ? "İndiriliyor…" : "Listeyi indir"}
             </button>
             <Link href="/counter" className={btnGhost()}>
-              Tezgâha git
+              Kasaya git
             </Link>
           </div>
         }
       />
-      <ErrorBanner message={error || actionError} />
-      <SuccessBanner message={actionOk} />
 
-      <div className="grid gap-3 sm:grid-cols-4">
-        <SoftBox>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-            Toplam
-          </p>
-          <p className="mt-1 font-[family-name:var(--font-display)] text-2xl tabular-nums">
-            {total}
-          </p>
-        </SoftBox>
-        <SoftBox>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-            Ödül hazır
-          </p>
-          <p className="mt-1 font-[family-name:var(--font-display)] text-2xl tabular-nums">
-            {filter === "ready" ? total : readyOnPage}
-            {filter !== "ready" ? (
-              <span className="ml-1 text-sm font-normal text-[var(--muted)]">
-                (sayfa)
-              </span>
-            ) : null}
-          </p>
-        </SoftBox>
-        <SoftBox>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-            Wallet’ta
-          </p>
-          <p className="mt-1 font-[family-name:var(--font-display)] text-2xl tabular-nums">
-            {filter === "wallet" ? total : walletOnPage}
-            {filter !== "wallet" ? (
-              <span className="ml-1 text-sm font-normal text-[var(--muted)]">
-                (sayfa)
-              </span>
-            ) : null}
-          </p>
-        </SoftBox>
-        <SoftBox>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-            Ödül kuralı
-          </p>
-          <p className="mt-1 text-sm font-medium text-[var(--ink)]">
-            {stampsRequired} damga → {data?.rewardLabel || "—"}
-          </p>
-        </SoftBox>
+      <div aria-live="polite">
+        <ErrorBanner message={error || actionError} />
+        <SuccessBanner message={actionOk} />
       </div>
 
-      <Panel>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <form onSubmit={search} className="min-w-0 flex-1">
-            <Field label="Ara">
-              <input
-                className={inputClassName()}
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="İsim veya telefon…"
-              />
-            </Field>
-          </form>
-          <div className="flex flex-wrap gap-2">
-            {(
-              [
-                ["all", "Tümü"],
-                ["ready", "Ödül hazır"],
-                ["wallet", "Wallet’ta"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setFilter(id)}
-                className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-                  filter === id
-                    ? "bg-[var(--accent)] text-white"
-                    : "border border-[var(--line)] bg-white text-[var(--muted)] hover:bg-[var(--surface)]"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-            <button
-              type="button"
-              className={btnGhost()}
-              disabled={refreshing}
-              onClick={() => void reload(true)}
-            >
-              {refreshing ? "…" : "Yenile"}
-            </button>
-          </div>
-        </div>
-      </Panel>
+      {detailId ? (
+        <CustomerDetailDrawer customerId={detailId} phone={detailPhone} onClose={() => setDetailId(null)} />
+      ) : null}
 
-      <Panel padded={false}>
-        <div className="border-b border-[var(--line)] px-5 py-4 sm:px-6">
-          <PanelHeader
-            title="Kayıtlar"
-            description={
-              query
-                ? `"${query}" · ${total} sonuç`
-                : `${total} müşteri · sayfa ${page}/${totalPages}`
-            }
-          />
-        </div>
-        {list.length === 0 ? (
-          <div className="p-5 sm:p-6">
-            <EmptyState
-              title="Müşteri bulunamadı"
-              description={
-                filter === "ready"
-                  ? "Ödül hazır müşteri yok."
-                  : filter === "wallet"
-                    ? "Henüz Wallet’a eklenmiş müşteri yok."
-                    : "Arama kriterlerini değiştir veya tezgâhtan yeni kayıt ekle."
-              }
-            />
-          </div>
+      {/* Özet kartları — tıklanınca filtre olur */}
+      <section aria-label="Özet" className="grid grid-cols-3 gap-2 sm:gap-3">
+        {firstLoad || !summary ? (
+          [0, 1, 2].map((i) => <div key={i} className="attio-surface h-[72px] animate-pulse" />)
         ) : (
           <>
-            {/* Mobile cards */}
-            <ul className="divide-y divide-[var(--line)] lg:hidden">
-              {list.map((c) => (
-                <CustomerCard
-                  key={c.id}
-                  c={c}
-                  stampsRequired={stampsRequired}
-                  busy={busyId === c.id}
-                  onExport={() => void exportOne(c.id, c.phone)}
-                  onDelete={() =>
-                    void deleteOne(
-                      c.id,
-                      c.displayName?.trim() || formatPhone(c.phone),
-                    )
+            <SummaryTile
+              label="Tüm müşteriler"
+              value={summary.all}
+              active={filter === "all"}
+              onClick={() => pickFilter("all")}
+            />
+            <SummaryTile
+              label="Ödül hazır"
+              value={summary.ready}
+              tone="success"
+              active={filter === "ready"}
+              onClick={() => pickFilter("ready")}
+            />
+            <SummaryTile
+              label="Kartı telefonunda"
+              value={summary.wallet}
+              active={filter === "wallet"}
+              onClick={() => pickFilter("wallet")}
+            />
+          </>
+        )}
+      </section>
+
+      <Panel padded={false}>
+        {/* Araç çubuğu: arama + filtre */}
+        <div className="flex flex-col gap-3 border-b border-[var(--line)] p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative w-full lg:max-w-sm">
+            <label htmlFor="customer-search" className="sr-only">
+              Müşteri ara
+            </label>
+            <SearchIcon />
+            <input
+              id="customer-search"
+              type="search"
+              className={`${inputClassName()} h-9 pl-8 pr-8`}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="İsim veya telefon ara"
+              autoComplete="off"
+            />
+            {q ? (
+              <button
+                type="button"
+                onClick={clearSearch}
+                aria-label="Aramayı temizle"
+                className="absolute right-1.5 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
+          <div
+            role="tablist"
+            aria-label="Duruma göre filtrele"
+            className="flex gap-1 overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)] p-0.5"
+          >
+            {FILTERS.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                role="tab"
+                aria-selected={filter === f.id}
+                onClick={() => pickFilter(f.id)}
+                className={`min-h-8 whitespace-nowrap rounded-md px-3 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-glow)] ${
+                  filter === f.id
+                    ? "bg-[var(--panel)] text-[var(--ink)] shadow-[var(--shadow-sm)]"
+                    : "text-[var(--muted)] hover:text-[var(--ink)]"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Sonuç başlığı */}
+        <div className="flex items-center justify-between gap-2 border-b border-[var(--line)] px-4 py-2.5 text-xs text-[var(--muted)]">
+          <span>
+            {firstLoad
+              ? "Yükleniyor…"
+              : searching
+                ? `«${query}» için ${total} sonuç`
+                : `${total} müşteri`}
+          </span>
+          <button
+            type="button"
+            className="font-medium text-[var(--ink)] hover:underline disabled:opacity-50"
+            disabled={refreshing}
+            onClick={() => void reload(true)}
+          >
+            {refreshing ? "Yenileniyor…" : "Yenile"}
+          </button>
+        </div>
+
+        <div className={`transition-opacity ${refreshing ? "opacity-60" : ""}`}>
+          {firstLoad ? (
+            <div className="p-4">
+              <ListSkeleton rows={5} />
+            </div>
+          ) : list.length === 0 ? (
+            <div className="p-6">
+              {searching ? (
+                <EmptyState
+                  title="Sonuç bulunamadı"
+                  description="Yazımı kontrol edin ya da telefonun son haneleriyle deneyin."
+                  action={
+                    <button type="button" className={btnGhost()} onClick={clearSearch}>
+                      Aramayı temizle
+                    </button>
                   }
                 />
-              ))}
-            </ul>
+              ) : filter !== "all" ? (
+                <EmptyState
+                  title={filter === "ready" ? "Ödül hazır müşteri yok" : "Kartı olan müşteri yok"}
+                  description="Filtreyi değiştirerek tüm müşterilere bakabilirsiniz."
+                  action={
+                    <button type="button" className={btnGhost()} onClick={() => pickFilter("all")}>
+                      Tümünü göster
+                    </button>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  title="Henüz müşteri yok"
+                  description="Yeni müşteriyi kasadan kaydedin, kartı telefonuna ekleyin."
+                  action={
+                    <Link href="/counter" className={btnGhost()}>
+                      Kasaya git
+                    </Link>
+                  }
+                />
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Telefon: kart liste */}
+              <ul className="divide-y divide-[var(--line)] md:hidden">
+                {list.map((c) => (
+                  <CustomerCard
+                    key={c.id}
+                    c={c}
+                    stampsRequired={stampsRequired}
+                    busy={busyId === c.id}
+                    onDetail={() => { setDetailId(c.id); setDetailPhone(c.phone); }}
+                    onExport={() => void exportOne(c.id, c.phone)}
+                    onDelete={() => void deleteOne(c.id, nameOf(c))}
+                  />
+                ))}
+              </ul>
 
-            {/* Desktop table */}
-            <div className="hidden overflow-x-auto lg:block">
-              <table className="w-full min-w-[760px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--line)] bg-[var(--surface)] text-[11px] uppercase tracking-wide text-[var(--muted)]">
-                    <th className="px-5 py-3 font-semibold sm:px-6">Müşteri</th>
-                    <th className="px-3 py-3 font-semibold">Damga</th>
-                    <th className="px-3 py-3 font-semibold">Durum</th>
-                    <th className="px-3 py-3 font-semibold">Doğum günü</th>
-                    <th className="px-3 py-3 font-semibold">Son işlem</th>
-                    <th className="px-5 py-3 font-semibold sm:px-6">İşlem</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--line)]">
-                  {list.map((c) => {
-                    const bday = formatBirthday(c.birthMonth, c.birthDay);
-                    const pct = Math.min(
-                      100,
-                      Math.round((c.stampCount / stampsRequired) * 100),
-                    );
-                    const label = c.displayName?.trim() || formatPhone(c.phone);
-                    return (
+              {/* Masaüstü: tablo */}
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead className="border-b border-[var(--line)] bg-[var(--surface)] text-xs text-[var(--muted)]">
+                    <tr>
+                      <th scope="col" className="px-4 py-2.5 font-medium">Müşteri</th>
+                      <th scope="col" className="px-4 py-2.5 font-medium">Damga</th>
+                      <th scope="col" className="px-4 py-2.5 font-medium">Durum</th>
+                      <th scope="col" className="px-4 py-2.5 font-medium">Son işlem</th>
+                      <th scope="col" className="px-4 py-2.5 text-right font-medium">İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--line)]">
+                    {list.map((c) => (
                       <tr key={c.id} className="hover:bg-[var(--surface)]/60">
-                        <td className="px-5 py-3.5 sm:px-6">
+                        <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent)]">
-                              {initials(c.displayName, c.phone)}
-                            </span>
+                            <Avatar text={initials(c.displayName, c.phone)} />
                             <div className="min-w-0">
-                              <p className="truncate font-medium text-[var(--ink)]">
-                                {c.displayName?.trim() || "İsimsiz"}
-                              </p>
+                              <p className="truncate font-medium text-[var(--ink)]">{nameOf(c)}</p>
                               <p className="tabular-nums text-xs text-[var(--muted)]">
-                                {formatPhone(c.phone)}
+                                {displayPhone(c.phone)}
                               </p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-3.5">
-                          <div className="w-28">
-                            <div className="mb-1 flex justify-between text-xs tabular-nums">
-                              <span>
-                                {c.stampCount}/{stampsRequired}
-                              </span>
-                            </div>
-                            <div className="h-1.5 overflow-hidden rounded-full bg-[var(--line)]">
-                              <div
-                                className={`h-full rounded-full ${
-                                  c.rewardReady
-                                    ? "bg-emerald-500"
-                                    : "bg-[var(--accent)]"
-                                }`}
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                          </div>
+                        <td className="px-4 py-3">
+                          <StampProgress
+                            count={c.stampCount}
+                            required={stampsRequired}
+                            ready={c.rewardReady}
+                          />
                         </td>
-                        <td className="px-3 py-3.5">
-                          <div className="flex flex-wrap gap-1.5">
-                            {c.rewardReady ? (
-                              <Badge tone="success">Ödül hazır</Badge>
-                            ) : (
-                              <Badge tone="neutral">Devam</Badge>
-                            )}
-                            {c.hasWallet ? (
-                              <Badge tone="info">Wallet</Badge>
-                            ) : (
-                              <Badge tone="neutral">Kart yok</Badge>
-                            )}
-                          </div>
+                        <td className="px-4 py-3">
+                          <StatusBadges c={c} />
                         </td>
-                        <td className="px-3 py-3.5 text-xs text-[var(--muted)]">
-                          {bday ?? "—"}
+                        <td className="whitespace-nowrap px-4 py-3 text-xs text-[var(--muted)]">
+                          {lastSeen(c.updatedAt)}
+                          <span className="opacity-70"> · {c.ledgerCount} işlem</span>
                         </td>
-                        <td className="px-3 py-3.5 text-xs text-[var(--muted)]">
-                          {new Date(c.updatedAt).toLocaleString("tr-TR", {
-                            day: "2-digit",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                          <span className="ml-1 opacity-70">
-                            · {c.ledgerCount} hareket
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 text-right sm:px-6">
-                          <div className="flex flex-wrap justify-end gap-2">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              className={btnGhost()}
+                              onClick={() => { setDetailId(c.id); setDetailPhone(c.phone); }}
+                            >
+                              Detay
+                            </button>
                             <Link
-                              href={`/counter?phone=${encodeURIComponent(c.phone)}`}
-                              className="text-xs font-medium text-[var(--accent)] hover:underline"
+                              href={`/counter?customerId=${encodeURIComponent(c.id)}`}
+                              className={btnGhost()}
                             >
-                              Tezgâh
+                              Kasada aç
                             </Link>
-                            <button
-                              type="button"
-                              className="text-xs font-medium text-[var(--muted)] hover:underline"
+                            <MoreMenu
+                              label={`${nameOf(c)} için diğer işlemler`}
                               disabled={busyId === c.id}
-                              onClick={() => void exportOne(c.id, c.phone)}
-                            >
-                              KVKK
-                            </button>
-                            <button
-                              type="button"
-                              className="text-xs font-medium text-red-600 hover:underline"
-                              disabled={busyId === c.id}
-                              onClick={() => void deleteOne(c.id, label)}
-                            >
-                              Sil
-                            </button>
+                              onExport={() => void exportOne(c.id, c.phone)}
+                              onDelete={() => void deleteOne(c.id, nameOf(c))}
+                            />
                           </div>
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {totalPages > 1 ? (
-              <div className="flex items-center justify-between gap-3 border-t border-[var(--line)] px-5 py-3 sm:px-6">
-                <button
-                  type="button"
-                  className={btnGhost()}
-                  disabled={page <= 1 || refreshing}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  ← Önceki
-                </button>
-                <p className="text-xs text-[var(--muted)]">
-                  {page} / {totalPages}
-                </p>
-                <button
-                  type="button"
-                  className={btnGhost()}
-                  disabled={page >= totalPages || refreshing}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Sonraki →
-                </button>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ) : null}
-          </>
-        )}
+
+              {totalPages > 1 ? (
+                <nav
+                  aria-label="Sayfalar"
+                  className="flex items-center justify-between gap-3 border-t border-[var(--line)] px-4 py-3"
+                >
+                  <button
+                    type="button"
+                    className={btnGhost()}
+                    disabled={page <= 1 || refreshing}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    ← Önceki
+                  </button>
+                  <p className="text-xs tabular-nums text-[var(--muted)]">
+                    {page} / {totalPages}
+                  </p>
+                  <button
+                    type="button"
+                    className={btnGhost()}
+                    disabled={page >= totalPages || refreshing}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Sonraki →
+                  </button>
+                </nav>
+              ) : null}
+            </>
+          )}
+        </div>
       </Panel>
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Müşteri silinsin mi?"
+        confirmLabel="Müşteriyi sil"
+        danger
+        busy={busyId !== null}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setPendingDelete(null)}
+      >
+        <span className="font-medium text-[var(--ink)]">{pendingDelete?.label}</span> silinecek. Damga geçmişi ve Wallet kartları da silinir. Bu işlem geri alınamaz.
+      </ConfirmDialog>
     </div>
+  );
+}
+
+function SummaryTile({
+  label,
+  value,
+  tone,
+  active,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  tone?: "success";
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`attio-surface p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-glow)] sm:p-4 ${
+        active ? "ring-2 ring-[var(--ink)]/80" : "hover:-translate-y-px"
+      }`}
+    >
+      <p className="truncate text-[11px] font-medium text-[var(--muted)] sm:text-xs">{label}</p>
+      <p
+        className={`mt-1 font-display text-xl tabular-nums tracking-tight sm:text-2xl ${
+          tone === "success" && value > 0 ? "text-[var(--success)]" : "text-[var(--ink)]"
+        }`}
+      >
+        {value.toLocaleString("tr-TR")}
+      </p>
+    </button>
+  );
+}
+
+function Avatar({ text }: { text: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent)]"
+    >
+      {text}
+    </span>
+  );
+}
+
+function StampProgress({
+  count,
+  required,
+  ready,
+}: {
+  count: number;
+  required: number;
+  ready: boolean;
+}) {
+  const pct = Math.min(100, Math.round((count / Math.max(1, required)) * 100));
+  return (
+    <div className="w-32">
+      <div className="mb-1 flex items-center justify-between text-xs tabular-nums">
+        <span className="text-[var(--ink)]">
+          {count}
+          <span className="text-[var(--muted)]">/{required}</span>
+        </span>
+        {ready ? <span className="text-[10px] font-medium text-[var(--success)]">hazır</span> : null}
+      </div>
+      <div
+        className="h-1.5 overflow-hidden rounded-full bg-[var(--line)]"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={required}
+        aria-valuenow={count}
+        aria-label={`${count} / ${required} damga`}
+      >
+        <div
+          className={`h-full rounded-full ${ready ? "bg-emerald-500" : "bg-[var(--accent)]"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function StatusBadges({ c }: { c: CustomerRow }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {c.rewardReady ? <Badge tone="success">Ödül hazır</Badge> : null}
+      {c.hasWallet ? <Badge tone="info">Kartı var</Badge> : <Badge tone="neutral">Kart yok</Badge>}
+    </div>
+  );
+}
+
+/** Sekonder işlemler: KVKK verisi, silme */
+function MoreMenu({
+  label,
+  disabled,
+  onExport,
+  onDelete,
+}: {
+  label: string;
+  disabled?: boolean;
+  /** Eski prop; konum artık tetikleyiciye göre hesaplanır */
+  up?: boolean;
+  onExport: () => void;
+  onDelete: () => void;
+}) {
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  // Menü tablo kapsayıcısının dışında (fixed) açılır; böylece kaydırma alanı tarafından kesilmez
+  function onToggle() {
+    const el = detailsRef.current;
+    if (!el?.open) {
+      setPos(null);
+      return;
+    }
+    const rect = el.querySelector("summary")?.getBoundingClientRect();
+    if (!rect) return;
+    const menuH = 96;
+    const below = window.innerHeight - rect.bottom;
+    const top = below < menuH + 8 ? rect.top - menuH - 4 : rect.bottom + 4;
+    setPos({ top, left: Math.max(8, rect.right - 192) });
+  }
+
+  return (
+    <details ref={detailsRef} className="relative" onToggle={onToggle}>
+      <summary
+        aria-label={label}
+        className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-md text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)] [&::-webkit-details-marker]:hidden"
+      >
+        <DotsIcon />
+      </summary>
+      {pos ? (
+        <div
+          style={{ top: pos.top, left: pos.left }}
+          className="fixed z-50 w-48 overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--panel)] p-1 text-left shadow-[var(--shadow-md)]"
+        >
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onExport}
+            className="block w-full rounded-md px-2.5 py-2 text-left text-[0.8125rem] hover:bg-[var(--surface)] disabled:opacity-50"
+          >
+            Verisini indir (KVKK)
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onDelete}
+            className="block w-full rounded-md px-2.5 py-2 text-left text-[0.8125rem] text-[var(--danger)] hover:bg-[var(--danger-soft)] disabled:opacity-50"
+          >
+            Müşteriyi sil
+          </button>
+        </div>
+      ) : null}
+    </details>
   );
 }
 
@@ -529,83 +692,84 @@ function CustomerCard({
   c,
   stampsRequired,
   busy,
+  onDetail,
   onExport,
   onDelete,
 }: {
   c: CustomerRow;
   stampsRequired: number;
-  busy?: boolean;
+  busy: boolean;
+  onDetail: () => void;
   onExport: () => void;
   onDelete: () => void;
 }) {
   const bday = formatBirthday(c.birthMonth, c.birthDay);
-  const pct = Math.min(100, Math.round((c.stampCount / stampsRequired) * 100));
   return (
-    <li className="px-5 py-4 sm:px-6">
+    <li className="px-4 py-3.5">
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent)]">
-          {initials(c.displayName, c.phone)}
-        </span>
+        <Avatar text={initials(c.displayName, c.phone)} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="truncate font-medium text-[var(--ink)]">
-                {c.displayName?.trim() || "İsimsiz"}
-              </p>
+              <p className="truncate font-medium text-[var(--ink)]">{nameOf(c)}</p>
               <p className="tabular-nums text-xs text-[var(--muted)]">
-                {formatPhone(c.phone)}
+                {displayPhone(c.phone)}
                 {bday ? ` · ${bday}` : ""}
               </p>
             </div>
-            <Link
-              href={`/counter?phone=${encodeURIComponent(c.phone)}`}
-              className="shrink-0 text-xs font-medium text-[var(--accent)]"
-            >
-              Tezgâh
-            </Link>
-          </div>
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {c.rewardReady ? (
-              <Badge tone="success">Ödül hazır</Badge>
-            ) : (
-              <Badge tone="neutral">
-                {c.stampCount}/{stampsRequired}
-              </Badge>
-            )}
-            {c.hasWallet ? (
-              <Badge tone="info">Wallet</Badge>
-            ) : (
-              <Badge tone="neutral">Kart yok</Badge>
-            )}
-          </div>
-          <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[var(--line)]">
-            <div
-              className={`h-full rounded-full ${
-                c.rewardReady ? "bg-emerald-500" : "bg-[var(--accent)]"
-              }`}
-              style={{ width: `${pct}%` }}
+            <MoreMenu
+              label={`${nameOf(c)} için diğer işlemler`}
+              disabled={busy}
+              onExport={onExport}
+              onDelete={onDelete}
             />
           </div>
-          <div className="mt-3 flex gap-3">
-            <button
-              type="button"
-              className="text-xs font-medium text-[var(--muted)]"
-              disabled={busy}
-              onClick={onExport}
-            >
-              KVKK export
+          <div className="mt-2.5 flex items-center justify-between gap-3">
+            <StampProgress count={c.stampCount} required={stampsRequired} ready={c.rewardReady} />
+            <StatusBadges c={c} />
+          </div>
+          <div className="mt-3 flex gap-2">
+            <button type="button" className={`${btnGhost()} flex-1`} onClick={onDetail}>
+              Detay
             </button>
-            <button
-              type="button"
-              className="text-xs font-medium text-red-600"
-              disabled={busy}
-              onClick={onDelete}
+            <Link
+              href={`/counter?customerId=${encodeURIComponent(c.id)}`}
+              className={`${btnGhost()} flex-1`}
             >
-              Sil
-            </button>
+              Kasada aç
+            </Link>
           </div>
         </div>
       </div>
     </li>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)]"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
+
+function DotsIcon(): ReactNode {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="5" cy="12" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="19" cy="12" r="1.8" />
+    </svg>
   );
 }

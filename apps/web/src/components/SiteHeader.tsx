@@ -1,26 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import { useParams } from "next/navigation";
 import { Link, usePathname } from "../i18n/navigation";
 import type { Locale } from "../i18n/routing";
-import { Button } from "@/components/ui/button";
+import { BrandLogo } from "@/components/marketing/BrandLogo";
+import { getAdminLoginUrl } from "@/lib/public-urls";
+import { lockBodyScroll } from "@/lib/body-scroll-lock";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import { cn } from "@/lib/utils";
+
+const LOCALES = ["tr", "en", "ru"] as const;
+
+function isExternal(url: string) {
+  return /^https?:\/\//i.test(url);
+}
 
 export function SiteHeader() {
   const t = useTranslations("nav");
   const locale = useLocale() as Locale;
   const pathname = usePathname();
-  const onHome = pathname === "/";
+  const routeParams = useParams<{ slug?: string }>();
+  // Language switch keeps the current page; dynamic routes need their params
+  const switchTo = routeParams.slug
+    ? ({ pathname, params: { slug: routeParams.slug } } as const)
+    : pathname;
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const adminLogin = getAdminLoginUrl();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(open, panelRef);
 
+  // Main menu.
   const links = [
     { href: "/how" as const, label: t("how") },
     { href: "/features" as const, label: t("features") },
+    { href: "/programs" as const, label: t("programs") },
     { href: "/sectors" as const, label: t("sectors") },
-    { href: "/use-cases" as const, label: t("useCases") },
     { href: "/pricing" as const, label: t("pricing") },
     { href: "/contact" as const, label: t("contact") },
   ];
@@ -30,7 +48,7 @@ export function SiteHeader() {
   }, [pathname]);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
+    const onScroll = () => setScrolled(window.scrollY > 12);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -41,194 +59,240 @@ export function SiteHeader() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
-    document.body.style.overflow = "hidden";
+    const unlock = lockBodyScroll();
     window.addEventListener("keydown", onKey);
     return () => {
-      document.body.style.overflow = "";
+      unlock();
       window.removeEventListener("keydown", onKey);
     };
   }, [open]);
 
+  const LoginLink = ({ className }: { className: string }) =>
+    adminLogin && isExternal(adminLogin) ? (
+      <a href={adminLogin} className={className} rel="noopener noreferrer">
+        {t("login")}
+      </a>
+    ) : (
+      <Link href="/login" className={className}>
+        {t("login")}
+      </Link>
+    );
+
   return (
     <>
-      <motion.header
-        initial={{ opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+      <div className="h-20 lg:h-24" aria-hidden />
+
+      <header
         className={cn(
-          "z-50 transition-[background,border-color,backdrop-filter] duration-500",
-          onHome ? "fixed inset-x-0 top-0" : "sticky top-0",
-          scrolled || !onHome
-            ? "border-b border-[var(--line)] bg-[rgba(6,9,8,0.72)] backdrop-blur-2xl"
-            : "border-b border-transparent bg-transparent",
+          "fixed inset-x-0 top-0 z-50 transition-[padding] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          open && "z-[70]",
+          scrolled && !open ? "px-3 pt-3 sm:px-6" : "px-0 pt-0",
         )}
       >
-        <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:h-[4.25rem] sm:gap-4 sm:px-6 lg:px-8">
-          <Link
-            href="/"
-            className="shrink-0 font-display text-[1.4rem] font-light leading-none tracking-[-0.03em] text-white sm:text-[1.55rem]"
-          >
-            Dokun <span className="italic text-[var(--brass)]">&amp;</span> Kazan
+        <div
+          className={cn(
+            "mx-auto flex max-w-7xl items-center justify-between gap-6 transition-[height,padding,background-color,border-color,box-shadow,border-radius,max-width] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
+            scrolled && !open
+              ? "h-14 max-w-7xl rounded-full border border-white/10 bg-[#111217]/85 pl-4 pr-2.5 shadow-[0_18px_50px_-18px_rgba(0,0,0,0.75)] backdrop-blur-xl sm:pl-5"
+              : "h-20 rounded-none border border-transparent bg-transparent px-5 sm:px-8 lg:h-24",
+          )}
+        >
+          <Link href="/" className="flex min-h-11 shrink-0 items-center transition-transform duration-300 ease-out hover:scale-95 motion-reduce:transition-none" aria-label="StampWell">
+            <BrandLogo
+              compact
+              className={cn(
+                "max-w-[7rem] sm:max-w-none",
+                scrolled && !open && "h-8 sm:h-10",
+              )}
+            />
           </Link>
 
-          <nav className="mx-auto hidden min-w-0 items-center justify-center gap-x-4 lg:flex xl:gap-x-5">
-            {links.map((l) => {
-              const active = pathname === l.href;
-              return (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  data-active={active ? "true" : "false"}
-                  className={cn(
-                    "nav-link",
-                    active ? "text-white" : "text-white/45 hover:text-white",
-                  )}
-                >
-                  {l.label}
-                </Link>
-              );
-            })}
+          <nav aria-label="Main" className="hidden flex-1 justify-center 2xl:flex">
+            <ul className="flex items-center gap-0.5 rounded-full border border-white/[0.08] bg-white/[0.03] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              {links.map((l) => {
+                const active = pathname === l.href || pathname.startsWith(`${l.href}/`);
+                return (
+                  <li key={l.href} className="relative">
+                    <Link
+                      href={l.href}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "relative inline-flex h-8 items-center whitespace-nowrap rounded-full px-2.5 text-[0.84rem] font-medium tracking-tight transition-colors duration-200",
+                        active ? "text-[#111217]" : "text-[#DFE5EB]/65 hover:text-[#DFE5EB]",
+                      )}
+                    >
+                      {active ? (
+                        <motion.span
+                          layoutId="nav-pill"
+                          className="absolute inset-0 -z-0 rounded-full bg-[#DFE5EB] shadow-[0_6px_18px_-8px_rgba(223,229,235,0.6)]"
+                          transition={{ type: "spring", stiffness: 420, damping: 36 }}
+                        />
+                      ) : null}
+                      <span className="relative">{l.label}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
           </nav>
 
-          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <div
-              className="font-nav flex items-center gap-1.5 text-[0.62rem] font-medium tracking-[0.12em] uppercase text-white/40"
+              className="hidden items-center gap-0.5 rounded-full border border-white/10 p-0.5 md:inline-flex"
+              role="group"
               aria-label={t("language")}
             >
-              {(["tr", "en"] as const).map((code, i) => (
-                <span key={code} className="inline-flex items-center gap-1.5">
-                  {i > 0 ? <span className="text-white/20">/</span> : null}
-                  <Link
-                    href={pathname}
-                    locale={code}
-                    className={cn(
-                      "transition-colors duration-300",
-                      locale === code
-                        ? "text-[var(--brass)]"
-                        : "hover:text-white",
-                    )}
-                  >
-                    {code}
-                  </Link>
-                </span>
+              {LOCALES.map((code) => (
+                <Link
+                  key={code}
+                  href={switchTo as never}
+                  locale={code}
+                  aria-current={locale === code ? "true" : undefined}
+                  className={cn(
+                    "inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 text-[0.68rem] font-semibold tracking-wider transition-colors",
+                    locale === code
+                      ? "bg-[#DFE5EB] text-[#111217]"
+                      : "text-[#DFE5EB]/55 hover:text-[#DFE5EB]",
+                  )}
+                >
+                  {code.toUpperCase()}
+                </Link>
               ))}
             </div>
 
+            <LoginLink className="hidden h-9 items-center rounded-full px-3.5 text-sm font-medium text-[#DFE5EB]/75 transition-colors hover:text-[#DFE5EB] 2xl:inline-flex" />
+
             <Link
-              href="/login"
-              className="nav-link hidden text-white/45 hover:text-white sm:inline-flex"
+              href="/pricing"
+              className="group hidden h-9 items-center gap-1.5 whitespace-nowrap rounded-full bg-[#D91E33] pl-4 pr-3.5 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_8px_24px_-10px_rgba(239,35,60,0.9)] transition-[transform,box-shadow] duration-200 hover:-translate-y-px hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_12px_28px_-10px_rgba(239,35,60,1)] 2xl:inline-flex"
             >
-              {t("login")}
+              {t("signup")}
+              <span aria-hidden className="transition-transform duration-200 group-hover:translate-x-0.5">→</span>
             </Link>
-            <Button
-              asChild
-              size="sm"
-              variant="ghost-light"
-              className="hidden sm:inline-flex"
-            >
-              <Link href="/signup">
-                <span className="relative z-10">{t("signup")}</span>
-              </Link>
-            </Button>
 
             <button
               type="button"
               aria-expanded={open}
+              aria-controls="site-mobile-nav"
               aria-label={open ? "Close menu" : "Open menu"}
               onClick={() => setOpen((v) => !v)}
-              className="relative flex h-10 w-10 items-center justify-center text-white lg:hidden"
+              className="relative flex size-11 items-center justify-center rounded-full text-[#DFE5EB] transition-colors hover:bg-white/5 2xl:hidden"
             >
-              <span className="sr-only">Menu</span>
-              <span className="flex w-5 flex-col gap-1.5">
+              <span className="sr-only">{open ? "Close menu" : "Open menu"}</span>
+              <div className="relative block h-3.5 w-[18px]">
                 <span
+                  aria-hidden
                   className={cn(
-                    "block h-px w-full origin-center bg-current transition duration-300",
-                    open && "translate-y-[7px] rotate-45",
+                    "absolute left-0 block h-0.5 w-full rounded-full bg-current transition-transform duration-300 ease-out",
+                    open ? "top-1/2 -translate-y-1/2 rotate-45" : "top-0",
                   )}
                 />
                 <span
+                  aria-hidden
                   className={cn(
-                    "block h-px w-full bg-current transition duration-300",
-                    open && "opacity-0",
+                    "absolute left-0 top-1/2 block h-0.5 w-full -translate-y-1/2 rounded-full bg-current transition-opacity duration-200",
+                    open ? "opacity-0" : "opacity-100",
                   )}
                 />
                 <span
+                  aria-hidden
                   className={cn(
-                    "block h-px w-full origin-center bg-current transition duration-300",
-                    open && "-translate-y-[7px] -rotate-45",
+                    "absolute left-0 block h-0.5 w-full rounded-full bg-current transition-transform duration-300 ease-out",
+                    open ? "top-1/2 -translate-y-1/2 -rotate-45" : "bottom-0",
                   )}
                 />
-              </span>
+              </div>
             </button>
           </div>
         </div>
-      </motion.header>
+
+        <AnimatePresence>
+          {open ? (
+            <motion.div
+              key="panel"
+              id="site-mobile-nav"
+              ref={panelRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="mx-3 mb-3 flex max-h-[min(80vh,42rem)] flex-col overflow-y-auto rounded-3xl border border-white/10 bg-[#171920] p-4 shadow-[0_30px_60px_-24px_rgba(0,0,0,0.7)] sm:mx-6 2xl:hidden"
+            >
+              <div className="flex items-center justify-between px-2 pb-4 pt-1">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#DFE5EB]/60">
+                  {t("language")}
+                </span>
+                <div className="inline-flex items-center gap-0.5 rounded-full bg-white/5 p-0.5" role="group" aria-label={t("language")}>
+                  {LOCALES.map((code) => (
+                    <Link
+                      key={code}
+                      href={switchTo as never}
+                      locale={code}
+                      aria-current={locale === code ? "true" : undefined}
+                      className={cn(
+                        "inline-flex h-11 min-w-12 items-center justify-center rounded-full px-3 text-xs font-semibold tracking-wider transition-colors",
+                        locale === code ? "bg-[#DFE5EB] text-[#111217]" : "text-[#DFE5EB]/60",
+                      )}
+                    >
+                      {code.toUpperCase()}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              <nav className="flex flex-col">
+                {links.map((l) => {
+                  const active = pathname === l.href || pathname.startsWith(`${l.href}/`);
+                  return (
+                    <Link
+                      key={l.href}
+                      href={l.href}
+                      className={cn(
+                        "flex items-center justify-between rounded-2xl px-3 py-3.5 text-base font-medium transition-colors",
+                        active
+                          ? "bg-white/5 text-[#DFE5EB]"
+                          : "text-[#DFE5EB]/80 hover:bg-white/5 hover:text-[#DFE5EB]",
+                      )}
+                    >
+                      {l.label}
+                      <span aria-hidden className={cn(active ? "text-[#ff5a6e]" : "text-[#DFE5EB]/60")}>
+                        →
+                      </span>
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/10 pt-4">
+                <LoginLink className="flex h-11 items-center justify-center rounded-full border border-white/15 text-sm font-medium text-[#DFE5EB]" />
+                <Link
+                  href="/pricing"
+                  className="flex h-11 items-center justify-center rounded-full bg-[#D91E33] text-sm font-semibold text-white"
+                >
+                  {t("signup")}
+                </Link>
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </header>
 
       <AnimatePresence>
         {open ? (
-          <motion.div
-            key="menu"
+          <motion.button
+            key="nav-backdrop"
+            type="button"
+            aria-label="Close"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] lg:hidden"
-          >
-            <button
-              type="button"
-              aria-label="Close"
-              className="absolute inset-0 bg-black/70 backdrop-blur-md"
-              onClick={() => setOpen(false)}
-            />
-            <motion.nav
-              initial={{ y: -20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -12, opacity: 0 }}
-              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute inset-x-0 top-0 border-b border-[var(--line)] bg-[var(--bg-elevated)] px-5 pb-10 pt-24"
-            >
-              <ul className="space-y-1">
-                {links.map((l, i) => {
-                  const active = pathname === l.href;
-                  return (
-                    <motion.li
-                      key={l.href}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.05 * i }}
-                    >
-                      <Link
-                        href={l.href}
-                        className={cn(
-                          "flex items-baseline justify-between border-b border-[var(--line)] py-4 font-display text-3xl font-light tracking-[-0.03em]",
-                          active ? "text-[var(--brass)]" : "text-white",
-                        )}
-                      >
-                        {l.label}
-                        <span className="section-label">
-                          {String(i + 1).padStart(2, "0")}
-                        </span>
-                      </Link>
-                    </motion.li>
-                  );
-                })}
-              </ul>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Button asChild variant="outline">
-                  <Link href="/login">
-                    <span className="relative z-10">{t("login")}</span>
-                  </Link>
-                </Button>
-                <Button asChild>
-                  <Link href="/signup">
-                    <span className="relative z-10 inline-flex items-center gap-2">
-                      {t("signup")}
-                      <span className="btn-arrow">→</span>
-                    </span>
-                  </Link>
-                </Button>
-              </div>
-            </motion.nav>
-          </motion.div>
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] 2xl:hidden"
+            onClick={() => setOpen(false)}
+          />
         ) : null}
       </AnimatePresence>
     </>

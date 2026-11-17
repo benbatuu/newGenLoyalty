@@ -1,0 +1,3 @@
+-- PointCard ledger types
+ALTER TYPE "StampLedgerType" ADD VALUE IF NOT EXISTS 'POINT_EARN';
+ALTER TYPE "StampLedgerType" ADD VALUE IF NOT EXISTS 'POINT_REDEEM';

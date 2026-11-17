@@ -42,6 +42,7 @@ class _InviteQrSheetState extends State<_InviteQrSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       padding: EdgeInsets.fromLTRB(
@@ -51,9 +52,9 @@ class _InviteQrSheetState extends State<_InviteQrSheet> {
         20 + MediaQuery.paddingOf(context).bottom,
       ),
       decoration: BoxDecoration(
-        color: kPanel,
+        color: c.panel,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: kLine),
+        border: Border.all(color: c.line),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -63,7 +64,7 @@ class _InviteQrSheetState extends State<_InviteQrSheet> {
             height: 4,
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
-              color: kLine,
+              color: c.line,
               borderRadius: BorderRadius.circular(99),
             ),
           ),
@@ -77,7 +78,7 @@ class _InviteQrSheetState extends State<_InviteQrSheet> {
                 ? 'Müşteri (${widget.phoneLabel}) bu kodu tarayıp Wallet\'a eklesin.'
                 : 'Müşteri bu kodu tarayıp Wallet\'a eklesin.',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: kMuted, height: 1.4),
+            style: TextStyle(color: c.muted, height: 1.4),
           ),
           const SizedBox(height: 20),
           Container(
@@ -85,26 +86,26 @@ class _InviteQrSheetState extends State<_InviteQrSheet> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: kLine),
+              border: Border.all(color: c.line),
             ),
             child: QrImageView(
               data: widget.url,
               size: 220,
               backgroundColor: Colors.white,
-              eyeStyle: const QrEyeStyle(
+              eyeStyle: QrEyeStyle(
                 eyeShape: QrEyeShape.square,
-                color: kInk,
+                color: c.ink,
               ),
-              dataModuleStyle: const QrDataModuleStyle(
+              dataModuleStyle: QrDataModuleStyle(
                 dataModuleShape: QrDataModuleShape.square,
-                color: kInk,
+                color: c.ink,
               ),
             ),
           ),
           const SizedBox(height: 14),
           SelectableText(
             widget.url,
-            style: const TextStyle(fontSize: 11, color: kMuted, height: 1.4),
+            style: TextStyle(fontSize: 11, color: c.muted, height: 1.4),
           ),
           const SizedBox(height: 16),
           Row(

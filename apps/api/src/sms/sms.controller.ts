@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Role } from '@prisma/client';
 import type { Request } from 'express';
@@ -19,6 +20,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { SmsService } from './sms.service';
 
 @Controller()
+@ApiTags("root")
+@ApiBearerAuth()
 export class SmsController {
   constructor(
     private readonly sms: SmsService,

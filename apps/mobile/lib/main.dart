@@ -6,6 +6,7 @@ import 'auth_state.dart';
 import 'screens/home_shell.dart';
 import 'screens/login_screen.dart';
 import 'theme.dart';
+import 'theme_mode_controller.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,13 +18,22 @@ class DokunKazanApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AuthState(ApiClient())..bootstrap(),
-      child: MaterialApp(
-        title: 'Dokun & Kazan',
-        debugShowCheckedModeBanner: false,
-        theme: buildAppTheme(),
-        home: const _Root(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthState(ApiClient())..bootstrap()),
+        ChangeNotifierProvider(create: (_) => ThemeModeController()..load()),
+      ],
+      child: Consumer<ThemeModeController>(
+        builder: (context, themeCtrl, _) {
+          return MaterialApp(
+            title: 'Dokun & Kazan',
+            debugShowCheckedModeBanner: false,
+            theme: buildAppTheme(Brightness.light),
+            darkTheme: buildAppTheme(Brightness.dark),
+            themeMode: themeCtrl.themeMode,
+            home: const _Root(),
+          );
+        },
       ),
     );
   }
@@ -35,7 +45,9 @@ class _Root extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();
-    if (!auth.ready) {
+    final themeCtrl = context.watch<ThemeModeController>();
+
+    if (!auth.ready || !themeCtrl.loaded) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );

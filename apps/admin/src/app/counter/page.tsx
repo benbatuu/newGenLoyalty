@@ -1,73 +1,51 @@
 "use client";
 
-import { FormEvent, Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { InviteQrModal } from "../../components/invite-qr-modal";
+import { filterWalletPrograms } from "../../components/wallet-invite-picker-modal";
 import {
-  Badge,
-  EmptyState,
   ErrorBanner,
-  Field,
-  FormSkeleton,
-  ListSkeleton,
   PageHeader,
-  Panel,
-  PanelHeader,
   RequireAuth,
-  SoftBox,
+  Skeleton,
   SuccessBanner,
-  btnGhost,
-  btnPrimary,
-  inputClassName,
 } from "../../components/ui";
-import { ApiError, api } from "../../lib/api";
-import { bustCache, useApiQuery } from "../../lib/use-api-query";
-
-const PAGE_SIZE = 15;
-
-type Customer = {
-  id: string;
-  phone: string;
-  displayName?: string | null;
-  stampCount: number;
-  rewardReady: boolean;
-  hasWallet?: boolean;
-};
-
-type Directory = {
-  stampsRequired: number;
-  rewardLabel: string;
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-  customers: Customer[];
-};
-
-type StampResult = {
-  customer: Customer;
-  stampsRequired: number;
-  rewardLabel: string;
-  stampsRemaining: number;
-  walletInviteUrl?: string | null;
-};
-
-type Summary = {
-  stampsToday: number;
-  redeemsToday: number;
-  totalCustomers: number;
-};
-
-type Filter = "all" | "ready";
-
-function formatPhone(phone: string) {
-  return phone.startsWith("0") ? phone : `0${phone}`;
-}
+import { api } from "../../lib/api";
+import { useApiQuery } from "../../lib/use-api-query";
+import {
+  addStamp,
+  earnCashback,
+  earnPoints,
+  parseTryToKurus,
+  redeem,
+  redeemCashback,
+  redeemPoints,
+  register,
+  showWalletQr,
+  submitRegister,
+  submitWalletInvite,
+} from "./_components/counter-handlers";
+import { CounterModals } from "./_components/counter-modals";
+import { CustomerList } from "./_components/customer-list";
+import { CustomerWorkspace, RegisterCard } from "./_components/customer-workspace";
+import { SideDrawer } from "../../components/side-drawer";
+import { TodayStrip } from "./_components/today-strip";
+import {
+  PAGE_SIZE,
+  type CashbackState,
+  type Customer,
+  type CounterBootstrap,
+  type CustomerCounterState,
+  type Directory,
+  type Filter,
+  type PointState,
+  type Summary,
+} from "./_components/types";
 
 export default function CounterPage() {
   return (
     <RequireAuth roles={["CASHIER", "STORE_OWNER"]}>
-      <Suspense fallback={<FormSkeleton rows={2} />}>
+      <Suspense fallback={<CounterSkeleton />}>
         <CounterContent />
       </Suspense>
     </RequireAuth>
@@ -87,29 +65,87 @@ function CounterContent() {
   const [busy, setBusy] = useState(false);
   const [prefilled, setPrefilled] = useState(false);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [invitePickerOpen, setInvitePickerOpen] = useState(false);
+  const [invitePickerMode, setInvitePickerMode] = useState<"register" | "wallet">("wallet");
+  const [pendingPhone, setPendingPhone] = useState<string | null>(null);
+  const [pointAmountTry, setPointAmountTry] = useState("");
+  const [pointCategory, setPointCategory] = useState<string | undefined>();
+  const [pointBalance, setPointBalance] = useState<number | null>(null);
+  const [cashbackAmountTry, setCashbackAmountTry] = useState("");
+  const [cashbackBalanceTry, setCashbackBalanceTry] = useState<string | null>(null);
+  const [cashbackRedeemTry, setCashbackRedeemTry] = useState("");
+  const [cashbackBasketTry, setCashbackBasketTry] = useState("");
 
+  // ── 1) Açılış: kartlar + bugünün özeti + kampanyalar + ödül kuralı (tek istek)
+  const {
+    data: boot,
+    setData: setBoot,
+    error: bootError,
+  } = useApiQuery<CounterBootstrap>("counter:boot", "/stamps/counter");
+
+  const programs = useMemo(() => boot?.programs ?? [], [boot]);
+  const pointProgram = programs.find((p) => p.type === "POINT_CARD");
+  const cashbackProgram = programs.find((p) => p.type === "CASHBACK_CARD");
+  const primaryMultiStamp = programs.find((p) => p.type === "MULTI_STAMP" && p.isPrimary);
+  const showClassicStampPanel = !primaryMultiStamp;
+  const walletPrograms = useMemo(() => filterWalletPrograms(programs), [programs]);
+  const needsProgramPicker = walletPrograms.length > 1;
+  const stampsRequired = boot?.reward.stampsRequired ?? 10;
+  const rewardLabel = boot?.reward.rewardLabel ?? "";
+
+  // ── 2) Müşteri listesi (lean — gereksiz sayımlar yok)
   const listPath =
-    `/stamps/customers/directory?filter=${filter}&take=${PAGE_SIZE}&page=${page}` +
+    `/stamps/customers/directory?lean=1&filter=${filter}&take=${PAGE_SIZE}&page=${page}` +
     (searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : "");
-
   const {
     data: directory,
+    setData: setDirectory,
     error: loadError,
-    loading,
-    refreshing,
-    reload,
-  } = useApiQuery<Directory>(
-    `counter:directory:${filter}:${page}:${searchQuery}`,
-    listPath,
-    { ttlMs: 15_000 },
-  );
+    loading: listLoading,
+    refreshing: listRefreshing,
+    reload: reloadList,
+  } = useApiQuery<Directory>(listPath, listPath);
 
-  const { data: summary, reload: reloadSummary } = useApiQuery<Summary>(
-    "counter:summary",
-    "/stamps/summary/today",
-    { ttlMs: 30_000 },
-  );
+  // ── 3) Seçili müşteri: güncel kayıt + tüm kart durumları (tek istek)
+  const statePath = selected ? `/stamps/customers/${selected.id}/counter-state` : null;
+  const {
+    data: custState,
+    loading: stateLoadingRaw,
+    reload: reloadState,
+  } = useApiQuery<CustomerCounterState>(statePath, statePath);
+  // Önceki müşterinin verisi yeni müşteriye karışmasın
+  const freshState = custState && selected && custState.customer.id === selected.id ? custState : null;
+  const stateLoading = !!selected && (stateLoadingRaw || !freshState);
 
+  const pointState = (pointProgram && (freshState?.states[pointProgram.id] as PointState | null)) || null;
+  const cashbackState =
+    (cashbackProgram && (freshState?.states[cashbackProgram.id] as CashbackState | null)) || null;
+
+  // Sunucudan gelen bakiye, yerel (işlem sonrası) bakiyeyi günceller
+  useEffect(() => {
+    setPointBalance(pointState?.balance ?? null);
+  }, [pointState]);
+  useEffect(() => {
+    setCashbackBalanceTry(cashbackState?.balanceTry ?? null);
+  }, [cashbackState]);
+
+  // Taze müşteri kaydı geldiğinde seçili müşteriyi ve listedeki satırı güncelle
+  const patchCustomer = useCallback(
+    (c: Partial<Customer> & { id: string }) => {
+      setSelected((prev) => (prev && prev.id === c.id ? { ...prev, ...c } : prev));
+      setDirectory((prev) =>
+        prev
+          ? { ...prev, customers: prev.customers.map((x) => (x.id === c.id ? { ...x, ...c } : x)) }
+          : prev,
+      );
+    },
+    [setDirectory],
+  );
+  useEffect(() => {
+    if (freshState) patchCustomer(freshState.customer);
+  }, [freshState, patchCustomer]);
+
+  // Arama — 300 ms gecikmeyle
   useEffect(() => {
     const t = setTimeout(() => {
       setSearchQuery(searchInput.trim());
@@ -118,413 +154,285 @@ function CounterContent() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
+  // Dar ekranda (liste üstte) müşteri seçilince işlem alanına kaydır
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const selectedId = selected?.id ?? null;
   useEffect(() => {
+    if (!selectedId || window.matchMedia("(min-width: 1024px)").matches) return;
+    workspaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selectedId]);
+
+  // Esc → müşteriyi kapat
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && selected && !invitePickerOpen && !inviteUrl) setSelected(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selected, invitePickerOpen, inviteUrl]);
+
+  /**
+   * İşlem sonrası: kasiyeri bekletmeden arka planda tazele.
+   * - Seçili müşterinin durumu (tek istek)
+   * - Bugünün sayıları (hafif istek)
+   */
+  const refreshAll = useCallback(async () => {
+    void reloadState(true);
+    void api<Summary & { rewardReadyCount: number }>("/stamps/summary/today")
+      .then((summary) => setBoot((prev) => (prev ? { ...prev, summary } : prev)))
+      .catch(() => {});
+  }, [reloadState, setBoot]);
+
+  const selectCustomer = useCallback(
+    (c: Customer) => {
+      setSelected((prev) => (prev?.id === c.id ? { ...prev, ...c } : c));
+      patchCustomer(c);
+      setError(null);
+      setOk(null);
+    },
+    [patchCustomer],
+  );
+
+  /** Yeni kayıt: detay çekmecesi açılmaz; davet penceresi doğrudan gösterilir, liste tazelenir */
+  const selectAfterRegister = useCallback(
+    (_c: Customer) => {
+      setSelected(null);
+      void reloadList(true);
+    },
+    [reloadList],
+  );
+
+  const openInvite = useCallback((url: string | null | undefined) => {
+    if (url) setInviteUrl(url);
+  }, []);
+
+  // ?customerId= / ?phone= bağlantıları
+  const handledUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    const fromCustomerId = searchParams.get("customerId");
+    if (fromCustomerId && directory) {
+      // Bağlantıdaki müşteri yalnızca bir kez seçilir; yoksa kapatınca yeniden açılıp döngü oluşur
+      if (handledUrlRef.current === `id:${fromCustomerId}`) return;
+      const match = directory.customers.find((c) => c.id === fromCustomerId);
+      if (match) {
+        handledUrlRef.current = `id:${fromCustomerId}`;
+        selectCustomer(match);
+      }
+      return;
+    }
     const fromUrl = searchParams.get("phone");
     if (fromUrl && !prefilled) {
       setSearchInput(fromUrl);
       setPhone(fromUrl);
       setPrefilled(true);
     }
-  }, [searchParams, prefilled]);
-
-  const refreshAll = useCallback(async () => {
-    await Promise.all([reload(true), reloadSummary(true)]);
-    bustCache("metrics");
-    bustCache("reports");
-    bustCache("customers");
-  }, [reload, reloadSummary]);
-
-  const selectCustomer = useCallback((c: Customer) => {
-    setSelected(c);
-    setError(null);
-    setOk(null);
-  }, []);
+  }, [searchParams, prefilled, directory, selectCustomer]);
 
   useEffect(() => {
+    if (searchParams.get("customerId")) return;
     if (!directory || !searchParams.get("phone") || !prefilled) return;
     const digits = searchParams.get("phone")!.replace(/\D/g, "");
+    if (handledUrlRef.current === `phone:${digits}`) return;
     const match = directory.customers.find((c) => c.phone.includes(digits));
-    if (match) selectCustomer(match);
+    if (match) {
+      handledUrlRef.current = `phone:${digits}`;
+      selectCustomer(match);
+    }
   }, [directory, searchParams, prefilled, selectCustomer]);
 
-  function openInvite(url: string | null | undefined) {
-    if (url) setInviteUrl(url);
-  }
-
-  async function register(e?: FormEvent) {
-    e?.preventDefault();
-    const raw = phone.trim() || searchInput.trim();
-    if (!raw) {
-      setError("Kayıt için telefon girin");
-      return;
-    }
-    setError(null);
-    setOk(null);
-    setBusy(true);
-    try {
-      const data = await api<StampResult>("/stamps/customers", {
-        method: "POST",
-        body: JSON.stringify({ phone: raw }),
-      });
-      selectCustomer(data.customer);
-      setOk(
-        data.walletInviteUrl
-          ? "Kayıt + ilk damga tamam. Müşteri QR ile Wallet’a ekleyebilir."
-          : "Kayıt + ilk damga tamam.",
-      );
-      openInvite(data.walletInviteUrl);
-      setPhone("");
-      await refreshAll();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Kayıt başarısız");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function addStamp() {
-    if (!selected) return;
-    setError(null);
-    setOk(null);
-    setBusy(true);
-    try {
-      const data = await api<StampResult>(
-        `/stamps/customers/${selected.id}/stamp`,
-        {
-          method: "POST",
-          body: JSON.stringify({ source: "cashier" }),
-        },
-      );
-      selectCustomer(data.customer);
-      setOk(
-        data.customer.rewardReady
-          ? `Damga eklendi — ödül hazır: ${data.rewardLabel}`
-          : `Damga eklendi (${data.customer.stampCount}/${data.stampsRequired})`,
-      );
-      openInvite(data.walletInviteUrl);
-      await refreshAll();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Damga eklenemedi");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function showWalletQr() {
-    if (!selected) return;
-    setError(null);
-    setBusy(true);
-    try {
-      const data = await api<{ walletInviteUrl: string }>(
-        `/stamps/customers/${selected.id}/wallet-invite`,
-      );
-      openInvite(data.walletInviteUrl);
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Davet linki alınamadı",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function redeem() {
-    if (!selected) return;
-    setError(null);
-    setOk(null);
-    setBusy(true);
-    try {
-      const data = await api<{ customer: Customer; redeemed: string }>(
-        `/stamps/customers/${selected.id}/redeem`,
-        { method: "POST" },
-      );
-      selectCustomer(data.customer);
-      setOk(`Ödül kullanıldı: ${data.redeemed}`);
-      await refreshAll();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Ödül kullanılamadı");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const stampsRequired = directory?.stampsRequired ?? 10;
-  const rewardLabel = directory?.rewardLabel ?? "";
-  const customers = directory?.customers ?? [];
-  const totalPages = directory?.totalPages ?? 1;
-  const total = directory?.total ?? 0;
-
-  if (loading && !directory) {
-    return <ListSkeleton rows={6} />;
-  }
+  const handlerDeps = {
+    selected,
+    pointProgram,
+    cashbackProgram,
+    pointAmountTry,
+    pointCategory,
+    cashbackAmountTry,
+    cashbackRedeemTry,
+    cashbackBasketTry,
+    phone,
+    searchInput,
+    pendingPhone,
+    needsProgramPicker,
+    walletPrograms,
+    setError,
+    setOk,
+    setBusy,
+    setPointBalance,
+    setPointAmountTry,
+    setCashbackAmountTry,
+    setCashbackRedeemTry,
+    setCashbackBasketTry,
+    setCashbackBalanceTry,
+    setPhone,
+    setPendingPhone,
+    setInvitePickerOpen,
+    setInvitePickerMode,
+    selectCustomer,
+    openInvite,
+    refreshAll,
+  };
+  const registerDeps = { ...handlerDeps, selectCustomer: selectAfterRegister };
 
   return (
-    <div className="w-full space-y-5">
-      {inviteUrl ? (
-        <InviteQrModal
-          url={inviteUrl}
-          phoneLabel={
-            selected
-              ? selected.displayName?.trim() || formatPhone(selected.phone)
-              : undefined
-          }
-          onClose={() => setInviteUrl(null)}
-        />
-      ) : null}
-
-      <PageHeader
-        eyebrow="Operasyon"
-        title="Tezgâh"
-        subtitle="Müşteri listesinden seç, damga ekle veya ödül kullan. Günde 1 damga (1 ziyaret)."
-        actions={
-          <button
-            type="button"
-            className={btnGhost()}
-            disabled={refreshing}
-            onClick={() => void refreshAll()}
-          >
-            {refreshing ? "Yenileniyor…" : "Yenile"}
-          </button>
+    <div className="w-full space-y-4">
+      <CounterModals
+        inviteUrl={inviteUrl}
+        onCloseInvite={() => setInviteUrl(null)}
+        selected={selected}
+        pendingPhone={pendingPhone}
+        invitePickerOpen={invitePickerOpen}
+        invitePickerMode={invitePickerMode}
+        walletPrograms={walletPrograms}
+        phone={phone}
+        busy={busy}
+        onClosePicker={() => {
+          setInvitePickerOpen(false);
+          setPendingPhone(null);
+        }}
+        onConfirmPicker={(programIds) =>
+          invitePickerMode === "register"
+            ? submitRegister(registerDeps, programIds)
+            : submitWalletInvite(handlerDeps, programIds)
         }
       />
-      <ErrorBanner message={error || loadError} />
+
+      <PageHeader
+        eyebrow="İşletmem"
+        title="Kasa"
+        subtitle="Müşteriyi bulun, damga verin veya hazır ödülü kullandırın."
+        help="Telefonun tamamı, son 4 hanesi veya isimle arayın. Her ziyarette en fazla bir damga verilir; ödül dolunca «Ödülü kullandır» açılır."
+        actions={
+          selected ? (
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 text-[0.8125rem] font-medium text-[var(--ink)] transition hover:bg-[var(--surface)]"
+            >
+              ＋ Yeni müşteri
+            </button>
+          ) : null
+        }
+      />
+
+      <ErrorBanner message={error || loadError || bootError} />
       <SuccessBanner message={ok} />
 
-      {summary ? (
-        <div className="grid grid-cols-3 gap-2">
-          {(
-            [
-              ["Bugün damga", summary.stampsToday],
-              ["Bugün ödül", summary.redeemsToday],
-              ["Müşteri", summary.totalCustomers],
-            ] as const
-          ).map(([label, value]) => (
-            <SoftBox key={label} className="text-center">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-                {label}
-              </p>
-              <p className="mt-1 font-[family-name:var(--font-display)] text-2xl tabular-nums">
-                {value}
-              </p>
-            </SoftBox>
-          ))}
+      <TodayStrip data={boot} />
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] lg:items-start">
+        <div className="lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]">
+          <CustomerList
+            searchInput={searchInput}
+            onSearchInputChange={setSearchInput}
+            filter={filter}
+            onFilterChange={(f) => {
+              setFilter(f);
+              setPage(1);
+            }}
+            customers={listLoading && !directory ? null : (directory?.customers ?? [])}
+            total={directory?.total ?? 0}
+            page={page}
+            totalPages={directory?.totalPages ?? 1}
+            onPageChange={setPage}
+            stampsRequired={stampsRequired}
+            selectedId={selected?.id ?? null}
+            onSelect={selectCustomer}
+            onRegisterFromSearch={(p) => {
+              setPhone(p);
+              void register({ ...registerDeps, phone: p });
+            }}
+            refreshing={listRefreshing}
+            busy={busy}
+          />
         </div>
-      ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Panel padded={false}>
-          <div className="border-b border-[var(--line)] px-5 py-4 sm:px-6">
-            <PanelHeader
-              title="Müşteriler"
-              description={`${total} kayıt · sayfa ${page}/${totalPages}`}
-            />
-            <div className="mt-4 flex flex-col gap-3">
-              <input
-                className={inputClassName()}
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Telefon veya son hanelerle filtrele (isteğe bağlı)…"
-              />
-              <div className="flex flex-wrap gap-2">
-                {(
-                  [
-                    ["all", "Tümü"],
-                    ["ready", "Ödül hazır"],
-                  ] as const
-                ).map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    className={`rounded-[var(--radius-sm)] border px-3 py-1.5 text-sm font-medium transition ${
-                      filter === id
-                        ? "border-[var(--accent)] bg-[var(--accent)] text-white"
-                        : "border-[var(--line)] bg-white text-[var(--muted)] hover:bg-[var(--surface)]"
-                    }`}
-                    onClick={() => {
-                      setFilter(id);
-                      setPage(1);
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {customers.length === 0 ? (
-            <div className="p-5 sm:p-6">
-              <EmptyState
-                title="Müşteri yok"
-                description={
-                  searchQuery || filter === "ready"
-                    ? "Filtreyi değiştir veya yeni kayıt ekle."
-                    : "Sağdaki formdan ilk müşteriyi kaydedin."
-                }
-              />
-            </div>
-          ) : (
-            <ul className="divide-y divide-[var(--line)]">
-              {customers.map((c) => {
-                const active = selected?.id === c.id;
-                return (
-                  <li key={c.id}>
-                    <button
-                      type="button"
-                      onClick={() => selectCustomer(c)}
-                      className={`flex w-full items-center justify-between gap-3 px-5 py-3.5 text-left transition sm:px-6 ${
-                        active
-                          ? "bg-[var(--accent-soft)]"
-                          : "hover:bg-[var(--surface)]"
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <p className="font-medium text-[var(--ink)]">
-                          {c.displayName?.trim() || formatPhone(c.phone)}
-                        </p>
-                        <p className="text-xs text-[var(--muted)]">
-                          {c.displayName?.trim()
-                            ? formatPhone(c.phone)
-                            : null}
-                          {c.displayName?.trim() ? " · " : null}
-                          {c.stampCount}/{stampsRequired} damga
-                          {c.hasWallet ? " · Wallet" : ""}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        {c.rewardReady ? (
-                          <Badge tone="success">Ödül hazır</Badge>
-                        ) : (
-                          <span className="text-xs tabular-nums text-[var(--muted)]">
-                            {Math.max(stampsRequired - c.stampCount, 0)} kaldı
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-          {totalPages > 1 ? (
-            <div className="flex items-center justify-between gap-3 border-t border-[var(--line)] px-5 py-3 sm:px-6">
-              <button
-                type="button"
-                className={btnGhost()}
-                disabled={page <= 1 || busy || refreshing}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                ← Önceki
-              </button>
-              <p className="text-xs text-[var(--muted)]">
-                {page} / {totalPages}
-              </p>
-              <button
-                type="button"
-                className={btnGhost()}
-                disabled={page >= totalPages || busy || refreshing}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Sonraki →
-              </button>
-            </div>
-          ) : null}
-        </Panel>
-
-        <aside className="space-y-5 xl:sticky xl:top-6 xl:self-start">
-          <Panel>
-            <PanelHeader
-              title="Yeni müşteri"
-              description="Kayıt otomatik ilk damgayı verir."
-            />
-            <form
-              onSubmit={(e) => void register(e)}
-              className="flex flex-col gap-3"
-            >
-              <Field label="Telefon">
-                <input
-                  className={inputClassName()}
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="05xx xxx xx xx"
-                />
-              </Field>
-              <button
-                type="submit"
-                className={btnPrimary()}
-                disabled={busy || !phone.trim()}
-              >
-                Kayıt + ilk damga
-              </button>
-            </form>
-          </Panel>
-
+        <div className="min-w-0 scroll-mt-16" ref={workspaceRef}>
           {selected ? (
-            <Panel className="border-[var(--accent)]/20 bg-gradient-to-br from-white to-[var(--accent-soft)]">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="font-[family-name:var(--font-display)] text-xl">
-                    {selected.displayName?.trim() ||
-                      formatPhone(selected.phone)}
-                  </h2>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
-                    {selected.displayName?.trim()
-                      ? `${formatPhone(selected.phone)} · `
-                      : null}
-                    {selected.stampCount}/{stampsRequired} damga
-                    {selected.rewardReady
-                      ? ` — ${rewardLabel}`
-                      : ` · ${Math.max(stampsRequired - selected.stampCount, 0)} kaldı`}
-                    {selected.hasWallet ? " · Wallet" : ""}
-                  </p>
-                </div>
-                {selected.rewardReady ? (
-                  <Badge tone="success">Ödül hazır</Badge>
-                ) : null}
-              </div>
-              <div className="mt-4 flex flex-col gap-2">
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <button
-                    type="button"
-                    className={`${btnPrimary()} flex-1`}
-                    disabled={busy || selected.rewardReady}
-                    onClick={() => void addStamp()}
-                  >
-                    Damga ekle
-                  </button>
-                  <button
-                    type="button"
-                    className={`${btnGhost()} flex-1`}
-                    disabled={busy || !selected.rewardReady}
-                    onClick={() => void redeem()}
-                  >
-                    Ödül kullan
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  className={btnGhost()}
-                  disabled={busy}
-                  onClick={() => void showWalletQr()}
-                >
-                  Wallet davet QR
-                </button>
-              </div>
-              {selected.rewardReady ? (
-                <p className="mt-2 text-[11px] text-[var(--muted)]">
-                  Ödül hazır — yeni damga için önce ödülü kullanın.
-                </p>
-              ) : null}
-            </Panel>
+            <SideDrawer open onClose={() => setSelected(null)} title="Müşteri detayı">
+            <CustomerWorkspace
+              key={selected.id}
+              customer={selected}
+              stateLoading={stateLoading}
+              stampsRequired={stampsRequired}
+              rewardLabel={rewardLabel}
+              showClassicStampPanel={showClassicStampPanel}
+              busy={busy}
+              onClose={() => setSelected(null)}
+              onAddStamp={async () => {
+                // Sonuç (başarı ya da hata) sayfa üstündeki bildirimde görünsün diye çekmece kapanır
+                await addStamp(handlerDeps);
+                setSelected(null);
+              }}
+              onRedeem={() => redeem(handlerDeps)}
+              onShowWalletQr={() => showWalletQr(handlerDeps)}
+              pointProgram={pointProgram}
+              pointBalance={pointBalance}
+              pointAmountTry={pointAmountTry}
+              onPointAmountTryChange={setPointAmountTry}
+              pointCategory={pointCategory}
+              onPointCategoryChange={setPointCategory}
+              pointCategories={pointState?.categories ?? []}
+              pointRedeemOptions={pointState?.redeemOptions ?? []}
+              onEarnPoints={() => earnPoints(handlerDeps)}
+              onRedeemPoints={(cost, label) => redeemPoints(handlerDeps, cost, label)}
+              cashbackProgram={cashbackProgram}
+              cashbackBalanceTry={cashbackBalanceTry}
+              cashbackEarnPercent={cashbackState?.earnPercent ?? null}
+              cashbackAmountTry={cashbackAmountTry}
+              onCashbackAmountTryChange={setCashbackAmountTry}
+              cashbackBasketTry={cashbackBasketTry}
+              onCashbackBasketTryChange={setCashbackBasketTry}
+              cashbackRedeemTry={cashbackRedeemTry}
+              onCashbackRedeemTryChange={setCashbackRedeemTry}
+              onEarnCashback={() => earnCashback(handlerDeps)}
+              onRedeemCashback={() => redeemCashback(handlerDeps)}
+              parseTryToKurus={parseTryToKurus}
+              programs={programs}
+              states={freshState?.states}
+              onCustomerUpdate={(c) => patchCustomer({ id: selected.id, ...c })}
+              onRefresh={refreshAll}
+              setBusy={setBusy}
+              setError={setError}
+              setOk={setOk}
+            />
+            </SideDrawer>
           ) : (
-            <SoftBox>
-              <p className="text-sm text-[var(--muted)]">
-                Listeden bir müşteri seçin veya yeni kayıt oluşturun.
-              </p>
-            </SoftBox>
+            <div className="space-y-4">
+              <RegisterCard
+                phone={phone}
+                onPhoneChange={setPhone}
+                onRegister={(e) => register(registerDeps, e)}
+                busy={busy}
+              />
+              <div className="rounded-xl border border-dashed border-[var(--line-strong)] px-5 py-10 text-center">
+                <p className="text-[0.9375rem] font-medium text-[var(--ink)]">Müşteri seçilmedi</p>
+                <p className="mt-1 text-[0.8125rem] text-[var(--muted)]">
+                  Soldan bir müşteri seçin veya telefonla arayın. Damga, ödül ve kart işlemleri burada açılır.
+                </p>
+              </div>
+            </div>
           )}
-        </aside>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CounterSkeleton() {
+  return (
+    <div className="w-full space-y-4" aria-busy="true" aria-label="Kasa yükleniyor">
+      <div className="space-y-2">
+        <Skeleton className="h-2.5 w-20" />
+        <Skeleton className="h-6 w-28" />
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-[68px] rounded-xl" />
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
+        <Skeleton className="h-[480px] rounded-xl" />
+        <Skeleton className="h-[200px] rounded-xl" />
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -18,7 +19,7 @@ class StaffScreen extends StatefulWidget {
 class _StaffScreenState extends State<StaffScreen> {
   final _name = TextEditingController();
   final _email = TextEditingController();
-  final _password = TextEditingController(text: 'Password123!');
+  late final TextEditingController _password;
   List<StaffMember> _staff = [];
   bool _loading = true;
   bool _inviting = false;
@@ -29,6 +30,9 @@ class _StaffScreenState extends State<StaffScreen> {
   @override
   void initState() {
     super.initState();
+    _password = TextEditingController(
+      text: kDebugMode ? 'Password123!' : '',
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -120,8 +124,9 @@ class _StaffScreenState extends State<StaffScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return RefreshIndicator(
-      color: kAccent,
+      color: c.accent,
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
@@ -134,7 +139,7 @@ class _StaffScreenState extends State<StaffScreen> {
           if (_ok != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: Text(_ok!, style: const TextStyle(color: kAccent)),
+              child: Text(_ok!, style: TextStyle(color: c.accent)),
             ),
           PremiumCard(
             child: Column(
@@ -170,7 +175,7 @@ class _StaffScreenState extends State<StaffScreen> {
           const SectionLabel('Ekip'),
           const SizedBox(height: 8),
           if (_loading)
-            const Center(child: CircularProgressIndicator(color: kAccent))
+            Center(child: CircularProgressIndicator(color: c.accent))
           else if (_staff.isEmpty)
             const EmptyState(title: 'Henüz kasiyer yok')
           else
@@ -181,8 +186,8 @@ class _StaffScreenState extends State<StaffScreen> {
                   child: Row(
                     children: [
                       CircleAvatar(
-                        backgroundColor: kAccentMist,
-                        foregroundColor: kAccent,
+                        backgroundColor: c.brandMist,
+                        foregroundColor: c.accent,
                         child: Text(
                           u.name.isNotEmpty ? u.name[0].toUpperCase() : '?',
                         ),
@@ -198,7 +203,7 @@ class _StaffScreenState extends State<StaffScreen> {
                             ),
                             Text(
                               u.email,
-                              style: const TextStyle(color: kMuted, fontSize: 13),
+                              style: TextStyle(color: c.muted, fontSize: 13),
                             ),
                           ],
                         ),

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { PageShell } from "@/components/PageShell";
+import { LegalDocument } from "@/components/marketing/legal/LegalDocument";
 import { buildPageMetadata } from "@/lib/seo";
 
 export async function generateMetadata({
@@ -29,12 +29,11 @@ export default async function TermsPage({
   const paragraphs = t.raw("termsBody") as string[];
 
   return (
-    <PageShell title={t("termsTitle")} intro={t("lastUpdated")} narrow>
-      <div className="space-y-5 text-[0.98rem] font-light leading-relaxed text-[var(--ink)]/85">
-        {paragraphs.map((p) => (
-          <p key={p.slice(0, 48)}>{p}</p>
-        ))}
-      </div>
-    </PageShell>
+    <LegalDocument
+      eyebrow="Terms"
+      title={t("termsTitle")}
+      updated={t("lastUpdated")}
+      paragraphs={paragraphs}
+    />
   );
 }

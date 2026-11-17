@@ -10,6 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Role, StampSource } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
@@ -21,18 +22,27 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import {
   AddStampDto,
+  RedeemRewardDto,
   FindCustomerQueryDto,
   ListCustomersQueryDto,
   RegisterCustomerDto,
   ScanPassDto,
+  ScanCashbackDto,
+  WalletInviteDto,
 } from './dto/stamps.dto';
+import { CounterService } from './counter.service';
 import { StampsService } from './stamps.service';
 
 @Controller('stamps')
+@ApiTags("stamps")
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, TenantGuard)
 @Roles(Role.SUPER_ADMIN, Role.STORE_OWNER, Role.CASHIER)
 export class StampsController {
-  constructor(private readonly stampsService: StampsService) {}
+  constructor(
+    private readonly stampsService: StampsService,
+    private readonly counterService: CounterService,
+  ) {}
 
   private tenantIdOf(user: AuthUser): string {
     if (!user.tenantId) {
@@ -54,6 +64,67 @@ export class StampsController {
     );
   }
 
+  /** Pass QR → indirim kartı doğrula */
+  @Post('scan-discount')
+  @RequirePermissions('customer:write')
+  scanDiscount(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ScanPassDto & { programId: string; categoryId?: string },
+  ) {
+    return this.stampsService.verifyDiscountByPassCode(
+      this.tenantIdOf(user),
+      dto.code,
+      dto.programId,
+      dto.categoryId,
+    );
+  }
+
+  /** Pass QR → cashback kazanım (CASHBACK_CARD, customerId:programId barcode) */
+  @Post('scan-cashback')
+  @RequirePermissions('customer:write')
+  scanCashback(@CurrentUser() user: AuthUser, @Body() dto: ScanCashbackDto) {
+    return this.stampsService.scanCashbackByPassCode(
+      this.tenantIdOf(user),
+      dto.code,
+      user.id,
+      {
+        amountKurus: dto.amountKurus,
+        categoryId: dto.categoryId,
+        confirmed: dto.confirmed,
+        posReceiptId: dto.posReceiptId,
+      },
+    );
+  }
+
+  /** Kasa açılışı — kartlar, bugünün özeti, aktif kampanyalar, ödül kuralı (tek istek) */
+  @Get('counter')
+  @RequirePermissions('customer:write', 'reports:read')
+  counter(@CurrentUser() user: AuthUser) {
+    return this.counterService.bootstrap(
+      this.tenantIdOf(user),
+      user.role === Role.CASHIER ? (user.branchId ?? null) : undefined,
+    );
+  }
+
+  /** Müşteri profili — özet ve tüm hareketler */
+  @Get('customers/:customerId/timeline')
+  @Roles(Role.STORE_OWNER, Role.SUPER_ADMIN)
+  @RequirePermissions('customer:write')
+  customerTimeline(@CurrentUser() user: AuthUser, @Param('customerId') customerId: string) {
+    return this.stampsService.customerTimeline(this.tenantIdOf(user), customerId);
+  }
+
+  /** Kasa — seçilen müşteri + tüm kartların durumu (tek istek) */
+  @Get('customers/:id/counter-state')
+  @RequirePermissions('customer:write')
+  counterState(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.counterService.customerState(
+      this.tenantIdOf(user),
+      id,
+      user.role === Role.CASHIER ? (user.branchId ?? null) : undefined,
+    );
+  }
+
   @Get('customers/directory')
   @RequirePermissions('customer:write')
   directory(
@@ -65,6 +136,7 @@ export class StampsController {
       filter: query.filter ?? 'all',
       take: query.take ?? 20,
       page: query.page ?? 1,
+      lean: query.lean === '1',
     });
   }
 
@@ -112,7 +184,15 @@ export class StampsController {
       this.tenantIdOf(user),
       dto.phone,
       user.id,
+      dto.programIds,
     );
+  }
+
+  /** Wallet davetine uygun aktif kartlar */
+  @Get('wallet-invite/programs')
+  @RequirePermissions('customer:write')
+  walletInvitePrograms(@CurrentUser() user: AuthUser) {
+    return this.stampsService.listWalletInvitePrograms(this.tenantIdOf(user));
   }
 
   @Get('customers/:customerId/export')
@@ -153,6 +233,7 @@ export class StampsController {
       customerId,
       user.id,
       dto.source ?? StampSource.cashier,
+      { productGroupId: dto.productGroupId },
     );
   }
 
@@ -169,16 +250,32 @@ export class StampsController {
     );
   }
 
+  @Post('customers/:customerId/wallet-invite')
+  @RequirePermissions('customer:write')
+  walletInviteWithPrograms(
+    @CurrentUser() user: AuthUser,
+    @Param('customerId') customerId: string,
+    @Body() dto: WalletInviteDto,
+  ) {
+    return this.stampsService.walletInviteLink(
+      this.tenantIdOf(user),
+      customerId,
+      dto.programIds,
+    );
+  }
+
   @Post('customers/:customerId/redeem')
   @RequirePermissions('reward:redeem')
   redeem(
     @CurrentUser() user: AuthUser,
     @Param('customerId') customerId: string,
+    @Body() dto: RedeemRewardDto,
   ) {
     return this.stampsService.redeemReward(
       this.tenantIdOf(user),
       customerId,
       user.id,
+      dto.tierId,
     );
   }
 
@@ -188,10 +285,27 @@ export class StampsController {
     return this.stampsService.dailySummary(this.tenantIdOf(user));
   }
 
-  @Get('reports')
+  /** Son sadakat hareketleri (damga, ödül, puan…) — panel özet akışı */
+  @Get('activity/recent')
   @Roles(Role.STORE_OWNER, Role.SUPER_ADMIN)
   @RequirePermissions('reports:read')
-  reports(@CurrentUser() user: AuthUser) {
-    return this.stampsService.reports(this.tenantIdOf(user));
+  recentActivity(
+    @CurrentUser() user: AuthUser,
+    @Query('take') take?: string,
+  ) {
+    const n = Math.min(20, Math.max(1, Number(take) || 8));
+    return this.stampsService.recentActivity(this.tenantIdOf(user), n);
+  }
+
+  @Get('reports/near-reward/export.csv')
+  @Roles(Role.STORE_OWNER, Role.SUPER_ADMIN)
+  @RequirePermissions('reports:read')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="near-reward.csv"',
+  )
+  async exportNearReward(@CurrentUser() user: AuthUser) {
+    return this.stampsService.exportNearRewardCsv(this.tenantIdOf(user));
   }
 }

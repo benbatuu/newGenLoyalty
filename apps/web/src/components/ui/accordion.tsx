@@ -12,10 +12,7 @@ export function AccordionItem({
 }: React.ComponentProps<typeof AccordionPrimitive.Item>) {
   return (
     <AccordionPrimitive.Item
-      className={cn(
-        "border-b border-[var(--line)] transition-colors data-[state=open]:border-[var(--brass)]/40",
-        className,
-      )}
+      className={cn("border-b border-foreground/[0.08] last:border-b-0", className)}
       {...props}
     />
   );
@@ -30,15 +27,13 @@ export function AccordionTrigger({
     <AccordionPrimitive.Header className="flex">
       <AccordionPrimitive.Trigger
         className={cn(
-          "group flex flex-1 items-center justify-between gap-6 py-7 text-left font-display text-[1.3rem] font-medium tracking-[-0.02em] text-white transition-colors hover:text-[var(--brass)] sm:text-[1.5rem] [&[data-state=open]>span]:rotate-45",
+          "group flex flex-1 items-center justify-between gap-4 py-5 text-left text-base font-medium text-foreground transition-colors hover:text-primary sm:text-lg [&[data-state=open]>svg]:rotate-45",
           className,
         )}
         {...props}
       >
         {children}
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center border border-[var(--line)] transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:border-[var(--brass)] group-data-[state=open]:border-[var(--brass)] group-data-[state=open]:bg-[var(--brass-soft)] group-data-[state=open]:shadow-[0_0_24px_var(--glow)]">
-          <Plus className="h-3.5 w-3.5 text-[var(--muted)] transition-colors group-data-[state=open]:text-[var(--brass)]" />
-        </span>
+        <Plus className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]" />
       </AccordionPrimitive.Trigger>
     </AccordionPrimitive.Header>
   );
@@ -56,7 +51,7 @@ export function AccordionContent({
     >
       <div
         className={cn(
-          "max-w-2xl pb-8 text-[0.98rem] font-light leading-[1.8] text-[var(--muted)]",
+          "max-w-2xl pb-5 text-[0.95rem] leading-relaxed text-muted-foreground animate-accordion-content-in",
           className,
         )}
       >

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { PageShell } from "@/components/PageShell";
+import { MarketingSurface } from "@/components/marketing/MarketingSurface";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAdminLoginUrl } from "@/lib/public-urls";
 import { buildPageMetadata } from "@/lib/seo";
 
@@ -37,51 +37,48 @@ export default async function LoginPage({
     <PageShell
       title={t("loginTitle")}
       intro={t("loginIntro")}
+      eyebrow="Login"
       wide
-      heroImage="https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&w=2000&q=80"
-      heroAlt={t("loginTitle")}
     >
-      <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">{t("loginTitle")}</CardTitle>
-            <CardDescription className="text-base">
-              {t("loginHint")}
-            </CardDescription>
-            {adminLogin ? (
-              <Button asChild className="mt-8 w-full sm:w-auto" size="lg">
-                <a href={adminLogin}>
-                  <span className="relative z-10 inline-flex items-center gap-2">
-                    {t("loginCta")}
-                    <span className="btn-arrow" aria-hidden>
-                      →
-                    </span>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <MarketingSurface>
+          <h2 className="font-display text-2xl tracking-tight text-foreground">
+            {t("loginTitle")}
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
+            {t("loginHint")}
+          </p>
+          {adminLogin ? (
+            <Button asChild className="mt-8 w-full sm:w-auto" size="lg">
+              <a href={adminLogin}>
+                <span className="relative z-10 inline-flex items-center gap-2">
+                  {t("loginCta")}
+                  <span className="btn-arrow" aria-hidden>
+                    →
                   </span>
-                </a>
-              </Button>
-            ) : (
-              <p className="mt-8 text-sm text-[var(--muted)]">{t("loginHint")}</p>
-            )}
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader>
-            <p className="section-label">{nav("signup")}</p>
-            <CardTitle className="mt-3 text-2xl">
-              {locale === "tr" ? "Hesabınız yok mu?" : "New here?"}
-            </CardTitle>
-            <CardDescription className="text-base">
-              {locale === "tr"
-                ? "Kafe kaydı için başvurun — onboarding sonrası giriş bilgileri paylaşılır."
-                : "Apply for a café account — credentials are shared after onboarding."}
-            </CardDescription>
-            <Button asChild variant="outline" className="mt-8 w-full sm:w-auto">
-              <Link href="/signup">
-                <span className="relative z-10">{nav("signup")}</span>
-              </Link>
+                </span>
+              </a>
             </Button>
-          </CardHeader>
-        </Card>
+          ) : (
+            <p className="mt-8 text-sm text-muted-foreground">{t("loginHint")}</p>
+          )}
+        </MarketingSurface>
+        <MarketingSurface>
+          <p className="text-sm font-medium text-muted-foreground">{nav("signup")}</p>
+          <h2 className="mt-3 font-display text-2xl tracking-tight text-foreground">
+            {locale === "tr" ? "Hesabınız yok mu?" : "New here?"}
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
+            {locale === "tr"
+              ? "Kafe kaydı için başvurun — onboarding sonrası giriş bilgileri paylaşılır."
+              : "Apply for a café account — credentials are shared after onboarding."}
+          </p>
+          <Button asChild variant="outline" className="mt-8 w-full sm:w-auto">
+            <Link href="/pricing">
+              <span className="relative z-10">{nav("signup")}</span>
+            </Link>
+          </Button>
+        </MarketingSurface>
       </div>
     </PageShell>
   );

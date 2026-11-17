@@ -1,37 +1,84 @@
 {
   "meta": {
-    "title": "Dokun & Kazan",
-    "description": "Küçük kafeler ve butik işletmeler için Apple/Google Wallet tabanlı dijital damga kartı. Uygulama indirmeden sadakat, SMS davet, personel paneli.",
-    "keywords": "dijital damga kartı, sadakat programı, apple wallet, google wallet, kafe sadakat, punch card, türkiye",
-    "ogImageAlt": "Dokun & Kazan — Wallet damga kartı"
+    "title": "StampWell — Her ziyaret bir adım.",
+    "description": "Türkiye'deki kafe, perakende ve hizmet işletmeleri için Wallet tabanlı sadakat platformu. Damga, puan, cashback ve daha fazlası — müşteri uygulaması yok.",
+    "keywords": "StampWell, StampWell, dijital damga kartı, sadakat programı, apple wallet, google wallet, kafe sadakati, türkiye",
+    "ogImageAlt": "StampWell — Her ziyaret bir adım."
   },
   "nav": {
-    "how": "Nasıl",
+    "how": "Nasıl çalışır",
     "features": "Özellikler",
-    "pricing": "Fiyat",
+    "programs": "Programlar",
+    "pricing": "Fiyatlandırma",
     "sectors": "Sektörler",
     "useCases": "Senaryolar",
     "contact": "İletişim",
     "login": "Giriş",
     "language": "Dil",
-    "signup": "Kayıt"
+    "signup": "Kayıt ol"
   },
   "home": {
-    "brand": "Dokun & Kazan",
+    "brand": "StampWell",
+    "brandFull": "StampWell - StampWell",
     "headline": "Damga kartı, müşterinin cüzdanında.",
     "sub": "Uygulama indirmeden sadakat. SMS ile Wallet’a eklenir; personel telefona bakarak damgalar.",
     "ctaPrimary": "Demo iste",
     "ctaSecondary": "Nasıl çalışır",
     "heroAlt": "Kafe tezgâhı ve sıcak atmosfer",
-    "scrollHint": "Keşfet"
+    "scrollHint": "Keşfet",
+    "pill": "StampWell - Türkiye",
+    "hero": {
+      "title": "Cüzdanda yaşayan",
+      "subtitle": "sadakat"
+    }
+  },
+  "walletPass": {
+    "notice": "Bildirim",
+    "noticeText": "Bugün tüm kahvelerde %10 indirim var.",
+    "aboutBrand": "Hakkında",
+    "howDoesItWork": "Nasıl çalışır",
+    "howDoesItWorkText": "Her alışverişte 1 damga kazanırsınız; 10 damga topladığınızda {brand}'de ücretsiz bir tatlının keyfini çıkarabilirsiniz.",
+    "brandRules": "Kurallar",
+    "brandRulesText": "Her 24 saatte bir damga toplama hakkınız vardır. Her 24 saatte topladığınız damgalar telefonunuzun cüzdan bölümünde kaydedilir ve saklanır.",
+    "brandAddress": "Adres",
+    "brandAddressText": "Şekerhan, Hayate Hanım Caddesi No:43, Alanya/Antalya",
+    "workHours": "Çalışma saatleri",
+    "workHoursText": "Pazartesi-Pazar 09.00 - 23.00",
+    "brandWebsite": "Web sitesi",
+    "brandWebsiteText": "https://cafferibelle.com/",
+    "brandContactPhone": "İletişim telefonu",
+    "brandContactPhoneText": "05** *** ** 07",
+    "brandCampaign": "Kampanya",
+    "brandCampaignText": "Her Cumartesi 14.00 - 17.00 saatleri arasında, bir kahve alışverişinde tatlılarda %20 indirim kazanırsınız."
   },
   "sections": {
+    "statsGridTitle": "Platform",
+    "hero": {
+      "counterTitle": "StampWell - Marka Özet Tablosu",
+      "counterName": "Özet",
+      "counterBrand": "Caffe Ribelle",
+      "liveTag": "Canlı",
+      "searchCustomer": "Müşteri Ara",
+      "stampButton": "Damga Ver",
+      "stamps": "Damgalar",
+      "toReward": "Ödüllendir",
+      "columnCustomer": "Müşteri",
+      "columnStamp": "Damga Sayısı",
+      "columnStatus": "Durum",
+      "columnReward": "Ödül Hazır",
+      "columnActive": "Aktif",
+      "columnScore": "Skor",
+      "counterLastAction": "Son Aksiyonlar",
+      "stampAddedFor": "Damga Eklendi",
+      "walletUpdated": "Kart cüzdan da güncellendi",
+      "ago": "önce"
+    },
     "proofTitle": "Neden küçük işletmeler tercih ediyor",
     "proofItems": [
       {
         "stat": "0",
         "label": "Müşteri uygulaması",
-        "hint": "Web + ilk kasiyer"
+        "hint": "Sadece Apple / Google Wallet"
       },
       {
         "stat": "10 dk",
@@ -39,9 +86,9 @@
         "hint": "Panel + ilk kasiyer"
       },
       {
-        "stat": "1",
-        "label": "Ödül kuralı",
-        "hint": "MVP’de sade"
+        "stat": "8",
+        "label": "Kart çeşidi",
+        "hint": "Damga, puan, indirim, üyelik ve daha fazlası"
       },
       {
         "stat": "TR",
@@ -49,7 +96,9 @@
         "hint": "Telefon + SMS"
       }
     ],
+    "productLabel": "Ürün",
     "productTitle": "Kart, cüzdanda yaşar",
+    "loyaltyPass": "Sadakat Kartı",
     "productBody": "Müşteriye yeni bir app dayatmayız. Apple Wallet veya Google Wallet’taki damga kartı; damga ve ödül durumunu gösterir. Personel tarafında web panel veya Flutter uygulama.",
     "productPoints": [
       "SMS ile davet linki",
@@ -64,10 +113,10 @@
     "featuresIntro": "VIP katmanları ve e-posta otomasyonu yok. Operasyonu hızlandıran parçalar var.",
     "sectorsTitle": "Hangi sektörlere uyuyor",
     "sectorsIntro": "Tek veya az şubeli, tekrar ziyaret alan butik işletmeler.",
-    "plansTitle": "Tek paket, net fiyat",
-    "plansIntro": "Pilot dönemde abonelik manuel açılır. iyzico sonra gelir.",
+    "plansTitle": "Büyüdükçe ölçeklenen paketler",
+    "plansIntro": "Tek kart tipiyle başlayın veya üst paketlerde birden fazla program çalıştırın. Aylık veya yıllık faturalama — yıllıkta 2 ay tasarruf.",
     "usecaseTitle": "Gerçek kullanım senaryoları",
-    "usecaseIntro": "Tezgâhtan Wallet’a kadar mutlu yol.",
+    "usecaseIntro": "İlk ziyaretten win-back'e — StampWell üzerinde gerçek operasyonlar.",
     "faqTitle": "Sık sorulanlar",
     "ctaBandTitle": "Kafenizi dijital damgaya taşıyın",
     "ctaBandBody": "15 dakikalık demo: kayıt, SMS mock link, Wallet davet, damga ve ödül.",
@@ -100,9 +149,110 @@
     ],
     "opsTitle": "Günlük operasyon",
     "opsBody": "Kasiyer tek ekranda numpad + ara + kayıt. Owner müşteri listesi, raporlar ve kafe bilgisini görür. SuperAdmin tenant’ları yönetir.",
-    "imageAlt": "Personel tablette müşteri kaydı yapıyor"
+    "imageAlt": "Personel tablette müşteri kaydı yapıyor",
+    "metrics": [
+      {
+        "value": "4",
+        "label": "Kurulum adımı",
+        "hint": "Profil → misafir → Wallet → damga"
+      },
+      {
+        "value": "1",
+        "label": "Tezgâh ekranı",
+        "hint": "Telefon arama + damga"
+      },
+      {
+        "value": "3",
+        "label": "Kullanıcı rolü",
+        "hint": "Owner, kasiyer, SuperAdmin"
+      },
+      {
+        "value": "24s",
+        "label": "Pass sync",
+        "hint": "Her işlemden sonra güncelleme"
+      }
+    ],
+    "rolesTitle": "Kim ne yapar",
+    "rolesIntro": "Sorumluluklar net — tezgâh hattı hızlı, owner bilgilendirilmiş kalır.",
+    "roles": [
+      {
+        "role": "Owner",
+        "title": "Programı yönetir",
+        "body": "Marka, ödül kuralı ve personel hesaplarını ayarlar. Her sabah raporlara bakar.",
+        "tasks": [
+          "Damga eşiğini belirle",
+          "Kasiyer davet et",
+          "Win-back kampanyası başlat",
+          "Ödüle yakın misafirleri gör"
+        ]
+      },
+      {
+        "role": "Kasiyer",
+        "title": "Tezgâhta çalışır",
+        "body": "Misafiri telefonla bulur, damga ekler ve ödülü 30 saniyede kullandırır.",
+        "tasks": [
+          "Yeni misafir kaydı",
+          "Wallet daveti gönder",
+          "Damga veya puan ekle",
+          "Checkout'ta ödül kullan"
+        ]
+      },
+      {
+        "role": "Misafir",
+        "title": "Sadece Wallet kullanır",
+        "body": "Uygulama indirmez. SMS linkine bir kez tıklar, pass'i kaydeder, sonraki ziyaretlerde gösterir.",
+        "tasks": [
+          "SMS'ten pass ekle",
+          "Canlı bakiyeyi gör",
+          "Güncelleme push'u al",
+          "Mağazada ödül kullan"
+        ]
+      }
+    ],
+    "timelineTitle": "Misafir yolculuğu",
+    "timelineIntro": "İlk ziyaretten sadık müdavime — sırayla ne olur.",
+    "timeline": [
+      {
+        "title": "Tezgâha gelir",
+        "body": "Sipariş verir. Kasiyer telefon numarasını ister — kağıt kart veya uygulama formu yok."
+      },
+      {
+        "title": "Wallet davetini alır",
+        "body": "SMS tek dokunuşluk linkle gelir. Pass marka logosu, damga ızgarası ve ödül ilerlemesiyle açılır."
+      },
+      {
+        "title": "Geri gelir, kazanır",
+        "body": "Sonraki ziyaretler: kasiyer telefon haneleriyle bulur. Damga eklenir; pass ayrılmadan güncellenir."
+      },
+      {
+        "title": "Ödülü kullanır",
+        "body": "Eşik dolar. Kasiyer kullandırır; sayaç sıfırlanır ve misafir bedava ürününü alır."
+      }
+    ],
+    "faqTitle": "Kurulum & operasyon SSS",
+    "faq": [
+      {
+        "q": "Onboarding ne kadar sürer?",
+        "a": "Çoğu bağımsız kafe tek oturumda yayına alır: marka, kural ve test damgası. Pilot döneminde abonelikleri manuel açıyoruz."
+      },
+      {
+        "q": "Kasiyerler tek tablet paylaşabilir mi?",
+        "a": "Evet. Her kasiyer kendi hesabıyla girer. İşlemler aktivite logunda kişiye yazılır."
+      },
+      {
+        "q": "SMS gitmezse ne olur?",
+        "a": "Dev modunda link loglanır. Prod'da SMS sağlayıcınızla yeniden deneriz; link tezgâh ekranında manuel paylaşım için görünür."
+      }
+    ]
   },
   "featuresPage": {
+    "label": "Kart Tipleri",
+    "dailyCounter": "Günlük karşı harekatlar için tasarlandı",
+    "headTitle": "Her işletme için bir sadakat modeli.",
+    "headSubtitle": "Damga, puan, para iadesi ve daha fazlası; hepsi misafirinizin cebindeki Apple Cüzdan kartlarında. Kart türlerini incelemek için kaydırın.",
+    "bestFor": "Kimler için?",
+    "seePlans": "Planları Görüntüle",
+    "allProgramTypes": "Tüm Program Tipleri",
     "title": "Özellikler",
     "intro": "Wallet, SMS, RBAC panel ve rapor — küçük kafeye yetecek kadar.",
     "items": [
@@ -130,46 +280,166 @@
         "title": "Türkiye first",
         "body": "TR telefon doğrulama, Türkçe arayüz, KVKK metinleri, yerel SMS."
       }
+    ],
+    "metrics": [
+      {
+        "value": "8",
+        "label": "Program tipi",
+        "hint": "Damgadan üyeliğe"
+      },
+      {
+        "value": "<30sn",
+        "label": "Tezgâh akışı",
+        "hint": "Telefon → damga → pass sync"
+      },
+      {
+        "value": "2",
+        "label": "Wallet platformu",
+        "hint": "Apple + Google"
+      },
+      {
+        "value": "0",
+        "label": "Misafir uygulaması",
+        "hint": "Kartlar Wallet'ta"
+      }
+    ],
+    "deepDive": {
+      "eyebrow": "Wallet-first",
+      "title": "Neden ayrı bir sadakat uygulaması değil?",
+      "body": "Misafirler zaten haftada onlarca kez Apple veya Google Wallet'ı açıyor. StampWell markanızı oraya taşır — canlı damga sayısı, ödül durumu ve bakiye değişince push güncellemeleriyle.",
+      "bullets": [
+        "Her pass'te marka rengi, logo ve barkod",
+        "Her tezgâh işleminden sonra anında senkron",
+        "Müdavimler için App Store sürtünmesi yok",
+        "İlk günden iPhone ve Android desteği"
+      ]
+    },
+    "checklist": {
+      "title": "Her aktif tenant'ta dahil",
+      "description": "Hangi paketle başlarsanız başlayın temel platform yetenekleri.",
+      "items": [
+        "Tenant markalı Wallet pass'leri",
+        "Kasiyer tezgâhı + owner admin",
+        "Damga geçmişiyle müşteri dizini",
+        "Günlük ve haftalık rapor özetleri",
+        "Rol bazlı erişim (owner, kasiyer)",
+        "Türkçe ve İngilizce arayüz",
+        "KVKK uyumlu veri işleme",
+        "Pilot için mock modlu SMS davet"
+      ]
+    },
+    "faqTitle": "Sık sorulanlar",
+    "faq": [
+      {
+        "q": "Birden fazla kart tipini aynı anda çalıştırabilir miyim?",
+        "a": "Evet — Growth ve üzeri paketlerde. Starter tek damga kartına odaklanır; üst paketler puan, cashback ve etkinlik pass'lerini yan yana açar."
+      },
+      {
+        "q": "Misafir bir şey indirmek zorunda mı?",
+        "a": "Hayır. SMS linkinden Apple veya Google Wallet'a pass ekler — uçak bileti veya etkinlik bileti gibi."
+      },
+      {
+        "q": "Ödül kullanıldığında ne olur?",
+        "a": "Pass'teki sayaç sıfırlanır, işlem loglanır ve owner raporları saniyeler içinde güncellenir."
+      }
+    ],
+    "relatedTitle": "Devam edin",
+    "related": [
+      {
+        "href": "/how",
+        "label": "Nasıl çalışır",
+        "description": "Kafe kurulumundan günlük damga akışına adım adım."
+      },
+      {
+        "href": "/programs",
+        "label": "Program tipleri",
+        "description": "Damga, puan, cashback ve daha fazlası — modelinizi seçin."
+      },
+      {
+        "href": "/pricing",
+        "label": "Fiyatlandırma",
+        "description": "Tek karttan çok şubeli CRM'e dört paket."
+      }
     ]
   },
   "pricingPage": {
+    "monthly": "Aylık",
+    "yearly": "Yıllık",
+    "billingPeriod": "Ödeme Dönemi",
+    "saveTwoMonths": "Yıllık ödemede 2 ay bedava",
+    "monthlyShort": "/ay",
+    "yearlyShort": "/yıl",
     "title": "Fiyatlandırma",
-    "intro": "Tek paket. Pilot’ta manuel aktivasyon; online ödeme (iyzico) yol haritasında.",
+    "intro": "Tek damga kartından çok şubeli CRM’e dört paket. Aylık veya yıllık faturalama — yıllıkta 2 ay tasarruf.",
+    "buyCta": "Satın al",
     "plans": [
       {
-        "id": "cafe",
-        "name": "Kafe paketi",
+        "id": "starter",
+        "name": "Starter",
         "price": "₺990",
         "period": "/ ay",
-        "badge": "Önerilen",
-        "note": "Pilot fiyat — onboarding’de netleşir.",
+        "badge": "Starter",
+        "note": "1 sadakat kartı · 1 şube",
         "includes": [
-          "Sınırsız müşteri ve damga",
-          "Apple + Google Wallet kartları",
+          "1 damga kartı",
+          "Apple + Google Wallet",
           "Owner + kasiyer hesapları",
-          "SMS davet (kota anlaşmaya göre)",
-          "Web panel + Flutter personel",
-          "Temel raporlar"
-        ],
-        "cta": "Demo / fiyat konuşalım"
+          "Temel rapor özeti",
+          "1 şube"
+        ]
       },
       {
-        "id": "pilot",
-        "name": "Pilot",
-        "price": "Ücretsiz*",
-        "period": "deneme",
-        "badge": "Sınırlı",
-        "note": "*Süre ve SMS kotası yazılı anlaşmaya bağlı.",
+        "id": "growth",
+        "name": "Growth",
+        "price": "₺1490",
+        "period": "/ ay",
+        "badge": "Popüler",
+        "note": "3 sadakat kartına kadar · 1 şube",
         "includes": [
-          "1 tenant kurulumu",
-          "Seed / demo hesaplar",
-          "SMS mock veya sınırlı kota",
-          "Onboarding checklist desteği",
-          "Wallet sertifika kontrol listesi"
-        ],
-        "cta": "Pilotota başvur"
+          "3 sadakat kartına kadar",
+          "Multi damga + puan kartı",
+          "Kampanya & win-back",
+          "Doğum günü otomasyonu",
+          "Tam raporlar"
+        ]
+      },
+      {
+        "id": "pro",
+        "name": "Pro",
+        "price": "₺1990",
+        "period": "/ ay",
+        "badge": "Pro",
+        "note": "5 sadakat kartı · 3 şubeye kadar",
+        "includes": [
+          "5 kart limiti",
+          "Cashback & indirim kartları",
+          "İndirim & etkinlik kartları",
+          "3 şubeye kadar",
+          "Segmentasyon (temel)",
+          "NFC entegrasyonu"
+        ]
+      },
+      {
+        "id": "business",
+        "name": "Business",
+        "price": "₺2990",
+        "period": "/ ay",
+        "badge": "Business",
+        "note": "8 sadakat kartı · 10 şubeye kadar",
+        "includes": [
+          "8 kart limiti",
+          "CRM & e-posta",
+          "VIP & referral",
+          "10 şubeye kadar",
+          "SMS segment"
+        ]
       }
     ],
+    "needMore": {
+      "title": "Daha fazlasına mı ihtiyacınız var?",
+      "body": "Daha yüksek limitler, POS entegrasyonu, SLA veya API erişimi — ihtiyacınızı yazın, size uygun paketi birlikte netleştirelim.",
+      "cta": "Satış ekibiyle görüşün"
+    },
     "compareTitle": "Pakette ne var / ne yok",
     "compareIn": [
       "Damga + ödül",
@@ -178,11 +448,298 @@
       "Rapor özeti"
     ],
     "compareOut": [
-      "VIP katman",
-      "E-posta otomasyonu",
-      "POS entegrasyonu",
-      "NFC donanım (MVP sonrası)"
-    ]
+      "VIP katman (Starter)",
+      "E-posta otomasyonu (Growth altı)",
+      "POS webhook (Starter)"
+    ],
+    "metrics": [
+      {
+        "value": "4",
+        "label": "Herkese açık paket",
+        "hint": "Starter'dan Business'a"
+      },
+      {
+        "value": "2 ay",
+        "label": "Yıllık tasarruf",
+        "hint": "Aylığa göre"
+      },
+      {
+        "value": "10",
+        "label": "Maks. şube",
+        "hint": "Business paketinde"
+      },
+      {
+        "value": "8",
+        "label": "Kart limiti",
+        "hint": "En üst paket"
+      }
+    ],
+    "billingTitle": "Faturalama açıklaması",
+    "billingIntro": "Pilot döneminde damga başına gizli ücret yok — şeffaf fiyatlandırma.",
+    "billingBullets": [
+      "Aylık veya yıllık — yenilemeden önce istediğiniz zaman geçiş",
+      "Yıllık = 12 ay hizmet, 10 ay fiyat",
+      "Pilot aşamasında abonelikler manuel aktive edilir",
+      "Enterprise limitler iletişim formuyla ayrı fiyatlanır",
+      "Tüm paketlerde Wallet pass barındırma dahil",
+      "SMS kotası sağlayıcı anlaşmanıza göre faturalanır"
+    ],
+    "faqTitle": "Fiyatlandırma SSS",
+    "faq": [
+      {
+        "q": "Dönem ortasında yükseltebilir miyim?",
+        "a": "Evet. Üst pakete geçişte fark orantılı hesaplanır. Düşürme bir sonraki yenilemede geçerli olur."
+      },
+      {
+        "q": "Ücretsiz deneme var mı?",
+        "a": "Rehberli pilot yapıyoruz — demo görüşmesi, test tenant ve canlı damga sonrası karar."
+      },
+      {
+        "q": "Şube ne sayılır?",
+        "a": "Kendi tezgâhı olan her fiziksel lokasyon. Ortak müşteri dizini; damga işleminde şube seçici."
+      },
+      {
+        "q": "Müşteri başına ücret var mı?",
+        "a": "Herkese açık paketlerde misafir başına ücret yok. Limitler kart tipi ve şube sayısındadır."
+      }
+    ],
+    "featureMatrixTitle": "Özellikleri karşılaştır",
+    "featureMatrixLabel": "Özellik",
+    "featureMatrix": [
+      {
+        "label": "Sadakat kartı tipi",
+        "cells": [
+          "1",
+          "3'e kadar",
+          "5",
+          "8"
+        ]
+      },
+      {
+        "label": "Şube",
+        "cells": [
+          "1",
+          "1",
+          "3'e kadar",
+          "10'a kadar"
+        ]
+      },
+      {
+        "label": "Apple + Google Wallet",
+        "cells": [
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "Damga kartı",
+        "cells": [
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "Multi damga + puan",
+        "cells": [
+          false,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "Cashback & indirim",
+        "cells": [
+          false,
+          false,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "Kampanya & win-back",
+        "cells": [
+          false,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "CRM & e-posta",
+        "cells": [
+          false,
+          false,
+          false,
+          true
+        ]
+      },
+      {
+        "label": "VIP & referral",
+        "cells": [
+          false,
+          false,
+          false,
+          true
+        ]
+      },
+      {
+        "label": "Raporlar",
+        "cells": [
+          "Temel",
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "Segmentasyon",
+        "cells": [
+          false,
+          false,
+          "Temel",
+          true
+        ]
+      },
+      {
+        "label": "Owner + kasiyer hesapları",
+        "cells": [
+          true,
+          true,
+          true,
+          true
+        ]
+      }
+    ],
+    "trialCta": "14 gün ücretsiz dene",
+    "trialNote": "14 gün ücretsiz · kredi kartı gerekmez",
+    "trialTerms": "Deneme bitince paketi seçip etkinleştirirsiniz; otomatik ücret alınmaz.",
+    "eyebrow": "Fiyatlar"
+  },
+  "programsPage": {
+    "title": "Program tipleri",
+    "intro": "Damga kartından personel kartına sekiz sadakat modeli — üst paketlerde bir arada çalıştırın.",
+    "matrixTitle": "Hangi paket neyi açar",
+    "matrixIntro": "Kart tipi kullanılabilirliği — hızlı referans.",
+    "matrixColumns": [
+      "Starter",
+      "Growth",
+      "Pro",
+      "Business"
+    ],
+    "matrixRows": [
+      {
+        "label": "Damga kartı",
+        "values": [
+          "yes",
+          "yes",
+          "yes",
+          "yes"
+        ]
+      },
+      {
+        "label": "Multi damga",
+        "values": [
+          "no",
+          "yes",
+          "yes",
+          "yes"
+        ]
+      },
+      {
+        "label": "Puan kartı",
+        "values": [
+          "no",
+          "yes",
+          "yes",
+          "yes"
+        ]
+      },
+      {
+        "label": "Cashback",
+        "values": [
+          "no",
+          "no",
+          "yes",
+          "yes"
+        ]
+      },
+      {
+        "label": "İndirim / Etkinlik",
+        "values": [
+          "no",
+          "no",
+          "yes",
+          "yes"
+        ]
+      },
+      {
+        "label": "Üyelik / Personel",
+        "values": [
+          "no",
+          "no",
+          "no",
+          "yes"
+        ]
+      }
+    ],
+    "chooseTitle": "Doğru modeli seçmek",
+    "chooseIntro": "Basit başlayın, müdavimler istedikçe genişletin.",
+    "chooseBullets": [
+      "Damga kartı — kafe ve fırın için ideal ilk adım",
+      "Puan kartı — sepet tutarı değişken işletmeler (perakende, QSR)",
+      "Cashback — her ziyarette yüzde geri",
+      "Etkinlik kartı — sınırlı süreli promosyonlar",
+      "Üyelik — VIP müdavimlere kademeli avantaj",
+      "Personel kartı — çalışan indirimleri misafir programından ayrı"
+    ],
+    "deepDive": {
+      "eyebrow": "Çoklu program",
+      "title": "Misafir başına birden fazla pass",
+      "body": "Misafir günlük kahve için damga kartı, perakende için puan kartı taşıyabilir. Tezgâh aktif programı seçer; Wallet her pass'i ayrı gösterir.",
+      "bullets": [
+        "Business paketinde kart kotasına kadar birden fazla program tipi",
+        "Programlar arası ortak müşteri dizini",
+        "Kart tipine göre ayrı ödül kuralları",
+        "Owner panelinde birleşik raporlama"
+      ]
+    },
+    "relatedTitle": "İlgili sayfalar",
+    "related": [
+      {
+        "href": "/pricing",
+        "label": "Fiyatlandırma",
+        "description": "Hangi paketin hangi kart tipini açtığını görün."
+      },
+      {
+        "href": "/features",
+        "label": "Özellikler",
+        "description": "Her kart tipinin arkasındaki platform yetenekleri."
+      },
+      {
+        "href": "/how",
+        "label": "Nasıl çalışır",
+        "description": "Kurulumdan ilk damgaya dört adım."
+      }
+    ],
+    "suggestionCard": {
+      "label": "09",
+      "title": "Öneriniz var mı?",
+      "headline": "Listede olmayan bir program tipi mi arıyorsunuz?",
+      "body": "Sadakat modeli fikrinizi yazın — inceler, mümkün olanı birlikte netleştiririz.",
+      "cta": "Önerinizi gönderin"
+    },
+    "suggestionModal": {
+      "eyebrow": "Öneri",
+      "title": "Program tipi önerin",
+      "body": "Aradığınız sadakat modelini kısaca anlatın, size dönüş yapalım.",
+      "submit": "Öneriyi gönder",
+      "messagePlaceholder": "Örn. spor salonu ziyaret kademesi, abonelik damga kartı, hibrit damga + cashback…"
+    }
   },
   "sectorsPage": {
     "title": "Sektörler",
@@ -207,28 +764,410 @@
         "title": "Butik dondurma / tatlı",
         "body": "Sezonluk ziyaretleri ödülle geri getirin — app indirtmeden.",
         "image": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1200&q=80"
+      },
+      {
+        "title": "Hızlı servis restoranlar",
+        "body": "Tezgâhta damga, puan veya cashback — yoğun saatte kasa paneli hızlı kalır.",
+        "image": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80"
+      },
+      {
+        "title": "Perakende & butik",
+        "body": "Wallet'ta üyelik ve indirim kartları — plastik kart olmadan tekrar ziyaret.",
+        "image": "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&q=80"
+      }
+    ],
+    "fitTitle": "StampWell size uygun mu?",
+    "fitIntro": "Fiziksel tezgâhı olan ve misafirlerin geri geldiği işletmeler için tasarladık — tek seferlik satışlar için değil.",
+    "fitChecklist": {
+      "title": "İyi eşleşme kriterleri…",
+      "items": [
+        "Misafirler ayda en az iki kez geliyor",
+        "Personel checkout'ta telefon sorabiliyor",
+        "Misafir uygulaması olmadan dijital sadakat istiyorsunuz",
+        "Ödüller basit: bedava ürün, indirim veya puan",
+        "1–10 lokasyonunuz var (veya planlıyorsunuz)",
+        "Türkçe veya TR/EN çift dilli operasyon"
+      ]
+    },
+    "metrics": [
+      {
+        "value": "6+",
+        "label": "Sektör şablonu",
+        "hint": "Kafeden perakendeye"
+      },
+      {
+        "value": "%85",
+        "label": "Tekrar ziyaret hedefi",
+        "hint": "Tipik pilot KPI"
+      },
+      {
+        "value": "1",
+        "label": "Tezgâh cihazı",
+        "hint": "Tablet veya telefon"
+      },
+      {
+        "value": "TR",
+        "label": "Pazar odağı",
+        "hint": "Yerel SMS + KVKK"
+      }
+    ],
+    "deepDive": {
+      "eyebrow": "Tezgâh kültürü",
+      "title": "Yoğun saat kuyruğu için tasarlandı",
+      "body": "Sadakat checkout'u yavaşlatınca başarısız olur. StampWell kaydı tek telefon alanına, damgayı tek dokunuşa indirir — barista kasadan ayrılmaz.",
+      "bullets": [
+        "Kısmi hane aramasıyla telefon lookup",
+        "İdempotent damga — çift kredi yok",
+        "Bağlantı kesilince toleranslı tezgâh (yeniden bağlanınca sync)",
+        "Çok lokasyonlu owner için şube seçici"
+      ]
+    },
+    "relatedTitle": "Sonraki adımlar",
+    "related": [
+      {
+        "href": "/use-cases",
+        "label": "Kullanım senaryoları",
+        "description": "İlk ziyaretten ödül kullanımına gerçek hikâyeler."
+      },
+      {
+        "href": "/pricing",
+        "label": "Fiyatlandırma",
+        "description": "Şube sayınıza uygun paketi seçin."
+      },
+      {
+        "href": "/contact",
+        "label": "İletişim",
+        "description": "Sektörünüzü yazın — kurulum önerelim."
+      }
+    ],
+    "details": [
+      {
+        "metrics": [
+          {
+            "value": "Günlük",
+            "label": "Ziyaret ritmi",
+            "hint": "Sabah yoğunluğu, öğleden sonra müdavimler"
+          },
+          {
+            "value": "Damga",
+            "label": "Ana program",
+            "hint": "Belirli sayıda kahvede bir ödül"
+          },
+          {
+            "value": "Tek",
+            "label": "Tezgâh ekranı",
+            "hint": "Numpad ve telefon araması"
+          },
+          {
+            "value": "SMS",
+            "label": "Davet kanalı",
+            "hint": "Wallet linki, uygulama yok"
+          }
+        ],
+        "flow": {
+          "title": "Sabah yoğunluğunda kuyruk",
+          "steps": [
+            "Müdavim telefon numarasını söyler",
+            "Kasiyer son dört haneyi yazar",
+            "Damga eklenir, pass anında güncellenir",
+            "Ödül dolunca kasadan kullanılır"
+          ]
+        },
+        "fit": [
+          "Aynı müdavimler haftada birkaç kez geliyor",
+          "Kasiyer sipariş sırasında telefon sorabiliyor",
+          "Ödül basit: bedava kahve veya pasta"
+        ]
+      },
+      {
+        "metrics": [
+          {
+            "value": "Filtre",
+            "label": "Ödül türü",
+            "hint": "Bedava filtre kahve veya pastry"
+          },
+          {
+            "value": "Ayrı",
+            "label": "Ürün sayacı",
+            "hint": "Espresso ve filtre ayrı sayılır"
+          },
+          {
+            "value": "Marka",
+            "label": "Wallet görünümü",
+            "hint": "Logo ve renk pass'te"
+          },
+          {
+            "value": "Meraklı",
+            "label": "Müdavim tipi",
+            "hint": "Kahveyi türüne göre seçen misafir"
+          }
+        ],
+        "flow": {
+          "title": "Ürün grubuna göre sayaç",
+          "steps": [
+            "Misafir espresso veya filtre alır",
+            "Kasiyer ürün grubunu seçer",
+            "İlgili sayaç bir artar",
+            "Pass'te her grup ayrı görünür"
+          ]
+        },
+        "fit": [
+          "Menüde birden fazla kahve grubu var",
+          "Misafirler aynı kahveyi değil, farklı türleri deniyor",
+          "Ödül kahve ya da yanında pastry olabiliyor"
+        ]
+      },
+      {
+        "metrics": [
+          {
+            "value": "Sabah",
+            "label": "En yoğun saat",
+            "hint": "Ekmek ve pasta alımı"
+          },
+          {
+            "value": "Numpad",
+            "label": "Tezgâh girişi",
+            "hint": "Telefonu rakamla yazmak"
+          },
+          {
+            "value": "Tek",
+            "label": "Damga kontrolü",
+            "hint": "Aynı işlem iki kez sayılmaz"
+          },
+          {
+            "value": "Kısa",
+            "label": "Kasa süresi",
+            "hint": "Ödeme akışına ek adım yok"
+          }
+        ],
+        "flow": {
+          "title": "Kasada birkaç saniye",
+          "steps": [
+            "Kasiyer telefon hanelerini numpad'den girer",
+            "Liste tek müşteriye iner",
+            "Damga veya puan eklenir",
+            "Ödül varsa aynı ekranda kullanılır"
+          ]
+        },
+        "fit": [
+          "Gün içinde çok sayıda kısa işlem var",
+          "Kasiyer her seferinde numpad kullanıyor",
+          "Ödül ekmek, pasta veya simit gibi sayılı bir üründe"
+        ]
+      },
+      {
+        "metrics": [
+          {
+            "value": "Sezonluk",
+            "label": "Ziyaret deseni",
+            "hint": "Yazın yoğun, kışın sakin"
+          },
+          {
+            "value": "Geri dönüş",
+            "label": "Asıl hedef",
+            "hint": "Kış için win-back kampanyası"
+          },
+          {
+            "value": "SMS",
+            "label": "Kampanya kanalı",
+            "hint": "Owner kişiye özel teklif gönderir"
+          },
+          {
+            "value": "Damga",
+            "label": "Yeterli kart",
+            "hint": "Tek program çoğu zaman yeter"
+          }
+        ],
+        "flow": {
+          "title": "Mevsim sonunda geri dönüş",
+          "steps": [
+            "Pasif müdavimler filtrelenir",
+            "Kişiye özel SMS ile teklif gider",
+            "Misafir pass'ini açar ve damgayı görür",
+            "Ödül kışın kullanılır"
+          ]
+        },
+        "fit": [
+          "Ziyaretler belirli aylarda yoğunlaşıyor",
+          "Hafta sonu ve tatil ziyaretleri var",
+          "Kampanyalar SMS ile iletilebiliyor"
+        ]
+      },
+      {
+        "metrics": [
+          {
+            "value": "Puan",
+            "label": "Ana model",
+            "hint": "Sepet tutarına göre değişir"
+          },
+          {
+            "value": "Cashback",
+            "label": "Alternatif",
+            "hint": "Yüzde geri ödeme"
+          },
+          {
+            "value": "Sade",
+            "label": "Kasa paneli",
+            "hint": "Yoğun saatte az buton"
+          },
+          {
+            "value": "Tek",
+            "label": "Kural",
+            "hint": "Her ürün için ayrı kural gerekmez"
+          }
+        ],
+        "flow": {
+          "title": "Sepet tutarı puana dönüşür",
+          "steps": [
+            "Sipariş tamamlanır, toplam görünür",
+            "Telefonla müşteri bulunur",
+            "Tutara göre puan eklenir",
+            "Bakiye ödemede kullanılabilir"
+          ]
+        },
+        "fit": [
+          "Sepet tutarı her misafirde değişken",
+          "Yoğun saatte kasa hızlı kalmalı",
+          "Müşteriler sık ama kısa ziyaret yapıyor"
+        ]
+      },
+      {
+        "metrics": [
+          {
+            "value": "Üyelik",
+            "label": "Ana model",
+            "hint": "Seviye ve indirim birlikte"
+          },
+          {
+            "value": "İndirim",
+            "label": "Ek kart",
+            "hint": "Seçili kategorilerde geçerli"
+          },
+          {
+            "value": "Personel",
+            "label": "Çalışan kartı",
+            "hint": "Ayrı program, ayrı kural"
+          },
+          {
+            "value": "Pass",
+            "label": "Kart biçimi",
+            "hint": "Wallet'ta yaşar, basılmaz"
+          }
+        ],
+        "flow": {
+          "title": "Üyelikten indirime",
+          "steps": [
+            "Müşteri üyelik pass'ini Wallet'a ekler",
+            "Kasiyer telefonla üyeliği bulur",
+            "Seviyeye göre indirim uygulanır",
+            "Yeni seviye pass'te güncellenir"
+          ]
+        },
+        "fit": [
+          "Müşteriler tekrar gelip üyelik istiyor",
+          "Kategorilere göre farklı indirim veriliyor",
+          "Personel indirimi misafir programından ayrı tutulmak isteniyor"
+        ]
       }
     ]
   },
   "useCasesPage": {
     "title": "Kullanım senaryoları",
-    "intro": "Mutlu yol ve tipik operasyon hikâyeleri.",
+    "intro": "Tezgâhtan Wallet'a kadar gerçek operasyon hikâyeleri.",
     "items": [
       {
         "title": "İlk ziyaret → Wallet",
-        "body": "Müşteri ilk kez geliyor. Kasiyer telefonu girer, SMS mock link konsolda, müşteri kartı ekler. İlk damga hazır."
+        "body": "Misafir gelir. Kasiyer telefonu girer, SMS daveti gider, kart Apple veya Google Wallet'a eklenir. İlk damga veya puan tek akışta."
       },
       {
-        "title": "Müdavim damgası",
-        "body": "Son 4 hane ile arama, seç, damga. 30 sn idempotency çift damgayı engeller."
+        "title": "Tezgâhta damga veya tarama",
+        "body": "Müdavimler telefon haneleriyle bulunur. Personel saniyeler içinde damga, puan veya cashback ekler — idempotency çift işlemi engeller."
       },
       {
-        "title": "Ödül günü",
-        "body": "Eşik dolunca ödül hazır. Kasiyer ödülü kullanır; sayaç sıfırlanır, Wallet güncellenir."
+        "title": "Çoklu programlı misafir",
+        "body": "Aynı misafirde damga kartı ve puan kartı birlikte. Kasa aktif programı seçer; Wallet doğru bakiyeyi gösterir."
       },
       {
-        "title": "Owner sabah kontrolü",
-        "body": "Mobil veya web’de dün/bugün damga, ödül, ödüle yaklaşanlar ve ekip listesi."
+        "title": "Ödül kullanımı",
+        "body": "Eşik dolunca ödül hazır. Kasiyer checkout'ta kullanır; sayaçlar sıfırlanır, tüm pass'ler anında senkronize olur."
+      },
+      {
+        "title": "Win-back kampanyası",
+        "body": "İşletme sahibi 30 gündür gelmeyenleri hedefler. SMS ile teklif; dönen ziyaretler raporda izlenir."
+      },
+      {
+        "title": "Sabah owner kontrolü",
+        "body": "Panel dünkü damgalar, ödüller, ödüle yakın misafirler ve şube aktivitesini gösterir — web veya mobil."
+      }
+    ],
+    "quote": {
+      "text": "Kağıt damga kartlarını bir haftada bıraktık. Müdavimler oturmadan önce Wallet'ta damganın güncellendiğini görmeyi seviyor.",
+      "attribution": "GreenLeaf Café",
+      "role": "Pilot partner · İstanbul"
+    },
+    "timelineTitle": "Tipik bir salı",
+    "timelineIntro": "Yoğun bir kafenin açılıştan kapanışa sadakat akışı.",
+    "timeline": [
+      {
+        "title": "08:30 — Owner raporlara bakar",
+        "body": "Dünkü damgalar, ödüle yakın iki misafir, bir win-back yanıtı. Excel export gerekmez."
+      },
+      {
+        "title": "12:15 — Öğle yoğunluğunda kayıt",
+        "body": "Üç yeni misafir kuyruk ilerlerken SMS daveti alır. Latte bitmeden pass eklenir."
+      },
+      {
+        "title": "15:40 — Müdavim damgası",
+        "body": "Kasiyer son dört haneyi yazar, +1 damga. Misafirin cebinde pass güncellenir."
+      },
+      {
+        "title": "19:00 — Ödül kullanımı",
+        "body": "Misafir 10/10'a ulaşır. Kasiyer bedava kahveyi kullandırır; Wallet anında 0/10 olur."
+      }
+    ],
+    "checklist": {
+      "title": "Owner'ların takip ettiği sonuçlar",
+      "description": "Tek lokasyonlu pilot için anlamlı metrikler.",
+      "items": [
+        "Günlük yeni Wallet kaydı",
+        "Damga / ödül kullanım oranı",
+        "Ödüle bir damga kala misafirler",
+        "14 gün içinde dönüş ziyareti",
+        "Kampanya yanıt oranı",
+        "Şube bazlı aktivite (Pro+)"
+      ]
+    },
+    "faqTitle": "Senaryo SSS",
+    "faq": [
+      {
+        "q": "Bir misafir iki program taşıyabilir mi?",
+        "a": "Growth+ paketlerde evet. Tezgâh aktif programı seçer; her pass Wallet'ta kendi bakiyesini gösterir."
+      },
+      {
+        "q": "Akıllı telefonu olmayan misafirler?",
+        "a": "Personel telefon numarasıyla damga eklemeye devam eder. Bakiye tezgâh ekranından gösterilebilir — Wallet önerilir ama zorunlu değil."
+      },
+      {
+        "q": "Win-back kampanyaları nasıl çalışır?",
+        "a": "Owner pasif misafirleri filtreler, teklifli SMS gönderir. Dönüşler aktivite akışında ve haftalık raporda görünür."
+      }
+    ],
+    "relatedTitle": "Keşfetmeye devam",
+    "related": [
+      {
+        "href": "/how",
+        "label": "Nasıl çalışır",
+        "description": "Platform kurulumu ve günlük operasyon — dört adım."
+      },
+      {
+        "href": "/sectors",
+        "label": "Sektörler",
+        "description": "Farklı işletme tiplerinde StampWell kullanımı."
+      },
+      {
+        "href": "/features",
+        "label": "Özellikler",
+        "description": "Wallet, SMS, RBAC ve raporlama derinliği."
       }
     ]
   },
@@ -245,8 +1184,27 @@
     "sending": "Gönderiliyor…",
     "success": "Teşekkürler — en kısa sürede dönüş yapacağız.",
     "error": "Gönderilemedi, lütfen tekrar deneyin.",
+    "errorRateLimit": "Çok fazla istek. Biraz bekleyip tekrar deneyin.",
     "asideTitle": "Türkiye ofisi",
-    "asideBody": "İstanbul · uzaktan onboarding. Sertifika ve SMS checklist’i paylaşırız."
+    "asideBody": "İstanbul · uzaktan onboarding. Sertifika ve SMS checklist’i paylaşırız.",
+    "sectors": {
+      "cafe": "Kafe",
+      "specialty": "Specialty / kahve bar",
+      "bakery": "Fırın / pastane",
+      "dessert": "Dondurma / tatlı",
+      "other": "Diğer (yazın)",
+      "restaurant": "Restoran / bistro",
+      "fastfood": "Hızlı servis",
+      "retail": "Perakende",
+      "boutique": "Butik / giyim",
+      "beauty": "Kuaför / güzellik",
+      "gym": "Spor / stüdyo"
+    },
+    "sectorOther": null,
+    "sectorOtherPlaceholder": "Sektörünüzü yazın",
+    "kvkkConsent": "KVKK Aydınlatma Metni’ni okudum ve kabul ediyorum.",
+    "kvkkLink": "KVKK Aydınlatma Metni",
+    "marketingConsent": "Kampanya ve bilgilendirme amaçlı SMS ve e-posta almak istiyorum (isteğe bağlı)."
   },
   "faq": {
     "items": [
@@ -256,7 +1214,7 @@
       },
       {
         "q": "NFC var mı?",
-        "a": "MVP’de yok. Damga kasiyer paneli / mobil ile. NFC sonra adapter olarak planlandı."
+        "a": "Evet — Entegrasyonlar sayfasından NFC cihazı tanımlayıp kasada onaylayabilirsiniz. QR okutma ve mobil kasa paneli de desteklenir."
       },
       {
         "q": "SMS ücreti kimde?",
@@ -264,7 +1222,15 @@
       },
       {
         "q": "Birden fazla şube?",
-        "a": "MVP tek tenant / tek kafe odaklı. Zincir yönetimi sonra."
+        "a": "Growth ve Pro paketler çoklu şube destekler. Enterprise özel limitler ve onboarding sunar."
+      },
+      {
+        "q": "Hangi program tipleri dahil?",
+        "a": "Damga, çoklu damga, puan, cashback, indirim, etkinlik, üyelik ve personel kartları — pakete göre değişir."
+      },
+      {
+        "q": "Aylık ve yıllık fatura?",
+        "a": "Aylık veya yıllık ödeyin. Yıllık planda 12 aya göre 2 ay tasarruf. Pilot dönemde aktivasyon manuel kalır."
       }
     ]
   },
@@ -272,44 +1238,59 @@
     "kvkkTitle": "KVKK Aydınlatma Metni",
     "privacyTitle": "Gizlilik Politikası",
     "termsTitle": "Kullanım Şartları",
-    "lastUpdated": "Son güncelleme: Ağustos 2026",
+    "lastUpdated": "Son güncelleme: 17 Kasım 2026",
     "kvkkBody": [
-      "Dokun & Kazan (“Platform”), 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında veri sorumlusu sıfatıyla hareket eder.",
-      "İşlenen veriler: kafe personelinin e-posta ve adı; müşterilerin telefon numarası, damga/ödül kayıtları ve Wallet pass tanımlayıcıları.",
-      "Amaçlar: sadakat programının işletilmesi, Wallet kartı üretimi/güncellemesi, SMS ile davet linki gönderimi, destek ve güvenliğin sağlanması.",
-      "Hukuki sebepler: sözleşmenin ifası, meşru menfaat ve açık rıza (ticari ileti / SMS için).",
-      "Aktarım: SMS ve Wallet altyapı sağlayıcılarına, yalnızca hizmetin gerektirdiği ölçüde.",
-      "Haklarınız: Kanun’un 11. maddesi kapsamındaki başvuru haklarınızı iletişim kanallarımız üzerinden kullanabilirsiniz."
+      "Veri sorumlusu: Tüzel kişi olarak şirketimiz (vergi kimlik no: 11111111111, Yeşilce Mahallesi Define Sokak No:6). KVKK irtibat kişisi: Batuhan Küçük, bennbatuu@gmail.com, 0541 472 58 20.",
+      "Hangi veriler işlenir: ad ve soyad, telefon numarası, e-posta adresi, doğum tarihi (varsa), işletme adı ve sektörü, sadakat programı kayıtları (damga, puan, ödül, harcama tutarı ve işlem tarihleri), Wallet kartı tanımlayıcısı, IP adresi ve sistem günlük kayıtları.",
+      "İşleme amaçları: sadakat programının çalıştırılması, Apple ve Google Wallet kartının oluşturulması ve güncellenmesi, SMS ile davet ve bilgilendirme, destek ve talep yanıtlama, güvenlik ve kötüye kullanım önleme, yasal yükümlülüklerin yerine getirilmesi.",
+      "Hukuki sebepler: sözleşmenin kurulması ve ifası, hukuki yükümlülük, meşru menfaat ve açık rızanız. Ticari elektronik ileti (kampanya SMS ve e-posta) yalnızca açık rızanız varsa gönderilir.",
+      "Aktarım: veriler Türkiye'de depolanır ve yurt dışına aktarılmaz. Hizmeti sağlamak için SMS sağlayıcıları (ör. Netgsm, İletimerkezi), Apple ve Google Wallet altyapıları ve bulut barındırma hizmetleri veri işleyen olarak görev yapar. Bu sağlayıcılar yalnızca hizmet için gerekli veriyi işler.",
+      "Saklama süresi: verileriniz, silinmesini talep edene kadar saklanır. Yasal zorunluluk bulunan kayıtlar, ilgili mevzuatta öngörülen süre boyunca saklanabilir.",
+      "Haklarınız: KVKK'nın 11. maddesi kapsamında verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltme, silme ve işlemeye itiraz etme haklarına sahipsiniz. Başvurularınızı yukarıdaki e-posta adresine iletebilirsiniz.",
+      "Açık rıza beyanı: Kampanya ve bilgilendirme amacıyla SMS ve e-posta gönderilmesine, bu metni okuyarak onay veriyorum. Onayımı istediğim zaman e-posta ile geri alabilirim; geri alma işlem öncesi verilere dayanan işlemleri etkilemez."
     ],
     "privacyBody": [
-      "Bu politika, web sitemizi ve Platform’u ziyaret edenlerin verilerinin nasıl işlendiğini açıklar.",
-      "Topladığımız bilgiler: iletişim formundaki ad, işletme adı, e-posta, telefon ve mesaj; teknik loglar (IP, tarayıcı) güvenlik için kısa süre tutulabilir.",
-      "Çerezler: oturum ve dil tercihi için zorunlu çerezler; pazarlama çerezi yok (MVP).",
-      "Üçüncü taraflar: barındırma, SMS ve Wallet servisleri; veriler hizmet sözleşmeleri çerçevesinde işlenir.",
-      "Saklama: müşteri sadakat verileri tenant aktifken; silme taleplerinde makul süre içinde silinir veya anonimleştirilir."
+      "Kapsam: Bu gizlilik politikası web sitesini ziyaret eden ve iletişim, demo veya kayıt formlarını dolduran kişiler için geçerlidir. Sadakat programı müşterilerinin verileri KVKK aydınlatma metninde ayrıca açıklanmıştır.",
+      "Toplanan veriler: formlarda girdiğiniz bilgiler (ad, işletme adı, e-posta, telefon, sektör, mesaj), sitenin güvenlik ve performans için tuttuğu teknik kayıtlar (IP adresi, tarayıcı türü, ziyaret zamanı).",
+      "Çerezler: sitede yalnızca analitik çerezler kullanılır. Bu çerezler ziyaret sayılarını ve sayfa performansını ölçmek için kullanılır. Reklam çerezi kullanılmaz ve reklam ağlarına veri aktarılmaz. Tarayıcı ayarlarınızdan çerezleri silebilir veya engelleyebilirsiniz; bu durumda bazı sayfa işlevleri sınırlanabilir.",
+      "Çerez tercihleri: analitik çerezler için açık rızanız istenir. Rızanızı dilediğiniz zaman tarayıcı ayarlarından değiştirebilirsiniz.",
+      "Güvenlik: aktarım sırasında veriler şifrelenir. Erişim yetkileri rol bazlı tanımlanır ve yalnızca görevli personel erişebilir.",
+      "Veri paylaşımı: kişisel verileriniz satılmaz ve kiralanmaz. Yasal talepler dışında üçüncü kişilerle paylaşılmaz.",
+      "Haklarınız ve iletişim: KVKK kapsamındaki haklarınızı kullanmak için bennbatuu@gmail.com adresine yazabilirsiniz. Başvurular en geç otuz gün içinde yanıtlanır."
     ],
     "termsBody": [
-      "Platform, küçük işletmeler için dijital damga kartı SaaS hizmetidir. Müşteri mobil uygulaması sunulmaz.",
-      "Hesap güvenliği aboneye aittir; kasiyer hesaplarını abone yönetir.",
-      "MVP kapsamı: tek ödül kuralı, Wallet kartları, SMS davet, operasyon paneli. NFC donanımı ve POS entegrasyonu dahil değildir.",
-      "Abonelik pilot dönemde manuel onaylanabilir; ücret iadesi yazılı anlaşmaya tabidir.",
-      "Hizmet “olduğu gibi” sunulur; kesinti ve üçüncü taraf (Apple/Google/SMS) kesintilerinden doğan dolaylı zararlardan sorumlu tutulmayız.",
-      "Türkiye hukuku uygulanır; uyuşmazlıklarda İstanbul mahkemeleri yetkilidir."
+      "Taraflar ve kapsam: Bu şartlar, StampWell platformunu (web sitesi, Wallet kartları, SMS davetleri ve yönetim paneli) kullanan işletmeler ile şirket arasındaki hizmet ilişkisini düzenler.",
+      "Deneme süresi: tüm paketlerde 14 gün ücretsiz deneme süresi vardır. Deneme süresi sonunda kullanım sürdürülmek istenirse seçilen paketin ücreti tahsil edilir.",
+      "Ücretlendirme: paketler aylık veya yıllık olarak ücretlendirilir. Güncel fiyatlar ve KDV bilgisi her zaman sitede gösterilir. Yıllık ödemelerde belirtilen indirim geçerlidir.",
+      "Abonelik ve iptal: abonelik kullanıcı tarafından istediği zaman iptal edilebilir. İptal, bir sonraki fatura döneminden itibaren geçerli olur ve iptal öncesi dönem için ücret iadesi yapılmaz. Geçici özellikler (ör. mock SMS modu) yayından kaldırıldığında kullanıcıya bildirilir.",
+      "Paket geçişleri: starter ve growth paketlerinde üç günlük ek deneme tanımlanabilir. Pro ve business paketlerinde aylık kullanım limitleri paket tanımında belirtilir; limit aşımında ek ücret uygulanabilir.",
+      "Kullanıcının yükümlülükleri: doğru bilgi vermek, hesap bilgilerini korumak ve platformu yasalara uygun kullanmak. Yasa dışı içerik veya izinsiz pazarlama yapılamaz.",
+      "Hizmet seviyesi: şirket platformu makul özenle işletir, ancak kesintisiz veya hatasız hizmet ya da belirli bir erişilebilirlik oranı taahhüt etmez.",
+      "Sorumluluk ve uyuşmazlık: şirketin sorumluluğu, ilgili ücret ile sınırlıdır. Uyuşmazlıklarda yetkili mahkeme ve uygulanacak hukuk, şirketin bildirdiği yetkili mahkemedir. Tüketici statüsündeki kullanıcılar için zorunlu hükümler saklıdır.",
+      "Dil: bu şartların Türkçe, İngilizce ve Rusça sürümleri vardır. Uyuşmazlıkta Türkçe metin esas alınır."
     ]
   },
   "footer": {
-    "tagline": "Küçük işletmeler için Wallet tabanlı sadakat.",
+    "tagline": "StampWell — Her ziyaret bir adım. Modern işletmeler için Wallet tabanlı sadakat.",
     "product": "Ürün",
     "legal": "Yasal",
     "admin": "Giriş",
-    "rights": "© {year} Dokun & Kazan · Türkiye"
+    "portal": "Müşteri portalı",
+    "rights": "© {year} StampWell · Türkiye"
   },
   "demoModal": {
     "eyebrow": "Demo",
     "title": "15 dakikalık demo talep et",
     "body": "Kafe bilgilerinizi bırakın — aynı gün dönüş yapıyoruz.",
     "submit": "Talebi gönder",
-    "close": "Kapat"
+    "close": "Kapat",
+    "planInquiry": {
+      "eyebrow": "Kurumsal",
+      "title": "İhtiyacınızı anlatın",
+      "body": "Şube sayısı, kart tipleri ve entegrasyonları paylaşın — limitleri ve özel fiyatı birlikte netleştirelim.",
+      "submit": "Talebi gönder",
+      "messagePlaceholder": "örn. 15 şube, POS entegrasyonu, özel API erişimi…"
+    }
   },
   "authPages": {
     "loginTitle": "Giriş yap",
@@ -325,5 +1306,49 @@
     "intro": "Aradığınız sayfa taşınmış, silinmiş veya hiç var olmamış olabilir.",
     "home": "Ana sayfaya dön",
     "contact": "İletişim"
+  },
+  "portalPage": {
+    "title": "Müşteri portalı",
+    "intro": "Telefon numaranızla damga durumunuzu görüntüleyin. Kafe sahibinden aldığınız kısa kodu (slug) girin.",
+    "formTitle": "Durum sorgula",
+    "formBody": "Public API aktif kafelerde anlık damga sayısı gösterilir.",
+    "slugLabel": "Kafe kodu (slug)",
+    "slugPlaceholder": "ornek-kafe",
+    "phoneLabel": "Telefon",
+    "phonePlaceholder": "05xx xxx xx xx",
+    "submit": "Sorgula",
+    "loading": "Sorgulanıyor…",
+    "invalidInput": "Kafe kodu ve geçerli telefon girin.",
+    "notActive": "Bu kafe için portal henüz aktif değil.",
+    "queryFailed": "Sorgu başarısız — tekrar deneyin.",
+    "connectionError": "Bağlantı hatası — API erişilemiyor.",
+    "stampCount": "Damga sayısı",
+    "rewardReady": "Ödül hazır{reward}",
+    "programsTitle": "Programlarınız",
+    "programRewardReady": "Ödül hazır",
+    "historyTitle": "Son işlemler"
+  },
+  "socialPage": {
+    "title": "Sosyal ödül talebi",
+    "intro": "Google yorumu veya Instagram takibi kanıtınızı göndererek katılımcı kafelerden bonus damga kazanın.",
+    "formTitle": "Sosyal ödül talep et",
+    "formBody": "Kafenin sadakat programına önceden kayıtlı olmalısınız. Personel talebinizi inceleyecektir.",
+    "slugLabel": "Kafe kodu (slug)",
+    "slugPlaceholder": "ornek-kafe",
+    "phoneLabel": "Telefon",
+    "phonePlaceholder": "05xx xxx xx xx",
+    "platformLabel": "Platform",
+    "platforms": {
+      "google": "Google yorumu",
+      "instagram": "Instagram takibi"
+    },
+    "proofUrlLabel": "Kanıt bağlantısı (isteğe bağlı)",
+    "proofUrlPlaceholder": "https://…",
+    "submit": "Talep gönder",
+    "loading": "Gönderiliyor…",
+    "invalidInput": "Kafe kodu ve geçerli telefon girin.",
+    "submitFailed": "Talep başarısız — tekrar deneyin.",
+    "connectionError": "Bağlantı hatası — API erişilemiyor.",
+    "success": "Talebiniz alındı — personel kısa sürede inceleyecek."
   }
 }

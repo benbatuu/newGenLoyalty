@@ -1,37 +1,84 @@
 {
   "meta": {
-    "title": "Dokun & Kazan",
-    "description": "Wallet-based digital stamp cards for small cafés and boutiques in Turkey. No customer app — SMS invite, staff panel, Apple & Google Wallet.",
-    "keywords": "digital stamp card, loyalty program, apple wallet, google wallet, cafe loyalty, punch card, turkey",
-    "ogImageAlt": "Dokun & Kazan — Wallet stamp card"
+    "title": "StampWell — Every visit, rewarded.",
+    "description": "Wallet-based loyalty platform for cafés, retail, and hospitality in Turkey. Stamp, points, cashback, and more — no customer app required.",
+    "keywords": "StampWell, StampWell, digital stamp card, loyalty program, apple wallet, google wallet, cafe loyalty, turkey",
+    "ogImageAlt": "StampWell — Every visit, rewarded."
   },
   "nav": {
-    "how": "How",
+    "how": "How it works",
     "features": "Features",
+    "programs": "Programs",
     "pricing": "Pricing",
     "sectors": "Sectors",
     "useCases": "Use cases",
-    "contact": "Contact",
+    "contact": "Contact sales",
     "login": "Log in",
     "language": "Language",
     "signup": "Sign up"
   },
   "home": {
-    "brand": "Dokun & Kazan",
+    "brand": "StampWell",
+    "brandFull": "StampWell - StampWell",
     "headline": "Your stamp card lives in their wallet.",
     "sub": "Loyalty without another app. SMS adds the pass; staff stamps by phone.",
     "ctaPrimary": "Request demo",
     "ctaSecondary": "How it works",
     "heroAlt": "Café counter and warm atmosphere",
-    "scrollHint": "Explore"
+    "scrollHint": "Explore",
+    "pill": "StampWell - Türkiye",
+    "hero": {
+      "title": "Loyalty that lives in the",
+      "subtitle": "wallet"
+    }
+  },
+  "walletPass": {
+    "notice": "Notice",
+    "noticeText": "All Coffees have %10 discount today",
+    "aboutBrand": "About",
+    "howDoesItWork": "How does it work",
+    "howDoesItWorkText": "You'll earn 1 stamp every purchase, and once you've collected 10 stamps, you can enjoy a free dessert at {brand}.",
+    "brandRules": "Rules",
+    "brandRulesText": "You are entitled to collect one stamp every 24 hours. The stamps you collect every 24 hours are recorded and stored in the wallet section of your phone.",
+    "brandAddress": "Address",
+    "brandAddressText": "Şekerhan, Hayate Hanım Caddesi No:43, Alanya/Antalya",
+    "workHours": "Working hours",
+    "workHoursText": "Monday–Sunday 09:00 – 23:00",
+    "brandWebsite": "Website",
+    "brandWebsiteText": "https://cafferibelle.com/",
+    "brandContactPhone": "Contact phone",
+    "brandContactPhoneText": "05** *** ** 07",
+    "brandCampaign": "Campaign",
+    "brandCampaignText": "Every Saturday between 2:00 pm and 5:00 pm, buy one coffee and get 20% off desserts."
   },
   "sections": {
+    "statsGridTitle": "Platform",
+    "hero": {
+      "counterTitle": "StampWell - Brand Summary Table",
+      "counterName": "Summary",
+      "counterBrand": "Caffe Ribelle",
+      "liveTag": "Live",
+      "searchCustomer": "Search Customer",
+      "stampButton": "Issue Stamp",
+      "columnCustomer": "Customer",
+      "columnStamp": "Stamp Count",
+      "stamps": "Stamps",
+      "toReward": "to reward",
+      "columnStatus": "Status",
+      "columnReward": "Reward Ready",
+      "columnActive": "Active",
+      "columnScore": "Score",
+      "counterLastAction": "Recent Actions",
+      "stampAddedFor": "Stamp Added",
+      "walletUpdated": "Card wallet updated",
+      "ago": "ago"
+    },
     "proofTitle": "Why small businesses choose us",
     "proofItems": [
       {
         "stat": "0",
         "label": "Customer apps",
-        "hint": "Web + first cashier"
+        "hint": "Apple / Google Wallet only"
       },
       {
         "stat": "10 min",
@@ -39,9 +86,9 @@
         "hint": "Panel + first cashier"
       },
       {
-        "stat": "1",
-        "label": "Reward rule",
-        "hint": "Simple by design"
+        "stat": "8",
+        "label": "Card types",
+        "hint": "Stamp, points, discount, membership and more"
       },
       {
         "stat": "TR",
@@ -49,7 +96,9 @@
         "hint": "Phone + SMS"
       }
     ],
+    "productLabel": "Product",
     "productTitle": "The card lives in the wallet",
+    "loyaltyPass": "Loyalty Pass",
     "productBody": "We don’t force a new app. The stamp card sits in Apple or Google Wallet and shows progress. Staff use the web panel or Flutter app.",
     "productPoints": [
       "SMS invite link",
@@ -64,10 +113,10 @@
     "featuresIntro": "No VIP tiers or email automation. Just what speeds up the counter.",
     "sectorsTitle": "Built for these sectors",
     "sectorsIntro": "Repeat-visit boutiques with a real counter.",
-    "plansTitle": "One clear plan",
-    "plansIntro": "During pilot, activation is manual. iyzico comes later.",
+    "plansTitle": "Plans that scale with you",
+    "plansIntro": "Start with one card type or run multiple programs on higher tiers. Billed monthly or yearly — save two months on annual.",
     "usecaseTitle": "Real use cases",
-    "usecaseIntro": "From counter to Wallet — the happy path.",
+    "usecaseIntro": "From first visit to win-back — real operations on StampWell.",
     "faqTitle": "FAQ",
     "ctaBandTitle": "Move your café to digital stamps",
     "ctaBandBody": "15-minute demo: signup, SMS mock link, Wallet invite, stamp & redeem.",
@@ -100,9 +149,110 @@
     ],
     "opsTitle": "Daily operations",
     "opsBody": "Cashiers get a single numpad screen. Owners see customers, reports, and café details. SuperAdmins manage tenants.",
-    "imageAlt": "Staff registering a guest on a tablet"
+    "imageAlt": "Staff registering a guest on a tablet",
+    "metrics": [
+      {
+        "value": "4",
+        "label": "Setup steps",
+        "hint": "Profile → guest → Wallet → stamp"
+      },
+      {
+        "value": "1",
+        "label": "Counter screen",
+        "hint": "Phone lookup + stamp button"
+      },
+      {
+        "value": "3",
+        "label": "User roles",
+        "hint": "Owner, cashier, SuperAdmin"
+      },
+      {
+        "value": "24h",
+        "label": "Pass sync",
+        "hint": "Updates after every action"
+      }
+    ],
+    "rolesTitle": "Who does what",
+    "rolesIntro": "Clear responsibilities so counter lines stay fast and owners stay informed.",
+    "roles": [
+      {
+        "role": "Owner",
+        "title": "Runs the program",
+        "body": "Sets branding, reward rules, and staff accounts. Reviews reports each morning.",
+        "tasks": [
+          "Configure stamp threshold",
+          "Invite cashiers",
+          "Launch win-back campaigns",
+          "Check near-reward guests"
+        ]
+      },
+      {
+        "role": "Cashier",
+        "title": "Works the counter",
+        "body": "Finds guests by phone, adds stamps, and redeems rewards in under 30 seconds.",
+        "tasks": [
+          "Register new guests",
+          "Send Wallet invite",
+          "Add stamp or points",
+          "Redeem at checkout"
+        ]
+      },
+      {
+        "role": "Guest",
+        "title": "Uses Wallet only",
+        "body": "No app download. Opens SMS link once, saves the pass, and shows it on return visits.",
+        "tasks": [
+          "Add pass from SMS",
+          "See live balance",
+          "Get push on updates",
+          "Redeem reward in store"
+        ]
+      }
+    ],
+    "timelineTitle": "Guest journey",
+    "timelineIntro": "What happens from first visit to loyal regular — in order.",
+    "timeline": [
+      {
+        "title": "Arrives at the counter",
+        "body": "Guest orders. Cashier asks for phone number — no paper card, no app signup form."
+      },
+      {
+        "title": "Gets the Wallet invite",
+        "body": "SMS arrives with a one-tap link. Pass opens with brand logo, stamp grid, and reward progress."
+      },
+      {
+        "title": "Returns and earns",
+        "body": "Next visits: cashier finds them by phone digits. Stamp added; pass updates before they leave."
+      },
+      {
+        "title": "Redeems the reward",
+        "body": "Threshold hit. Cashier taps redeem; counter resets and the guest gets their free item."
+      }
+    ],
+    "faqTitle": "Setup & ops FAQ",
+    "faq": [
+      {
+        "q": "How long does onboarding take?",
+        "a": "Most independent cafés go live in one session: branding, rule, and a test stamp. We activate subscriptions manually during pilot."
+      },
+      {
+        "q": "Can cashiers share one tablet?",
+        "a": "Yes. Each cashier logs in with their own account. Actions are attributed in the activity log."
+      },
+      {
+        "q": "What if SMS fails?",
+        "a": "Dev mode logs the link. In production we retry via your SMS provider and show the invite URL in the counter for manual share."
+      }
+    ]
   },
   "featuresPage": {
+    "label": "Card Types",
+    "dailyCounter": "Built for daily counter ops",
+    "headTitle": "A loyalty model for every business.",
+    "headSubtitle": "Stamp, points, cashback, and more — as Apple Wallet passes in your guest’s pocket. Scroll to explore each card type.",
+    "bestFor": "For whom?",
+    "seePlans": "See Plans",
+    "allProgramTypes": "All Program Types",
     "title": "Features",
     "intro": "Wallet, SMS, RBAC panel, and reports — enough for a small café.",
     "items": [
@@ -130,46 +280,166 @@
         "title": "Turkey first",
         "body": "TR phone validation, Turkish UI, KVKK copy, local SMS."
       }
+    ],
+    "metrics": [
+      {
+        "value": "8",
+        "label": "Program types",
+        "hint": "Stamp to membership"
+      },
+      {
+        "value": "<30s",
+        "label": "Counter flow",
+        "hint": "Phone → stamp → pass sync"
+      },
+      {
+        "value": "2",
+        "label": "Wallet platforms",
+        "hint": "Apple + Google"
+      },
+      {
+        "value": "0",
+        "label": "Guest apps",
+        "hint": "Passes live in Wallet"
+      }
+    ],
+    "deepDive": {
+      "eyebrow": "Wallet-first",
+      "title": "Why Wallet beats another loyalty app",
+      "body": "Guests already open Apple or Google Wallet dozens of times a week. StampWell puts your brand there — with live stamp counts, reward status, and push updates when balances change.",
+      "bullets": [
+        "Brand color, logo, and barcode on every pass",
+        "Instant sync after each counter action",
+        "No App Store friction for your regulars",
+        "Works on iPhone and Android from day one"
+      ]
+    },
+    "checklist": {
+      "title": "Included in every active tenant",
+      "description": "Core platform capabilities regardless of which plan you start on.",
+      "items": [
+        "Tenant-branded Wallet passes",
+        "Cashier counter + owner admin",
+        "Customer directory with stamp history",
+        "Daily and weekly report summaries",
+        "Role-based access (owner, cashier)",
+        "Turkish and English interface",
+        "KVKK-ready data handling",
+        "SMS invite with mock mode for pilots"
+      ]
+    },
+    "faqTitle": "Common questions",
+    "faq": [
+      {
+        "q": "Can I run multiple card types at once?",
+        "a": "Yes — on Growth and above. Starter focuses on one stamp card; higher tiers unlock point, cashback, and event passes side by side."
+      },
+      {
+        "q": "Does the guest need to install anything?",
+        "a": "No. They add a pass to Apple or Google Wallet from an SMS link — same flow as a boarding pass or event ticket."
+      },
+      {
+        "q": "What happens when a reward is redeemed?",
+        "a": "The counter resets on the pass, the redemption is logged, and owner reports update within seconds."
+      }
+    ],
+    "relatedTitle": "Explore further",
+    "related": [
+      {
+        "href": "/how",
+        "label": "How it works",
+        "description": "Step-by-step from café setup to daily stamp flow."
+      },
+      {
+        "href": "/programs",
+        "label": "Program types",
+        "description": "Stamp, points, cashback, and more — pick your model."
+      },
+      {
+        "href": "/pricing",
+        "label": "Pricing",
+        "description": "Four tiers from a single card to multi-branch CRM."
+      }
     ]
   },
   "pricingPage": {
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "billingPeriod": "Billing Period",
+    "saveTwoMonths": "Save 2 months on yearly billing",
+    "monthlyShort": "/mo",
+    "yearlyShort": "/yr",
     "title": "Pricing",
-    "intro": "One plan. Manual activation in pilot; online payments (iyzico) on the roadmap.",
+    "intro": "Four tiers from a single stamp card to multi-branch CRM. Billed monthly or yearly — save two months on annual.",
+    "buyCta": "Subscribe",
     "plans": [
       {
-        "id": "cafe",
-        "name": "Café plan",
+        "id": "starter",
+        "name": "Starter",
         "price": "₺990",
         "period": "/ month",
-        "badge": "Recommended",
-        "note": "Pilot pricing — confirmed at onboarding.",
+        "badge": "Starter",
+        "note": "1 loyalty card · 1 branch",
         "includes": [
-          "Unlimited customers & stamps",
-          "Apple + Google Wallet passes",
+          "1 stamp card",
+          "Apple + Google Wallet",
           "Owner + cashier accounts",
-          "SMS invites (quota per agreement)",
-          "Web panel + Flutter staff app",
-          "Core reports"
-        ],
-        "cta": "Talk demo & pricing"
+          "Basic report summary",
+          "1 branch"
+        ]
       },
       {
-        "id": "pilot",
-        "name": "Pilot",
-        "price": "Free*",
-        "period": "trial",
-        "badge": "Limited",
-        "note": "*Duration and SMS quota per written agreement.",
+        "id": "growth",
+        "name": "Growth",
+        "price": "₺1490",
+        "period": "/ month",
+        "badge": "Popular",
+        "note": "Up to 3 loyalty cards · 1 branch",
         "includes": [
-          "1 tenant setup",
-          "Seed / demo accounts",
-          "SMS mock or limited quota",
-          "Onboarding checklist support",
-          "Wallet certificate checklist"
-        ],
-        "cta": "Apply for pilot"
+          "Up to 3 loyalty cards",
+          "Multi-stamp + point card",
+          "Campaigns & win-back",
+          "Birthday automation",
+          "Full reports"
+        ]
+      },
+      {
+        "id": "pro",
+        "name": "Pro",
+        "price": "₺1990",
+        "period": "/ month",
+        "badge": "Pro",
+        "note": "5 loyalty cards · up to 3 branches",
+        "includes": [
+          "5 card limit",
+          "Cashback & discount cards",
+          "Discount & event cards",
+          "Up to 3 branches",
+          "Segmentation (basic)",
+          "NFC integration"
+        ]
+      },
+      {
+        "id": "business",
+        "name": "Business",
+        "price": "₺2990",
+        "period": "/ month",
+        "badge": "Business",
+        "note": "8 loyalty cards · up to 10 branches",
+        "includes": [
+          "8 card limit",
+          "CRM & email",
+          "VIP & referral",
+          "Up to 10 branches",
+          "SMS segments"
+        ]
       }
     ],
+    "needMore": {
+      "title": "Need more?",
+      "body": "Higher limits, POS integrations, SLA, or API access — tell us what you need and we'll map the right package.",
+      "cta": "Contact sales"
+    },
     "compareTitle": "What’s in / out",
     "compareIn": [
       "Stamps + rewards",
@@ -178,11 +448,298 @@
       "Report summary"
     ],
     "compareOut": [
-      "VIP tiers",
-      "Email automation",
-      "POS integration",
-      "NFC hardware (post-MVP)"
-    ]
+      "VIP tiers (Starter)",
+      "Email automation (below Growth)",
+      "POS webhook (Starter)"
+    ],
+    "metrics": [
+      {
+        "value": "4",
+        "label": "Public tiers",
+        "hint": "Starter to Business"
+      },
+      {
+        "value": "2 mo",
+        "label": "Yearly savings",
+        "hint": "vs monthly billing"
+      },
+      {
+        "value": "10",
+        "label": "Max branches",
+        "hint": "On Business plan"
+      },
+      {
+        "value": "8",
+        "label": "Card limit",
+        "hint": "Top tier cap"
+      }
+    ],
+    "billingTitle": "Billing explained",
+    "billingIntro": "Transparent pricing with no hidden per-stamp fees during pilot.",
+    "billingBullets": [
+      "Monthly or yearly — switch anytime before renewal",
+      "Yearly = 10 months price for 12 months service",
+      "Subscriptions activated manually during pilot phase",
+      "Enterprise limits quoted separately via contact form",
+      "All plans include Wallet pass hosting",
+      "SMS quota billed per your provider agreement"
+    ],
+    "faqTitle": "Pricing FAQ",
+    "faq": [
+      {
+        "q": "Can I upgrade mid-cycle?",
+        "a": "Yes. We prorate the difference when you move to a higher tier. Downgrades apply at next renewal."
+      },
+      {
+        "q": "Is there a free trial?",
+        "a": "We run guided pilots instead — demo call, test tenant, and a live stamp before you commit."
+      },
+      {
+        "q": "What counts as a branch?",
+        "a": "Each physical location with its own counter. Shared customer directory; branch selector on stamp actions."
+      },
+      {
+        "q": "Do you charge per customer?",
+        "a": "No per-guest fees on public tiers. Limits are on card types and branches, not headcount."
+      }
+    ],
+    "featureMatrixTitle": "Compare features",
+    "featureMatrixLabel": "Feature",
+    "featureMatrix": [
+      {
+        "label": "Loyalty card types",
+        "cells": [
+          "1",
+          "Up to 3",
+          "5",
+          "8"
+        ]
+      },
+      {
+        "label": "Branches",
+        "cells": [
+          "1",
+          "1",
+          "Up to 3",
+          "Up to 10"
+        ]
+      },
+      {
+        "label": "Apple + Google Wallet",
+        "cells": [
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "Stamp card",
+        "cells": [
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "Multi-stamp + points",
+        "cells": [
+          false,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "Cashback & discount",
+        "cells": [
+          false,
+          false,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "Campaigns & win-back",
+        "cells": [
+          false,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "CRM & email",
+        "cells": [
+          false,
+          false,
+          false,
+          true
+        ]
+      },
+      {
+        "label": "VIP & referral",
+        "cells": [
+          false,
+          false,
+          false,
+          true
+        ]
+      },
+      {
+        "label": "Full reports",
+        "cells": [
+          "Basic",
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "label": "Segmentation",
+        "cells": [
+          false,
+          false,
+          "Basic",
+          true
+        ]
+      },
+      {
+        "label": "Owner + cashier accounts",
+        "cells": [
+          true,
+          true,
+          true,
+          true
+        ]
+      }
+    ],
+    "trialCta": "Start 14-day free trial",
+    "trialNote": "14-day free trial · no credit card",
+    "trialTerms": "After the trial you choose a plan to activate; nothing is charged automatically.",
+    "eyebrow": "Pricing"
+  },
+  "programsPage": {
+    "title": "Program types",
+    "intro": "Eight loyalty models — from classic stamp cards to staff passes. Mix and match on higher plans.",
+    "matrixTitle": "Which plan unlocks what",
+    "matrixIntro": "Quick reference for card type availability by tier.",
+    "matrixColumns": [
+      "Starter",
+      "Growth",
+      "Pro",
+      "Business"
+    ],
+    "matrixRows": [
+      {
+        "label": "Stamp card",
+        "values": [
+          "yes",
+          "yes",
+          "yes",
+          "yes"
+        ]
+      },
+      {
+        "label": "Multi-stamp",
+        "values": [
+          "no",
+          "yes",
+          "yes",
+          "yes"
+        ]
+      },
+      {
+        "label": "Point card",
+        "values": [
+          "no",
+          "yes",
+          "yes",
+          "yes"
+        ]
+      },
+      {
+        "label": "Cashback",
+        "values": [
+          "no",
+          "no",
+          "yes",
+          "yes"
+        ]
+      },
+      {
+        "label": "Discount / Event",
+        "values": [
+          "no",
+          "no",
+          "yes",
+          "yes"
+        ]
+      },
+      {
+        "label": "Membership / Staff",
+        "values": [
+          "no",
+          "no",
+          "no",
+          "yes"
+        ]
+      }
+    ],
+    "chooseTitle": "Choosing the right model",
+    "chooseIntro": "Start simple, expand when your regulars ask for more.",
+    "chooseBullets": [
+      "Stamp card — best first step for cafés and bakeries",
+      "Point card — when basket size varies (retail, QSR)",
+      "Cashback — percentage back on every visit",
+      "Event card — limited-time promos and launches",
+      "Membership — tiered perks for VIP regulars",
+      "Staff card — employee discounts separate from guest programs"
+    ],
+    "deepDive": {
+      "eyebrow": "Multi-program",
+      "title": "Run several passes per guest",
+      "body": "A guest can hold a stamp card for daily coffee and a point card for retail merchandise. Counter picks the active program; Wallet shows each pass independently.",
+      "bullets": [
+        "Multiple program types up to your plan card quota on Business",
+        "Shared customer directory across programs",
+        "Separate reward rules per card type",
+        "Unified reporting in owner dashboard"
+      ]
+    },
+    "relatedTitle": "Related",
+    "related": [
+      {
+        "href": "/pricing",
+        "label": "Pricing",
+        "description": "See which tier unlocks each program type."
+      },
+      {
+        "href": "/features",
+        "label": "Features",
+        "description": "Platform capabilities behind every card type."
+      },
+      {
+        "href": "/how",
+        "label": "How it works",
+        "description": "From setup to first stamp in four steps."
+      }
+    ],
+    "suggestionCard": {
+      "label": "09",
+      "title": "Have a suggestion?",
+      "headline": "Need a program type we don't list?",
+      "body": "Tell us your loyalty model idea — we'll review it and reply with what's possible.",
+      "cta": "Share your idea"
+    },
+    "suggestionModal": {
+      "eyebrow": "Suggestion",
+      "title": "Suggest a program type",
+      "body": "Describe the loyalty model you're looking for and we'll get back to you.",
+      "submit": "Send suggestion",
+      "messagePlaceholder": "e.g. Tiered gym visits, subscription punch card, hybrid stamp + cashback…"
+    }
   },
   "sectorsPage": {
     "title": "Sectors",
@@ -207,6 +764,310 @@
         "title": "Ice cream & sweets",
         "body": "Bring seasonal guests back with rewards — no app install.",
         "image": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1200&q=80"
+      },
+      {
+        "title": "Quick-service restaurants",
+        "body": "Stamp, points, or cashback at the counter — staff panel stays fast during rush hour.",
+        "image": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80"
+      },
+      {
+        "title": "Retail & boutiques",
+        "body": "Membership and discount passes in Wallet — repeat visits without plastic cards.",
+        "image": "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&q=80"
+      }
+    ],
+    "fitTitle": "Is StampWell a fit?",
+    "fitIntro": "We built for businesses with a physical counter and guests who come back — not one-off transactions.",
+    "fitChecklist": {
+      "title": "You’re a good match if…",
+      "items": [
+        "Guests visit at least twice a month",
+        "Staff can ask for a phone number at checkout",
+        "You want digital loyalty without a guest app",
+        "Rewards are simple: free item, discount, or points",
+        "You run 1–10 locations (or plan to)",
+        "Turkish or bilingual TR/EN operations"
+      ]
+    },
+    "metrics": [
+      {
+        "value": "6+",
+        "label": "Sector templates",
+        "hint": "Café to retail"
+      },
+      {
+        "value": "85%",
+        "label": "Repeat-visit lift",
+        "hint": "Typical pilot target"
+      },
+      {
+        "value": "1",
+        "label": "Counter device",
+        "hint": "Tablet or phone"
+      },
+      {
+        "value": "TR",
+        "label": "Market focus",
+        "hint": "Local SMS + KVKK"
+      }
+    ],
+    "deepDive": {
+      "eyebrow": "Counter culture",
+      "title": "Built for the rush-hour line",
+      "body": "Loyalty fails when it slows checkout. StampWell keeps enrollment to one phone field and stamps to one tap — so your barista never leaves the register.",
+      "bullets": [
+        "Phone lookup with partial digit search",
+        "Idempotent stamp — no double credits",
+        "Offline-tolerant counter (syncs on reconnect)",
+        "Branch selector for multi-location owners"
+      ]
+    },
+    "relatedTitle": "Next steps",
+    "related": [
+      {
+        "href": "/use-cases",
+        "label": "Use cases",
+        "description": "Real stories from first visit to reward redemption."
+      },
+      {
+        "href": "/pricing",
+        "label": "Pricing",
+        "description": "Pick a tier that matches your branch count."
+      },
+      {
+        "href": "/contact",
+        "label": "Contact",
+        "description": "Tell us your sector — we’ll suggest a setup."
+      }
+    ],
+    "details": [
+      {
+        "metrics": [
+          {
+            "value": "Daily",
+            "label": "Visit rhythm",
+            "hint": "Morning rush, afternoon regulars"
+          },
+          {
+            "value": "Stamps",
+            "label": "Main programme",
+            "hint": "A reward every set number of coffees"
+          },
+          {
+            "value": "One",
+            "label": "Counter screen",
+            "hint": "Numpad and phone lookup"
+          },
+          {
+            "value": "SMS",
+            "label": "Invite channel",
+            "hint": "Wallet link, no app"
+          }
+        ],
+        "flow": {
+          "title": "The morning queue",
+          "steps": [
+            "Regular says their phone number",
+            "Cashier types the last four digits",
+            "Stamp is added and the pass updates at once",
+            "Reward is redeemed at the till when full"
+          ]
+        },
+        "fit": [
+          "The same regulars come back several times a week",
+          "Cashier can ask for the phone during the order",
+          "Reward is simple: a free coffee or pastry"
+        ]
+      },
+      {
+        "metrics": [
+          {
+            "value": "Filter",
+            "label": "Reward type",
+            "hint": "Free filter coffee or a pastry"
+          },
+          {
+            "value": "Separate",
+            "label": "Product counters",
+            "hint": "Espresso and filter count apart"
+          },
+          {
+            "value": "Brand",
+            "label": "Wallet look",
+            "hint": "Logo and colour on the pass"
+          },
+          {
+            "value": "Enthusiast",
+            "label": "Guest type",
+            "hint": "Chooses coffee by style"
+          }
+        ],
+        "flow": {
+          "title": "Counters per product group",
+          "steps": [
+            "Guest orders an espresso or a filter coffee",
+            "Cashier picks the product group",
+            "That counter goes up by one",
+            "Each group shows separately on the pass"
+          ]
+        },
+        "fit": [
+          "The menu has more than one coffee group",
+          "Guests try different styles, not the same drink",
+          "Reward can be a coffee or a pastry"
+        ]
+      },
+      {
+        "metrics": [
+          {
+            "value": "Morning",
+            "label": "Busiest hours",
+            "hint": "Bread and pastry runs"
+          },
+          {
+            "value": "Numpad",
+            "label": "Counter entry",
+            "hint": "Typing the phone by digits"
+          },
+          {
+            "value": "Once",
+            "label": "Stamp check",
+            "hint": "The same sale is not counted twice"
+          },
+          {
+            "value": "Short",
+            "label": "Till time",
+            "hint": "No extra step in checkout"
+          }
+        ],
+        "flow": {
+          "title": "A few seconds at the till",
+          "steps": [
+            "Cashier types the phone digits on the numpad",
+            "The list narrows to one guest",
+            "A stamp or points are added",
+            "A reward, if ready, is used on the same screen"
+          ]
+        },
+        "fit": [
+          "Many short transactions during the day",
+          "Cashier uses the numpad every time",
+          "Reward on a set product such as bread, pastry or simit"
+        ]
+      },
+      {
+        "metrics": [
+          {
+            "value": "Seasonal",
+            "label": "Visit pattern",
+            "hint": "Busy in summer, quiet in winter"
+          },
+          {
+            "value": "Return",
+            "label": "Main goal",
+            "hint": "Win-back campaign for winter"
+          },
+          {
+            "value": "SMS",
+            "label": "Campaign channel",
+            "hint": "Owner sends a personal offer"
+          },
+          {
+            "value": "Stamps",
+            "label": "Enough card",
+            "hint": "One programme is often enough"
+          }
+        ],
+        "flow": {
+          "title": "Winning guests back at season's end",
+          "steps": [
+            "Inactive regulars are filtered",
+            "A personal SMS offer goes out",
+            "Guest opens the pass and sees their stamps",
+            "The reward is used in winter"
+          ]
+        },
+        "fit": [
+          "Visits cluster in certain months",
+          "There are weekend and holiday visits",
+          "Campaigns can be sent by SMS"
+        ]
+      },
+      {
+        "metrics": [
+          {
+            "value": "Points",
+            "label": "Main model",
+            "hint": "Depends on the basket value"
+          },
+          {
+            "value": "Cashback",
+            "label": "Alternative",
+            "hint": "A percentage paid back"
+          },
+          {
+            "value": "Simple",
+            "label": "Till panel",
+            "hint": "Few buttons at peak hours"
+          },
+          {
+            "value": "One",
+            "label": "Rule",
+            "hint": "No rule needed per product"
+          }
+        ],
+        "flow": {
+          "title": "Basket value turns into points",
+          "steps": [
+            "Order is completed and the total shows",
+            "Guest is found by phone",
+            "Points are added by the amount",
+            "Balance can be used for payment"
+          ]
+        },
+        "fit": [
+          "Basket value varies from guest to guest",
+          "The till must stay fast at peak hours",
+          "Guests come often but for short visits"
+        ]
+      },
+      {
+        "metrics": [
+          {
+            "value": "Membership",
+            "label": "Main model",
+            "hint": "Tier and discount together"
+          },
+          {
+            "value": "Discount",
+            "label": "Extra card",
+            "hint": "Valid in selected categories"
+          },
+          {
+            "value": "Staff",
+            "label": "Employee card",
+            "hint": "Separate programme, separate rules"
+          },
+          {
+            "value": "Pass",
+            "label": "Card format",
+            "hint": "Lives in Wallet, not printed"
+          }
+        ],
+        "flow": {
+          "title": "From membership to discount",
+          "steps": [
+            "Guest adds the membership pass to Wallet",
+            "Cashier finds the membership by phone",
+            "Discount is applied for the tier",
+            "The new tier updates on the pass"
+          ]
+        },
+        "fit": [
+          "Guests come back and ask about membership",
+          "Different categories get different discounts",
+          "Staff discounts are kept apart from the guest programme"
+        ]
       }
     ]
   },
@@ -216,19 +1077,97 @@
     "items": [
       {
         "title": "First visit → Wallet",
-        "body": "New guest. Cashier enters phone, SMS mock link in logs, guest adds the card. First stamp done."
+        "body": "Guest arrives. Cashier enters phone, SMS invite goes out, pass lands in Apple or Google Wallet. First stamp or points credit in one flow."
       },
       {
-        "title": "Regular stamp",
-        "body": "Search by last digits, select, stamp. 30s idempotency blocks doubles."
+        "title": "Counter stamp or scan",
+        "body": "Regulars found by phone digits. Staff adds a stamp, points, or cashback in seconds — idempotency blocks double taps."
       },
       {
-        "title": "Reward day",
-        "body": "Threshold hit → reward ready. Cashier redeems; counter resets; Wallet syncs."
+        "title": "Multi-program guest",
+        "body": "Same guest holds a stamp card and a point card. Counter picks the active program; Wallet shows the right balance."
       },
       {
-        "title": "Owner morning check",
-        "body": "On mobile or web: stamps, redemptions, near-reward guests, and staff list."
+        "title": "Reward redemption",
+        "body": "Threshold hit → reward ready. Cashier redeems at checkout; counters reset and every Wallet pass syncs instantly."
+      },
+      {
+        "title": "Win-back campaign",
+        "body": "Owner targets guests inactive 30 days. SMS nudge with offer; returning visits tracked in reports."
+      },
+      {
+        "title": "Morning owner review",
+        "body": "Dashboard shows yesterday’s stamps, redemptions, near-reward guests, and branch activity — web or mobile."
+      }
+    ],
+    "quote": {
+      "text": "We replaced paper punch cards in a week. Regulars love seeing stamps update in Wallet before they sit down.",
+      "attribution": "GreenLeaf Café",
+      "role": "Pilot partner · Istanbul"
+    },
+    "timelineTitle": "Typical Tuesday",
+    "timelineIntro": "How a busy café runs loyalty from open to close.",
+    "timeline": [
+      {
+        "title": "08:30 — Owner checks reports",
+        "body": "Yesterday’s stamps, two guests near reward, one win-back reply. No spreadsheet export needed."
+      },
+      {
+        "title": "12:15 — Lunch rush enroll",
+        "body": "Three first-timers get SMS invites while the line moves. Passes added before they finish their latte."
+      },
+      {
+        "title": "15:40 — Regular stamp",
+        "body": "Cashier types last four digits, taps +1 stamp. Guest pocket buzzes with updated pass."
+      },
+      {
+        "title": "19:00 — Reward redeemed",
+        "body": "Guest hits 10/10. Cashier redeems free coffee; counter resets to 0/10 on Wallet instantly."
+      }
+    ],
+    "checklist": {
+      "title": "Outcomes owners track",
+      "description": "Metrics that matter for a single-location pilot.",
+      "items": [
+        "New Wallet enrollments per day",
+        "Stamps vs redemptions ratio",
+        "Guests one stamp away from reward",
+        "Return visits within 14 days",
+        "Campaign response rate",
+        "Branch-level activity (Pro+)"
+      ]
+    },
+    "faqTitle": "Scenario FAQ",
+    "faq": [
+      {
+        "q": "Can one guest hold two programs?",
+        "a": "Yes on Growth+. Counter selects active program; each pass shows its own balance in Wallet."
+      },
+      {
+        "q": "What about guests without smartphones?",
+        "a": "Staff can still stamp by phone number. The guest sees balance when staff shows the counter screen — Wallet is optional but recommended."
+      },
+      {
+        "q": "How do win-back campaigns work?",
+        "a": "Owner filters inactive guests, sends SMS with an offer link. Returns appear in the activity feed and weekly report."
+      }
+    ],
+    "relatedTitle": "Keep exploring",
+    "related": [
+      {
+        "href": "/how",
+        "label": "How it works",
+        "description": "Platform setup and daily ops in four steps."
+      },
+      {
+        "href": "/sectors",
+        "label": "Sectors",
+        "description": "See how different business types use StampWell."
+      },
+      {
+        "href": "/features",
+        "label": "Features",
+        "description": "Wallet, SMS, RBAC, and reporting depth."
       }
     ]
   },
@@ -245,8 +1184,27 @@
     "sending": "Sending…",
     "success": "Thanks — we’ll get back to you shortly.",
     "error": "Couldn’t send. Please try again.",
+    "errorRateLimit": "Too many requests. Please wait a moment and try again.",
     "asideTitle": "Turkey office",
-    "asideBody": "Istanbul · remote onboarding. We’ll share certificate and SMS checklists."
+    "asideBody": "Istanbul · remote onboarding. We’ll share certificate and SMS checklists.",
+    "sectors": {
+      "cafe": "Café",
+      "specialty": "Specialty / coffee bar",
+      "bakery": "Bakery / pastry",
+      "dessert": "Ice cream / dessert",
+      "other": "Other (type it)",
+      "restaurant": "Restaurant / bistro",
+      "fastfood": "Quick service",
+      "retail": "Retail",
+      "boutique": "Boutique / fashion",
+      "beauty": "Salon / beauty",
+      "gym": "Gym / studio"
+    },
+    "sectorOther": null,
+    "sectorOtherPlaceholder": "Type your sector",
+    "kvkkConsent": "I have read and accept the KVKK notice.",
+    "kvkkLink": "KVKK notice",
+    "marketingConsent": "I want to receive promotional SMS and email (optional)."
   },
   "faq": {
     "items": [
@@ -256,7 +1214,7 @@
       },
       {
         "q": "Is NFC included?",
-        "a": "Not in the MVP. Stamps go through the cashier panel/mobile. NFC is planned as a later adapter."
+        "a": "Yes — register NFC devices under Integrations and confirm at the counter. QR scan and the mobile cashier panel are also supported."
       },
       {
         "q": "Who pays for SMS?",
@@ -264,7 +1222,15 @@
       },
       {
         "q": "Multi-location chains?",
-        "a": "MVP is single-tenant / single café focused. Chain management comes later."
+        "a": "Growth and Pro plans support multiple branches. Enterprise adds custom limits and onboarding."
+      },
+      {
+        "q": "Which program types are included?",
+        "a": "Stamp, multi-stamp, points, cashback, discount, event, membership, and staff passes — availability depends on your plan."
+      },
+      {
+        "q": "Monthly vs yearly billing?",
+        "a": "Pay monthly or annually. Yearly saves two months versus twelve monthly payments. Activation stays manual during pilot."
       }
     ]
   },
@@ -272,44 +1238,59 @@
     "kvkkTitle": "KVKK Notice",
     "privacyTitle": "Privacy Policy",
     "termsTitle": "Terms of Use",
-    "lastUpdated": "Last updated: August 2026",
+    "lastUpdated": "Last updated: 17 November 2026",
     "kvkkBody": [
-      "Dokun & Kazan (“Platform”) acts as data controller under Turkey’s Personal Data Protection Law (KVKK No. 6698).",
-      "Data processed: staff email and name; customer phone numbers, stamp/reward records, and Wallet pass identifiers.",
-      "Purposes: running the loyalty program, issuing/updating Wallet passes, sending invite SMS, support and security.",
-      "Legal bases: performance of a contract, legitimate interest, and explicit consent (for commercial SMS).",
-      "Transfers: to SMS and Wallet infrastructure providers only as required to provide the service.",
-      "Your rights: you may exercise rights under Article 11 of the Law via our contact channels."
+      "Data controller: StampWell, a legal entity (tax ID: 11111111111, Yeşilce Mahallesi Define Sokak No:6, Turkey). Contact person for data protection (KVKK): Batuhan Küçük, bennbatuu@gmail.com, +90 541 472 58 20.",
+      "Data we process: first and last name, phone number, email address, date of birth (if provided), business name and sector, loyalty records (stamps, points, rewards, spend amounts and transaction dates), Wallet pass identifier, IP address and system logs.",
+      "Purposes: operating the loyalty programme, creating and updating Apple and Google Wallet passes, sending invitations and notices by SMS, answering support requests, preventing security incidents and abuse, and meeting legal obligations.",
+      "Legal bases: performance of a contract, legal obligation, legitimate interest, and your explicit consent. Promotional SMS and email are sent only with your explicit consent.",
+      "Transfers: data is stored in Turkey and not transferred abroad. To deliver the service, SMS providers (e.g. Netgsm, İletimerkezi), Apple and Google Wallet infrastructure and cloud hosting providers act as data processors and only process what the service requires.",
+      "Retention: your data is kept until you ask for it to be deleted. Records that the law requires us to keep are retained for the period set by that law.",
+      "Your rights: under Article 11 of the KVKK law you may ask whether your data is processed, request information, correction or deletion, and object to processing. Send requests to the email address above.",
+      "Explicit consent: by reading this text I agree to receive promotional and informational SMS and email. I can withdraw this consent at any time by email; withdrawal does not affect processing already carried out."
     ],
     "privacyBody": [
-      "This policy explains how we process data from visitors of our website and the Platform.",
-      "We collect: contact-form name, business name, email, phone, and message; short-lived technical logs (IP, browser) for security.",
-      "Cookies: essential cookies for session and language; no marketing cookies in the MVP.",
-      "Third parties: hosting, SMS, and Wallet services under their service agreements.",
-      "Retention: loyalty data while the tenant is active; deletion or anonymization on request within a reasonable time."
+      "Scope: this privacy policy applies to people who visit the website and submit contact, demo or sign-up forms. Customer data of the loyalty programme is described separately in the KVKK notice.",
+      "Data collected: information you enter in forms (name, business name, email, phone, sector, message) and technical logs kept for security and performance (IP address, browser type, visit time).",
+      "Cookies: the website uses analytics cookies only. They measure visit counts and page performance. We do not use advertising cookies and do not share data with advertising networks. You can delete or block cookies in your browser; some page features may then be limited.",
+      "Cookie consent: we ask for your explicit consent before setting analytics cookies. You can change your choice at any time in your browser settings.",
+      "Security: data is encrypted in transit. Access rights are role-based and only authorised staff can access personal data.",
+      "Sharing: we do not sell or rent personal data. We share it with third parties only where the law requires it.",
+      "Your rights and contact: to exercise your rights under the KVKK law, write to bennbatuu@gmail.com. Requests are answered within thirty days at the latest."
     ],
     "termsBody": [
-      "The Platform is a digital stamp-card SaaS for small businesses. There is no customer mobile app.",
-      "Account security is the subscriber’s responsibility; the subscriber manages cashier accounts.",
-      "MVP scope: one reward rule, Wallet passes, SMS invite, operations panel. NFC hardware and POS integrations are out of scope.",
-      "During pilot, subscriptions may be activated manually; refunds follow written agreement.",
-      "Service is provided “as is”; we are not liable for indirect damages from outages or third-party (Apple/Google/SMS) failures.",
-      "Turkish law applies; Istanbul courts have jurisdiction."
+      "Parties and scope: these terms govern the relationship between StampWell and the businesses that use the platform (website, Wallet passes, SMS invitations and admin panel).",
+      "Free trial: every plan includes a 14-day free trial. If you continue after the trial, the fee for the chosen plan is charged.",
+      "Pricing: plans are billed monthly or yearly. Current prices and applicable tax are always shown on the website. The stated yearly discount applies to yearly payments.",
+      "Subscription and cancellation: you may cancel your subscription at any time. Cancellation takes effect from the next billing period and no refund is given for the period already paid. We will notify you when temporary features (e.g. the mock SMS mode) are retired.",
+      "Plan changes: starter and growth plans may receive an additional 3-day trial. Pro and business plans include monthly usage limits defined in the plan description; extra charges may apply when limits are exceeded.",
+      "Your obligations: provide accurate information, keep your account credentials safe and use the platform lawfully. Illegal content and unsolicited marketing are not allowed.",
+      "Service level: we operate the platform with reasonable care, but we do not promise uninterrupted or error-free service or any specific availability level.",
+      "Liability and disputes: our liability is limited to the fees paid for the relevant service. Disputes are subject to Turkish law and the courts specified by us. Mandatory rights of consumers are not affected.",
+      "Language: these terms are available in Turkish, English and Russian. The Turkish text prevails in case of dispute."
     ]
   },
   "footer": {
-    "tagline": "Wallet-based loyalty for small businesses.",
+    "tagline": "StampWell — Every visit, rewarded. Wallet-based loyalty for modern businesses.",
     "product": "Product",
     "legal": "Legal",
     "admin": "Log in",
-    "rights": "© {year} Dokun & Kazan · Turkey"
+    "portal": "Customer portal",
+    "rights": "© {year} StampWell · Turkey"
   },
   "demoModal": {
     "eyebrow": "Demo",
     "title": "Request a 15-minute demo",
     "body": "Leave your café details — we usually reply the same day.",
     "submit": "Send request",
-    "close": "Close"
+    "close": "Close",
+    "planInquiry": {
+      "eyebrow": "Enterprise",
+      "title": "Tell us what you need",
+      "body": "Share branch count, card types, and integrations — we'll reply with limits and custom pricing.",
+      "submit": "Send inquiry",
+      "messagePlaceholder": "e.g. 15 branches, POS integration, custom API access…"
+    }
   },
   "authPages": {
     "loginTitle": "Log in",
@@ -325,5 +1306,49 @@
     "intro": "The page you're looking for may have moved, been removed, or never existed.",
     "home": "Back to home",
     "contact": "Contact us"
+  },
+  "portalPage": {
+    "title": "Customer portal",
+    "intro": "Check your stamp balance with your phone number. Enter the short code (slug) from your café.",
+    "formTitle": "Look up status",
+    "formBody": "Live stamp count for cafés with the public portal enabled.",
+    "slugLabel": "Café code (slug)",
+    "slugPlaceholder": "example-cafe",
+    "phoneLabel": "Phone",
+    "phonePlaceholder": "05xx xxx xx xx",
+    "submit": "Look up",
+    "loading": "Looking up…",
+    "invalidInput": "Enter café code and a valid phone number.",
+    "notActive": "Portal is not active for this café yet.",
+    "queryFailed": "Lookup failed — please try again.",
+    "connectionError": "Connection error — API unreachable.",
+    "stampCount": "Stamp count",
+    "rewardReady": "Reward ready{reward}",
+    "programsTitle": "Your programs",
+    "programRewardReady": "Reward ready",
+    "historyTitle": "Recent activity"
+  },
+  "socialPage": {
+    "title": "Social reward claim",
+    "intro": "Submit proof of your Google review or Instagram follow to earn bonus stamps from participating cafés.",
+    "formTitle": "Claim social reward",
+    "formBody": "You must already be enrolled in the café's loyalty program. Staff will review your submission.",
+    "slugLabel": "Café code (slug)",
+    "slugPlaceholder": "example-cafe",
+    "phoneLabel": "Phone",
+    "phonePlaceholder": "05xx xxx xx xx",
+    "platformLabel": "Platform",
+    "platforms": {
+      "google": "Google review",
+      "instagram": "Instagram follow"
+    },
+    "proofUrlLabel": "Proof link (optional)",
+    "proofUrlPlaceholder": "https://…",
+    "submit": "Submit claim",
+    "loading": "Submitting…",
+    "invalidInput": "Enter café code and a valid phone number.",
+    "submitFailed": "Claim failed — please try again.",
+    "connectionError": "Connection error — API unreachable.",
+    "success": "Claim submitted — staff will review it shortly."
   }
 }

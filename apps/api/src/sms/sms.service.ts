@@ -9,6 +9,8 @@ export type SmsPayload = {
   body: string;
   /** Convenience for logs — e.g. Wallet invite URL */
   link?: string;
+  /** Müşteri opt-out kontrolü için */
+  tenantId?: string;
 };
 
 type IletiSendResponse = {
@@ -82,6 +84,31 @@ export class SmsService {
   }> {
     const mode = this.provider();
     const toPhone = this.normalizePhone(payload.toPhone);
+
+    if (payload.tenantId) {
+      const customer = await this.prisma.customer.findFirst({
+        where: {
+          tenantId: payload.tenantId,
+          phone: { endsWith: toPhone.slice(-10) },
+        },
+        select: { smsOptOut: true },
+      });
+      if (customer?.smsOptOut) {
+        this.logger.log(
+          `SMS skipped (opt-out): tenant=${payload.tenantId} phone=***${toPhone.slice(-4)}`,
+        );
+        const row = await this.prisma.smsMessage.create({
+          data: {
+            provider: 'skipped',
+            toPhone,
+            body: payload.body,
+            link: payload.link ?? null,
+            status: 'skipped_opt_out',
+          },
+        });
+        return { ok: false, mode: 'skipped_opt_out', messageId: row.id };
+      }
+    }
 
     const row = await this.prisma.smsMessage.create({
       data: {

@@ -1,3 +1,4 @@
+import { randomInt } from 'crypto';
 import {
   BadRequestException,
   Injectable,
@@ -6,22 +7,46 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
-import { PassNotifyKind, PassPlatform } from '@prisma/client';
+import { PassNotifyKind, PassPlatform, ProgramType, StampLedgerType } from '@prisma/client';
 import * as crypto from 'crypto';
 import * as jwt from 'jsonwebtoken';
+import { MultiStampService } from '../loyalty/multi-stamp.service';
+import type { DiscountCardService } from '../loyalty/discount-card.service';
+import type { EventCardService } from '../loyalty/event-card.service';
+import type { PointCardService } from '../loyalty/point-card.service';
+import type { MultiStampConfig } from '../loyalty/loyalty.types';
+import {
+  parseWalletTemplate,
+  resolvePassBranding,
+} from '../loyalty/wallet-template';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../sms/sms.service';
 import { AppleApnsService } from './apple-apns.service';
 import { ApplePassService } from './apple-pass.service';
 import { GoogleWalletService } from './google-wallet.service';
 import { PassArtService } from './pass-art.service';
-import { parseInvitePolicies } from './invite-page';
+import {
+  stripBroadcastStamps,
+  withBroadcastStamp,
+} from './broadcast-message.util';
+import { parseInvitePolicies, sanitizeInviteLayout } from './invite-page';
+import {
+  WalletProgramService,
+  applePassSerial,
+  buildPassBarcodeMessage,
+  parseApplePassSerial,
+} from './wallet-program.service';
+import { customerPhonePlain } from '../pii/customer-pii';
+import { PiiService } from '../pii/pii.service';
 
 type InviteClaims = {
   sub: string;
   tenantId: string;
   typ: 'wallet_invite';
+  /** Seçili kartlar — yoksa tüm uygun aktif kartlar */
+  programIds?: string[];
 };
 
 @Injectable()
@@ -42,7 +67,50 @@ export class WalletService {
     private readonly sms: SmsService,
     private readonly apns: AppleApnsService,
     private readonly passArt: PassArtService,
+    private readonly multiStamp: MultiStampService,
+    private readonly walletPrograms: WalletProgramService,
+    private readonly moduleRef: ModuleRef,
+    private readonly pii: PiiService,
   ) {}
+
+  private customerPhone(customer: {
+    phone?: string | null;
+    phoneEnc?: string | null;
+  }): string {
+    return customerPhonePlain(this.pii, customer);
+  }
+
+  private _pointCard?: PointCardService;
+  private _discountCard?: DiscountCardService;
+  private _eventCard?: EventCardService;
+
+  /** Döngüsel import önlemek için lazy — Wallet ↔ Campaigns ↔ PointCard */
+  private get pointCard(): PointCardService {
+    if (!this._pointCard) {
+      const { PointCardService: Svc } =
+        require('../loyalty/point-card.service') as typeof import('../loyalty/point-card.service');
+      this._pointCard = this.moduleRef.get(Svc, { strict: false });
+    }
+    return this._pointCard;
+  }
+
+  private get discountCard(): DiscountCardService {
+    if (!this._discountCard) {
+      const { DiscountCardService: Svc } =
+        require('../loyalty/discount-card.service') as typeof import('../loyalty/discount-card.service');
+      this._discountCard = this.moduleRef.get(Svc, { strict: false });
+    }
+    return this._discountCard;
+  }
+
+  private get eventCard(): EventCardService {
+    if (!this._eventCard) {
+      const { EventCardService: Svc } =
+        require('../loyalty/event-card.service') as typeof import('../loyalty/event-card.service');
+      this._eventCard = this.moduleRef.get(Svc, { strict: false });
+    }
+    return this._eventCard;
+  }
 
   private apiUrl(): string {
     const fromEnv = this.config.get<string>('API_URL')?.trim();
@@ -57,12 +125,18 @@ export class WalletService {
    * iOS caches pass notification icons by serialNumber. Bump APPLE_ICON_REV
    * when the icon pipeline changes so a fresh add picks up the new icon.
    */
-  private appleSerial(customerId: string): string {
-    return `apple_${customerId}_${WalletService.APPLE_ICON_REV}`;
+  private appleSerial(customerId: string, programId?: string | null): string {
+    return applePassSerial(
+      customerId,
+      programId,
+      WalletService.APPLE_ICON_REV,
+    );
   }
 
   /** Public base for invite/download links (phone must reach this). */
   private publicApiUrl(): string {
+    const lan = this.config.get<string>('PUBLIC_API_URL')?.trim();
+    if (lan) return lan.replace(/\/$/, '');
     return this.appleWebServiceUrl() ?? this.apiUrl();
   }
 
@@ -104,12 +178,24 @@ export class WalletService {
     }
   }
 
-  createInviteToken(customerId: string, tenantId: string): string {
-    return jwt.sign(
-      { sub: customerId, tenantId, typ: 'wallet_invite' } satisfies InviteClaims,
-      this.inviteSecret(),
-      { expiresIn: '30d' },
-    );
+  listInvitePrograms(tenantId: string) {
+    return this.walletPrograms.listEligiblePrograms(tenantId);
+  }
+
+  createInviteToken(
+    customerId: string,
+    tenantId: string,
+    programIds?: string[],
+  ): string {
+    const claims: InviteClaims = {
+      sub: customerId,
+      tenantId,
+      typ: 'wallet_invite',
+    };
+    if (programIds?.length) {
+      claims.programIds = programIds;
+    }
+    return jwt.sign(claims, this.inviteSecret(), { expiresIn: '30d' });
   }
 
   verifyInviteToken(token: string): InviteClaims {
@@ -120,9 +206,61 @@ export class WalletService {
     return payload;
   }
 
-  inviteUrl(customerId: string, tenantId: string): string {
-    const token = this.createInviteToken(customerId, tenantId);
-    return `${this.publicApiUrl()}/wallet/invite/${token}`;
+  /** Kısa davet linki üretir (kayıt kaydedilir, süresi 30 gün) */
+  async inviteUrl(
+    customerId: string,
+    tenantId: string,
+    programIds?: string[],
+  ): Promise<string> {
+    const code = await this.newShortCode();
+    await this.prisma.walletShortLink.create({
+      data: {
+        code,
+        tenantId,
+        customerId,
+        programIds: programIds?.length ? programIds : undefined,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    });
+    return `${this.publicApiUrl()}/wallet/i/${code}`;
+  }
+
+  private async newShortCode(): Promise<string> {
+    const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = Array.from({ length: 7 }, () => alphabet[randomInt(alphabet.length)]).join('');
+      const exists = await this.prisma.walletShortLink.findUnique({ where: { code } });
+      if (!exists) return code;
+    }
+    throw new ServiceUnavailableException('Davet kodu üretilemedi');
+  }
+
+  /** Kısa koddan davet token'ı üretir; süresi dolmuş ya da yoksa hata */
+  async tokenForShortCode(code: string): Promise<string> {
+    const row = await this.prisma.walletShortLink.findUnique({ where: { code } });
+    if (!row || row.expiresAt < new Date()) {
+      throw new NotFoundException('Davet linki geçersiz veya süresi dolmuş');
+    }
+    const programIds = Array.isArray(row.programIds) ? (row.programIds as string[]) : undefined;
+    return this.createInviteToken(row.customerId, row.tenantId, programIds);
+  }
+
+  async createWalletInvite(
+    customerId: string,
+    tenantId: string,
+    programIds?: string[],
+  ) {
+    const resolved = await this.walletPrograms.resolveProgramIds(
+      tenantId,
+      programIds,
+    );
+    await this.walletPrograms.enrollCustomerPrograms(
+      tenantId,
+      customerId,
+      resolved,
+    );
+    const link = await this.inviteUrl(customerId, tenantId, resolved);
+    return { link, programIds: resolved };
   }
 
   private async loadCustomerContext(customerId: string, tenantId: string) {
@@ -143,13 +281,254 @@ export class WalletService {
       throw new ServiceUnavailableException('Ödül kuralı tanımlı değil');
     }
 
-    return { customer, rule, tenant: customer.tenant };
+    // Hedefli duyuru varsa bu müşterinin kartında o görünür (kafe geneli yerine)
+    const tenant = {
+      ...customer.tenant,
+      passBroadcastMessage:
+        customer.passNotice ?? customer.tenant.passBroadcastMessage,
+    };
+    return { customer, rule, tenant };
+  }
+
+  /** MultiStamp Mod A lane alanları + son damga bildirimi metni */
+  private async buildPassEnrichment(
+    tenantId: string,
+    customerId: string,
+    notifyKind?: PassNotifyKind | null,
+  ): Promise<{
+    extraAuxiliaryFields: { key: string; label: string; value: string }[];
+    stampNotifyValue?: string;
+  }> {
+    const extraAuxiliaryFields: { key: string; label: string; value: string }[] =
+      [];
+
+    const multiProgram = await this.prisma.loyaltyProgram.findFirst({
+      where: {
+        tenantId,
+        isActive: true,
+        type: ProgramType.MULTI_STAMP,
+      },
+      include: { tiers: { orderBy: { sortOrder: 'asc' } } },
+    });
+
+    if (multiProgram) {
+      const config = this.multiStamp.parseConfig(multiProgram.config);
+      if (config?.mode === 'LANES' && config.lanes?.length) {
+        const cp = await this.prisma.customerProgram.findUnique({
+          where: {
+            customerId_programId: {
+              customerId,
+              programId: multiProgram.id,
+            },
+          },
+        });
+        const balances =
+          (cp?.balances as Record<string, number> | null) ?? {};
+        for (const lane of config.lanes.slice(0, 3)) {
+          const used = balances[lane.id] ?? 0;
+          const tier = multiProgram.tiers.find((t) => t.laneId === lane.id);
+          const max = tier?.threshold ?? 10;
+          extraAuxiliaryFields.push({
+            key: `lane_${lane.id}`,
+            label: lane.label,
+            value: `${used}/${max}`,
+          });
+        }
+      }
+    }
+
+    const pointProgram = await this.pointCard.findActivePointProgram(tenantId);
+    if (pointProgram) {
+      const config = this.pointCard.parseConfig(pointProgram.config);
+      const cp = await this.prisma.customerProgram.findUnique({
+        where: {
+          customerId_programId: {
+            customerId,
+            programId: pointProgram.id,
+          },
+        },
+      });
+      const balance = cp?.balance ?? 0;
+      const fields = this.pointCard.walletFields(config, balance);
+      extraAuxiliaryFields.push({
+        key: 'points_balance',
+        label: fields.label,
+        value: fields.value,
+      });
+      if (fields.hint && extraAuxiliaryFields.length < 4) {
+        extraAuxiliaryFields.push({
+          key: 'points_next',
+          label: 'Sonraki ödül',
+          value: fields.hint.slice(0, 40),
+        });
+      }
+    }
+
+    const discountProgram =
+      await this.discountCard.findActiveDiscountProgram(tenantId);
+    if (discountProgram && extraAuxiliaryFields.length < 4) {
+      const config = this.discountCard.parseConfig(discountProgram.config);
+      const cp = await this.prisma.customerProgram.findUnique({
+        where: {
+          customerId_programId: {
+            customerId,
+            programId: discountProgram.id,
+          },
+        },
+      });
+      const meta =
+        cp?.metadata && typeof cp.metadata === 'object'
+          ? (cp.metadata as Record<string, unknown>)
+          : {};
+      const customer = await this.prisma.customer.findFirst({
+        where: { id: customerId, tenantId },
+        select: { vipTierId: true },
+      });
+      const effective = this.discountCard.resolveEffectiveDiscount(config, {
+        visitCount: Number(meta.visitCount ?? 0),
+        lifetimeSpendKurus: Number(meta.lifetimeSpendKurus ?? 0),
+        vipTierId: customer?.vipTierId,
+      });
+      const fields = this.discountCard.walletFields(config, effective, meta);
+      extraAuxiliaryFields.push({
+        key: 'discount_value',
+        label: fields.label,
+        value: fields.value,
+      });
+      if (fields.hint && extraAuxiliaryFields.length < 4) {
+        extraAuxiliaryFields.push({
+          key: 'discount_usage',
+          label: 'Kullanım',
+          value: fields.hint.slice(0, 40),
+        });
+      }
+    }
+
+    const eventProgram = await this.eventCard.findActiveEventProgram(tenantId);
+    if (eventProgram && extraAuxiliaryFields.length < 4) {
+      const config = this.eventCard.parseConfig(eventProgram.config);
+      const cp = await this.prisma.customerProgram.findUnique({
+        where: {
+          customerId_programId: {
+            customerId,
+            programId: eventProgram.id,
+          },
+        },
+      });
+      const meta =
+        cp?.metadata && typeof cp.metadata === 'object'
+          ? (cp.metadata as Record<string, unknown>)
+          : {};
+      const fields = this.eventCard.walletFields(config, meta);
+      extraAuxiliaryFields.push({
+        key: 'event_entry',
+        label: fields.label,
+        value: fields.value,
+      });
+      if (fields.hint && extraAuxiliaryFields.length < 4) {
+        extraAuxiliaryFields.push({
+          key: 'event_date',
+          label: 'Tarih',
+          value: fields.hint.slice(0, 40),
+        });
+      }
+    }
+
+    let stampNotifyValue: string | undefined;
+    if (notifyKind === PassNotifyKind.STAMP) {
+      const lastPoint = await this.prisma.stampLedger.findFirst({
+        where: {
+          tenantId,
+          customerId,
+          type: StampLedgerType.POINT_EARN,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      const lastStamp = await this.prisma.stampLedger.findFirst({
+        where: {
+          tenantId,
+          customerId,
+          type: StampLedgerType.STAMP,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      const usePoint =
+        lastPoint &&
+        (!lastStamp ||
+          lastPoint.createdAt.getTime() >= lastStamp.createdAt.getTime());
+      if (usePoint && lastPoint) {
+        stampNotifyValue = this.formatPointNotifyValue(
+          lastPoint.amount,
+          lastPoint.metadata,
+        );
+      } else {
+        const last = lastStamp;
+        if (last) {
+          stampNotifyValue = this.formatStampNotifyValue(
+            last.amount,
+            last.metadata,
+            multiProgram?.config,
+          );
+        }
+      }
+    }
+
+    return { extraAuxiliaryFields, stampNotifyValue };
+  }
+
+  private formatPointNotifyValue(
+    amount: number | null,
+    metadata: unknown,
+  ): string | undefined {
+    const meta =
+      metadata && typeof metadata === 'object'
+        ? (metadata as Record<string, unknown>)
+        : {};
+    const pts = amount ?? Number(meta.finalPoints ?? 0);
+    const campMult = Number(meta.campaignMultiplier ?? 1);
+    const parts: string[] = [`+${pts} puan`];
+    if (campMult > 1) parts.push('kampanya');
+    return parts.join(' ').slice(0, 80);
+  }
+
+  private formatStampNotifyValue(
+    amount: number | null,
+    metadata: unknown,
+    programConfig: unknown,
+  ): string | undefined {
+    const meta =
+      metadata && typeof metadata === 'object'
+        ? (metadata as Record<string, unknown>)
+        : {};
+    const finalDelta = amount ?? Number(meta.finalDelta ?? 1);
+    const baseDelta = Number(meta.baseDelta ?? finalDelta);
+    const config = this.multiStamp.parseConfig(programConfig);
+
+    const parts: string[] = [];
+    if (finalDelta > 1) {
+      parts.push(`+${finalDelta} damga`);
+    } else {
+      parts.push('Damga eklendi');
+    }
+
+    const groupId = meta.productGroupId as string | undefined;
+    if (groupId && config?.mode === 'MULTIPLIER') {
+      const group = config.productGroups?.find((g) => g.id === groupId);
+      if (group) parts.push(`(${group.label})`);
+    }
+
+    if (finalDelta > baseDelta && baseDelta >= 1) {
+      parts.push('kampanya');
+    }
+
+    return parts.join(' ').slice(0, 80);
   }
 
   private async ensureApplePassRow(
     tenantId: string,
     customerId: string,
     serial: string,
+    programId?: string | null,
   ) {
     const existing = await this.prisma.pass.findUnique({
       where: {
@@ -173,6 +552,7 @@ export class WalletService {
         data: {
           tenantId,
           customerId,
+          programId: programId ?? null,
           platform: PassPlatform.APPLE,
           externalId: serial,
           authenticationToken: this.newAuthToken(),
@@ -240,17 +620,37 @@ export class WalletService {
       google?: { ok: boolean; externalId: string; saveUrl?: string };
     } = {};
 
+    const applePasses = await this.prisma.pass.findMany({
+      where: {
+        tenantId,
+        customerId,
+        platform: PassPlatform.APPLE,
+      },
+    });
+
+    const serialsToBump =
+      applePasses.length > 0
+        ? applePasses.map((p) => p.externalId)
+        : [appleSerial];
+
     if (this.apple.isConfigured()) {
       try {
-        await this.ensureApplePassRow(tenantId, customer.id, appleSerial);
-        const pushed = await this.bumpApplePassAndPush(
-          appleSerial,
-          opts?.notifyKind,
-        );
+        let totalDevices = 0;
+        for (const serial of serialsToBump) {
+          const parsed = parseApplePassSerial(serial);
+          await this.ensureApplePassRow(
+            tenantId,
+            customer.id,
+            serial,
+            parsed.programId,
+          );
+          const pushed = await this.bumpApplePassAndPush(serial, opts?.notifyKind);
+          totalDevices += pushed.deviceCount;
+        }
         results.apple = {
           ok: true,
-          externalId: appleSerial,
-          deviceCount: pushed.deviceCount,
+          externalId: serialsToBump[0]!,
+          deviceCount: totalDevices,
         };
       } catch (err) {
         const code = (err as { code?: string }).code;
@@ -354,6 +754,65 @@ export class WalletService {
   }
 
   /**
+   * Program (Kartlarım) tasarım/kural değişince ilgili Apple pass'leri yenile + APNs.
+   */
+  async syncProgramPasses(
+    tenantId: string,
+    programId: string,
+    opts?: { includeLegacyPrimary?: boolean },
+  ): Promise<{ synced: number; devices: number }> {
+    if (!this.apple.isConfigured()) {
+      this.logger.warn('Program pass sync atlandı — Apple Wallet yapılandırılmamış');
+      return { synced: 0, devices: 0 };
+    }
+
+    const passes = await this.prisma.pass.findMany({
+      where: {
+        tenantId,
+        platform: PassPlatform.APPLE,
+        OR: [
+          { programId },
+          { programId: null, externalId: { contains: `_${programId}_` } },
+          ...(opts?.includeLegacyPrimary ? [{ programId: null }] : []),
+        ],
+      },
+      select: { externalId: true, customerId: true },
+    });
+
+    const uniquePasses = [
+      ...new Map(passes.map((p) => [p.externalId, p])).values(),
+    ];
+
+    if (uniquePasses.length === 0) {
+      this.logger.warn(
+        `Program pass sync: kayıtlı pass yok (tenant=${tenantId} program=${programId})`,
+      );
+      return { synced: 0, devices: 0 };
+    }
+
+    const customers = new Set<string>();
+    let devices = 0;
+
+    for (const pass of uniquePasses) {
+      try {
+        const pushed = await this.bumpApplePassAndPush(pass.externalId);
+        devices += pushed.deviceCount;
+        customers.add(pass.customerId);
+      } catch (err) {
+        this.logger.warn(
+          `Program pass bump fail serial=${pass.externalId}: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `Program pass sync: tenant=${tenantId} program=${programId} passes=${uniquePasses.length} customers=${customers.size} devices=${devices}`,
+    );
+
+    return { synced: customers.size, devices };
+  }
+
+  /**
    * Owner anlık duyuru — pass alanını güncelleyip APNs ile Wallet bildirimi tetikler.
    * (Apple serbest push metni vermez; changeMessage ile görünür.)
    */
@@ -366,7 +825,7 @@ export class WalletService {
     devices: number;
     sentAt: Date;
   }> {
-    const clean = message.trim();
+    const clean = stripBroadcastStamps(message);
     if (clean.length < 2) {
       throw new BadRequestException('Bildirim metni en az 2 karakter olmalı');
     }
@@ -381,14 +840,9 @@ export class WalletService {
     if (!tenant) throw new NotFoundException('Kafe bulunamadı');
 
     // Aynı metin tekrarında Apple changeMessage tetiklenmez — zaman damgası ekle
-    let value = clean;
-    if (tenant.passBroadcastMessage === clean) {
-      const stamp = new Date().toLocaleTimeString('tr-TR', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      value = `${clean} · ${stamp}`;
-    }
+    const previousClean = stripBroadcastStamps(tenant.passBroadcastMessage ?? '');
+    const value =
+      previousClean === clean ? withBroadcastStamp(clean) : clean;
 
     const sentAt = new Date();
     await this.prisma.tenant.update({
@@ -398,20 +852,97 @@ export class WalletService {
         passBroadcastAt: sentAt,
       },
     });
+    // Kafe geneli duyuru gidince eski hedefli duyurular silinir
+    await this.prisma.customer.updateMany({
+      where: { tenantId, passNotice: { not: null } },
+      data: { passNotice: null, passNoticeAt: null },
+    });
 
     const { synced, devices } = await this.syncTenantPasses(tenantId);
 
     await this.prisma.broadcastLog.create({
       data: {
         tenantId,
-        message: value,
+        message: clean,
         synced,
         devices,
+        audience: 'all',
+        audienceLabel: 'Herkes',
+        targetCount: synced,
         createdAt: sentAt,
       },
     });
 
-    return { message: value, synced, devices, sentAt };
+    return { message: clean, synced, devices, sentAt };
+  }
+
+  /**
+   * Seçili müşteri kümesine duyuru: müşterinin kendi kartına yazılır,
+   * sadece o müşterilerin kartları yenilenir.
+   */
+  async broadcastToCustomers(
+    tenantId: string,
+    customerIds: string[],
+    message: string,
+    audience: { type: 'segment' | 'vip'; label: string },
+  ): Promise<{ message: string; synced: number; devices: number; targetCount: number; sentAt: Date }> {
+    const clean = stripBroadcastStamps(message);
+    if (clean.length < 2) {
+      throw new BadRequestException('Bildirim metni en az 2 karakter olmalı');
+    }
+    if (clean.length > 120) {
+      throw new BadRequestException('Bildirim metni en fazla 120 karakter');
+    }
+    const sentAt = new Date();
+    if (customerIds.length === 0) {
+      return { message: clean, synced: 0, devices: 0, targetCount: 0, sentAt };
+    }
+
+    await this.prisma.customer.updateMany({
+      where: { tenantId, id: { in: customerIds } },
+      data: { passNotice: clean, passNoticeAt: sentAt },
+    });
+
+    // Sadece kartı olan müşterileri yenile
+    const withCards = await this.prisma.customer.findMany({
+      where: { tenantId, id: { in: customerIds }, passes: { some: {} } },
+      select: { id: true },
+    });
+
+    let synced = 0;
+    let devices = 0;
+    const chunkSize = 10;
+    for (let i = 0; i < withCards.length; i += chunkSize) {
+      const chunk = withCards.slice(i, i + chunkSize);
+      const outcomes = await Promise.allSettled(
+        chunk.map((c) => this.syncPasses(c.id, tenantId)),
+      );
+      for (const o of outcomes) {
+        if (o.status === 'fulfilled') {
+          synced += 1;
+          devices += o.value.apple?.deviceCount ?? 0;
+        } else {
+          this.logger.warn(
+            `Targeted notice sync fail: ${(o.reason as Error)?.message ?? o.reason}`,
+          );
+        }
+      }
+    }
+
+    await this.prisma.broadcastLog.create({
+      data: {
+        tenantId,
+        message: clean,
+        synced,
+        devices,
+        audience: audience.type,
+        audienceLabel: audience.label,
+        targetCount: customerIds.length,
+        createdAt: sentAt,
+      },
+    });
+
+    return { message: clean, synced, devices, targetCount: customerIds.length, sentAt };
   }
 
   private buildGooglePassInput(
@@ -436,7 +967,9 @@ export class WalletService {
     },
     customer: {
       id: string;
-      phone: string;
+      phone?: string | null;
+      phoneEnc?: string | null;
+      phoneLast4?: string | null;
       stampCount: number;
       rewardReady: boolean;
     },
@@ -450,7 +983,7 @@ export class WalletService {
       logoUrl: tenant.logoUrl,
       programName: tenant.logoText?.trim() || 'Damga Kartı',
       customerId: customer.id,
-      phone: customer.phone,
+      phone: this.pii.phoneMasked(customer),
       stampCount: customer.stampCount,
       stampsRequired,
       rewardLabel,
@@ -566,12 +1099,16 @@ export class WalletService {
     return fields;
   }
 
-  async sendWalletInviteSms(customerId: string, tenantId: string) {
+  async sendWalletInviteSms(
+    customerId: string,
+    tenantId: string,
+    linkOverride?: string,
+  ) {
     const { customer, tenant } = await this.loadCustomerContext(
       customerId,
       tenantId,
     );
-    const link = this.inviteUrl(customerId, tenantId);
+    const link = linkOverride ?? (await this.inviteUrl(customerId, tenantId));
 
     const body = [
       `${tenant.name} damga kartınız hazır.`,
@@ -582,15 +1119,20 @@ export class WalletService {
     ].join('\n');
 
     await this.sms.send({
-      toPhone: customer.phone,
+      toPhone: this.customerPhone(customer),
       body,
       link,
+      tenantId,
     });
 
     return { link };
   }
 
-  async ensurePassesAndInvite(customerId: string, tenantId: string) {
+  async ensurePassesAndInvite(
+    customerId: string,
+    tenantId: string,
+    programIds?: string[],
+  ) {
     let sync: Awaited<ReturnType<WalletService['syncPasses']>> | Record<
       string,
       never
@@ -602,8 +1144,13 @@ export class WalletService {
         `Pass sync (invite) başarısız — SMS yine de gönderilecek: ${(err as Error).message}`,
       );
     }
-    const invite = await this.sendWalletInviteSms(customerId, tenantId);
-    return { ...sync, inviteUrl: invite.link };
+    const invite = await this.createWalletInvite(
+      customerId,
+      tenantId,
+      programIds,
+    );
+    await this.sendWalletInviteSms(customerId, tenantId, invite.link);
+    return { ...sync, inviteUrl: invite.link, programIds: invite.programIds };
   }
 
   async getInvitePageData(token: string) {
@@ -613,33 +1160,66 @@ export class WalletService {
       claims.tenantId,
     );
 
+    const programIds = await this.walletPrograms.resolveProgramIds(
+      claims.tenantId,
+      claims.programIds,
+      claims.programIds?.length ? 'all' : 'primary',
+    );
+
     const profileComplete = this.isInviteProfileComplete(customer, tenant);
     const needsName = tenant.collectCustomerName;
     const needsBirthday = tenant.collectCustomerBirthday;
 
-    let googleSaveUrl: string | null = null;
-    let appleDownloadUrl: string | null = null;
-
-    if (profileComplete) {
-      if (this.google.isConfigured()) {
-        try {
-          googleSaveUrl = this.google.createSaveUrl(
-            this.buildGooglePassInput(
-              tenant,
-              customer,
-              rule.stampsRequired,
-              rule.rewardLabel,
-            ),
-          );
-        } catch (err) {
-          this.logger.warn(`Google save URL: ${(err as Error).message}`);
+    const baseUrl = this.publicApiUrl();
+    const walletCards = await Promise.all(
+      programIds.map(async (programId) => {
+        const program = await this.prisma.loyaltyProgram.findFirst({
+          where: { id: programId, tenantId: claims.tenantId },
+          include: { tiers: { orderBy: { sortOrder: 'asc' } } },
+        });
+        if (!program) return null;
+        const card = this.walletPrograms.toWalletCard(program);
+        let appleDownloadUrl: string | null = null;
+        let googleSaveUrl: string | null = null;
+        if (profileComplete) {
+          if (this.apple.isConfigured()) {
+            appleDownloadUrl = `${baseUrl}/wallet/apple/${token}/${programId}`;
+          }
+          if (this.google.isConfigured() && programIds.length === 1) {
+            try {
+              googleSaveUrl = this.google.createSaveUrl(
+                this.buildGooglePassInput(
+                  tenant,
+                  customer,
+                  rule.stampsRequired,
+                  rule.rewardLabel,
+                ),
+              );
+            } catch (err) {
+              this.logger.warn(`Google save URL: ${(err as Error).message}`);
+            }
+          }
         }
-      }
-      if (this.apple.isConfigured()) {
-        appleDownloadUrl = `${this.publicApiUrl()}/wallet/apple/${token}`;
-      }
-    }
+        return {
+          ...card,
+          appleDownloadUrl,
+          googleSaveUrl,
+        };
+      }),
+    );
 
+    const cards = walletCards.filter(Boolean) as NonNullable<
+      (typeof walletCards)[number]
+    >[];
+
+    const single = cards.length === 1 ? cards[0]! : null;
+
+    const stampArt = await this.inviteStampArt(tenant, programIds[0]).catch(
+      (err: Error) => {
+        this.logger.warn(`Davet damga görünümü: ${err.message}`);
+        return { stampTheme: 'COFFEE', stampIconFilledUrl: null, stampIconEmptyUrl: null };
+      },
+    );
     return {
       token,
       tenantName: tenant.name,
@@ -657,14 +1237,17 @@ export class WalletService {
       inviteGoogleBtnLabel: tenant.inviteGoogleBtnLabel?.trim() || null,
       inviteFormTitle: tenant.inviteFormTitle?.trim() || null,
       inviteLegalText: tenant.inviteLegalText?.trim() || null,
+      layout: sanitizeInviteLayout(tenant.inviteLayout),
+      ...stampArt,
       invitePolicies: parseInvitePolicies(tenant.invitePolicies),
       stampCount: customer.stampCount,
       stampsRequired: rule.stampsRequired,
       rewardLabel: rule.rewardLabel,
       rewardReady: customer.rewardReady,
       appleAvailable: this.apple.isConfigured(),
-      googleSaveUrl,
-      appleDownloadUrl,
+      googleSaveUrl: single?.googleSaveUrl ?? null,
+      appleDownloadUrl: single?.appleDownloadUrl ?? null,
+      walletCards: cards,
       profileComplete,
       collect: {
         name: needsName,
@@ -689,6 +1272,11 @@ export class WalletService {
   invitePreviewUrl(tenantId: string): string {
     const token = this.createInvitePreviewToken(tenantId);
     return `${this.publicApiUrl()}/wallet/invite-preview/${token}`;
+  }
+
+  /** Gerçek self-enrollment QR (masa tenti) */
+  enrollUrl(tenantSlug: string): string {
+    return `${this.publicApiUrl()}/wallet/enroll/${tenantSlug}`;
   }
 
   async getInvitePreviewPageData(token: string) {
@@ -718,6 +1306,7 @@ export class WalletService {
     const stampsRequired = rule?.stampsRequired ?? 10;
     const rewardLabel = rule?.rewardLabel ?? 'Ödül';
 
+    const stampArt = await this.inviteStampArt(tenant);
     return {
       token: 'preview',
       tenantName: tenant.name,
@@ -735,6 +1324,8 @@ export class WalletService {
       inviteGoogleBtnLabel: tenant.inviteGoogleBtnLabel?.trim() || null,
       inviteFormTitle: tenant.inviteFormTitle?.trim() || null,
       inviteLegalText: tenant.inviteLegalText?.trim() || null,
+      layout: sanitizeInviteLayout(tenant.inviteLayout),
+      ...stampArt,
       invitePolicies: parseInvitePolicies(tenant.invitePolicies),
       stampCount: Math.min(3, stampsRequired),
       stampsRequired,
@@ -755,6 +1346,37 @@ export class WalletService {
         birthDay: null,
       },
       isPreview: true as const,
+    };
+  }
+
+  /** Davet sayfasında damga görünümü: birincil programın cüzdan tasarımı, yoksa marka ayarları */
+  private async inviteStampArt(
+    tenant: {
+    id: string;
+    stampTheme?: string | null;
+    stampIconFilledUrl?: string | null;
+    stampIconEmptyUrl?: string | null;
+    primaryColor?: string | null;
+    foregroundColor?: string | null;
+    logoUrl?: string | null;
+  } & Record<string, unknown>,
+    programId?: string,
+  ) {
+    // Müşterinin kartındaki program; yoksa birincil program
+    const program = await this.prisma.loyaltyProgram.findFirst({
+      where: programId
+        ? { id: programId, tenantId: tenant.id }
+        : { tenantId: tenant.id, isPrimary: true, isActive: true },
+      select: { config: true },
+    });
+    const branding = resolvePassBranding(
+      tenant as never,
+      parseWalletTemplate(program?.config),
+    );
+    return {
+      stampTheme: branding.stampTheme || 'COFFEE',
+      stampIconFilledUrl: this.resolvePublicAssetUrl(branding.stampIconFilledUrl),
+      stampIconEmptyUrl: this.resolvePublicAssetUrl(branding.stampIconEmptyUrl),
     };
   }
 
@@ -1033,6 +1655,7 @@ export class WalletService {
     tenantId: string,
     authToken: string,
     notifyKind?: PassNotifyKind | null,
+    programId?: string | null,
   ): Promise<Buffer> {
     const { customer, rule, tenant } = await this.loadCustomerContext(
       customerId,
@@ -1045,58 +1668,93 @@ export class WalletService {
       );
     }
 
-    const [stripArt, logoArt, iconArt] = await Promise.all([
+    const display = programId
+      ? await this.walletPrograms.buildProgramPassDisplay(
+          tenantId,
+          customerId,
+          programId,
+          {
+            stampCount: customer.stampCount,
+            rewardReady: customer.rewardReady,
+            stampsRequired: rule.stampsRequired,
+            rewardLabel: rule.rewardLabel,
+          },
+        )
+      : null;
+
+    const stampCount = display?.stampCount ?? customer.stampCount;
+    const stampsRequired = display?.stampsRequired ?? rule.stampsRequired;
+    const rewardLabel = display?.rewardLabel ?? rule.rewardLabel;
+    const rewardReady = display?.rewardReady ?? customer.rewardReady;
+
+    let walletTemplate = null;
+    if (programId) {
+      const program = await this.prisma.loyaltyProgram.findFirst({
+        where: { id: programId, tenantId },
+        select: { config: true },
+      });
+      walletTemplate = parseWalletTemplate(program?.config);
+    }
+    const branding = resolvePassBranding(tenant, walletTemplate);
+
+    const [stripArt, logoArt, iconArt, backgroundArt] = await Promise.all([
       this.passArt.buildStampStrip({
-        theme: tenant.stampTheme || 'COFFEE',
-        stampCount: customer.stampCount,
-        stampsRequired: rule.stampsRequired,
-        backgroundColor: tenant.primaryColor ?? '#1B4332',
-        foregroundColor: tenant.foregroundColor ?? '#FFFFFF',
-        stampIconFilledUrl: tenant.stampIconFilledUrl,
-        stampIconEmptyUrl: tenant.stampIconEmptyUrl,
-        inset: tenant.stampInset,
+        theme: branding.stampTheme || 'COFFEE',
+        stampCount,
+        stampsRequired,
+        backgroundColor: branding.primaryColor,
+        foregroundColor: branding.foregroundColor,
+        stampIconFilledUrl: branding.stampIconFilledUrl,
+        stampIconEmptyUrl: branding.stampIconEmptyUrl,
+        inset: branding.stampInset,
+        slotFilled: display?.walletSlotFilled,
+        slotStyles: display?.walletSlotStyles,
+        customStripUrl: walletTemplate?.stripImageUrl,
       }),
-      this.passArt.buildLogoAssets(tenant.logoUrl),
+      this.passArt.buildLogoAssets(branding.logoUrl),
       this.passArt.buildNotifyIconAssets(
-        tenant.notifyIconUrl || tenant.logoUrl,
-        tenant.primaryColor,
+        tenant.notifyIconUrl || branding.logoUrl || tenant.logoUrl,
+        branding.primaryColor,
       ),
+      this.passArt.buildBackgroundAssets(walletTemplate?.backgroundImageUrl),
     ]);
 
-    const orgName =
-      tenant.logoText?.trim() ||
-      tenant.name?.trim() ||
-      'Damga Kartı';
+    const orgName = branding.orgName;
 
-    // Logo image present → omit logoText entirely (empty string still reserved
-    // visually on some iOS versions if set). Name stays on organizationName.
     const logoText = logoArt?.logo
       ? undefined
-      : tenant.logoText?.trim() || orgName;
+      : branding.logoText?.trim() || orgName;
+
+    const enrichment = programId
+      ? { extraAuxiliaryFields: display!.extraAuxiliaryFields, stampNotifyValue: undefined }
+      : await this.buildPassEnrichment(tenantId, customerId, notifyKind);
 
     return this.apple.createPkPass({
-      serialNumber: this.appleSerial(customer.id),
+      serialNumber: this.appleSerial(customerId, programId),
       organizationName: orgName,
       description:
-        tenant.passDescription?.trim() || `${orgName} Damga Kartı`,
+        branding.passDescription?.trim() ??
+        display?.description ??
+        tenant.passDescription?.trim() ??
+        `${orgName} Damga Kartı`,
       logoText: logoText ?? undefined,
-      backgroundColor: tenant.primaryColor ?? '#1B4332',
-      foregroundColor: tenant.foregroundColor ?? '#FFFFFF',
-      labelColor: tenant.labelColor ?? '#DCDCDC',
-      stampCount: customer.stampCount,
-      stampsRequired: rule.stampsRequired,
-      rewardLabel: rule.rewardLabel,
-      rewardReady: customer.rewardReady,
-      barcodeMessage: customer.id,
+      backgroundColor: branding.primaryColor,
+      foregroundColor: branding.foregroundColor,
+      labelColor: branding.labelColor,
+      stampCount,
+      stampsRequired,
+      rewardLabel,
+      rewardReady,
+      barcodeMessage: buildPassBarcodeMessage(customer.id, programId),
       barcodeFormat: tenant.barcodeFormat ?? 'QR',
-      stampFieldLabel: tenant.stampFieldLabel ?? undefined,
-      rewardFieldLabel: tenant.rewardFieldLabel ?? undefined,
-      statusFieldLabel: tenant.statusFieldLabel ?? undefined,
+      stampFieldLabel: display?.stampFieldLabel ?? branding.stampFieldLabel ?? undefined,
+      rewardFieldLabel: display?.rewardFieldLabel ?? branding.rewardFieldLabel ?? undefined,
+      statusFieldLabel: display?.statusFieldLabel ?? branding.statusFieldLabel ?? undefined,
       broadcastFieldLabel: tenant.broadcastFieldLabel ?? undefined,
       broadcastEmptyText: tenant.broadcastEmptyText ?? undefined,
-      showStampField: tenant.showStampField,
-      showRewardField: tenant.showRewardField,
-      showStatusField: tenant.showStatusField,
+      showStampField: branding.showStampField,
+      showRewardField: branding.showRewardField,
+      showStatusField: branding.showStatusField,
       showBroadcastField: tenant.showBroadcastField,
       rewardReadyText: tenant.rewardReadyText ?? undefined,
       stampsRemainingTemplate: tenant.stampsRemainingTemplate ?? undefined,
@@ -1113,6 +1771,10 @@ export class WalletService {
       backFields: this.buildAppleBackFields(tenant),
       stripPng: stripArt.strip,
       strip2xPng: stripArt.strip2x,
+      strip3xPng: stripArt.strip3x,
+      backgroundPng: backgroundArt?.background,
+      background2xPng: backgroundArt?.background2x,
+      background3xPng: backgroundArt?.background3x,
       logoPng: logoArt?.logo,
       logo2xPng: logoArt?.logo2x,
       iconPng: iconArt?.icon,
@@ -1120,10 +1782,12 @@ export class WalletService {
       icon3xPng: iconArt?.icon3x,
       authenticationToken: authToken,
       webServiceURL: webServiceURL ?? undefined,
+      extraAuxiliaryFields: enrichment.extraAuxiliaryFields,
+      stampNotifyValue: enrichment.stampNotifyValue,
     });
   }
 
-  async buildApplePkPass(token: string): Promise<Buffer> {
+  async buildApplePkPass(token: string, programId?: string): Promise<Buffer> {
     if (!this.apple.isConfigured()) {
       throw new ServiceUnavailableException('Apple Wallet yapılandırılmamış');
     }
@@ -1137,16 +1801,33 @@ export class WalletService {
         'Önce davet sayfasındaki bilgileri tamamlayın',
       );
     }
-    const serial = this.appleSerial(claims.sub);
+
+    const programIds = await this.walletPrograms.resolveProgramIds(
+      claims.tenantId,
+      claims.programIds,
+      claims.programIds?.length ? 'all' : 'primary',
+    );
+    const targetProgramId =
+      programId ??
+      (programIds.length === 1 ? programIds[0]! : undefined);
+
+    if (!targetProgramId && programIds.length > 1) {
+      throw new BadRequestException('Hangi kartın ekleneceğini belirtin');
+    }
+
+    const serial = this.appleSerial(claims.sub, targetProgramId);
     const pass = await this.ensureApplePassRow(
       claims.tenantId,
       claims.sub,
       serial,
+      targetProgramId ?? null,
     );
     return this.createPkPassBuffer(
       claims.sub,
       claims.tenantId,
       pass.authenticationToken!,
+      null,
+      targetProgramId ?? null,
     );
   }
 
@@ -1294,11 +1975,16 @@ export class WalletService {
     if (!pass) throw new NotFoundException();
     this.assertApplePassAuth(input.authorization, pass.authenticationToken);
 
+    const parsed = parseApplePassSerial(input.serialNumber);
+    const programId =
+      pass.programId ?? parsed.programId ?? null;
+
     const buffer = await this.createPkPassBuffer(
       pass.customerId,
       pass.tenantId,
       pass.authenticationToken!,
       pass.pendingNotifyKind,
+      programId,
     );
 
     if (pass.pendingNotifyKind) {

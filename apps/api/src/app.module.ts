@@ -12,7 +12,28 @@ import { TenantsModule } from './tenants/tenants.module';
 import { WalletModule } from './wallet/wallet.module';
 import { OwnerPushModule } from './owner-push/owner-push.module';
 import { PublicModule } from './public/public.module';
+import { SupportModule } from './support/support.module';
 import { StorageModule } from './storage/storage.module';
+import { LoyaltyModule } from './loyalty/loyalty.module';
+import { QueueModule } from './queue/queue.module';
+import { PlansModule } from './plans/plans.module';
+
+import { CampaignsModule } from './campaigns/campaigns.module';
+import { BranchesModule } from './branches/branches.module';
+import { NfcModule } from './nfc/nfc.module';
+import { PosModule } from './pos/pos.module';
+import { CrmModule } from './crm/crm.module';
+import { VipModule } from './vip/vip.module';
+import { ReferralsModule } from './referrals/referrals.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { TableTentModule } from './table-tent/table-tent.module';
+import { EmailModule } from './email/email.module';
+import { SocialModule } from './social/social.module';
+import { TenantApiModule } from './tenant-api/tenant-api.module';
+import { GiftCreditModule } from './gift-credit/gift-credit.module';
+import { PiiModule } from './pii/pii.module';
+import { MenuModule } from './menu/menu.module';
+import { MarketplaceBridgeModule } from './marketplace-bridge/marketplace-bridge.module';
 
 @Module({
   imports: [
@@ -24,6 +45,7 @@ import { StorageModule } from './storage/storage.module';
       ignoreEnvVars: false,
     }),
     ScheduleModule.forRoot(),
+    PiiModule,
     StorageModule,
     PrismaModule,
     AuthModule,
@@ -34,6 +56,25 @@ import { StorageModule } from './storage/storage.module';
     OwnerPushModule,
     BillingModule,
     PublicModule,
+    SupportModule,
+    LoyaltyModule,
+    QueueModule,
+    PlansModule,
+    CampaignsModule,
+    BranchesModule,
+    NfcModule,
+    PosModule,
+    CrmModule,
+    VipModule,
+    ReferralsModule,
+    AnalyticsModule,
+    TableTentModule,
+    EmailModule,
+    SocialModule,
+    TenantApiModule,
+    GiftCreditModule,
+    MenuModule,
+    MarketplaceBridgeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,10 +1,12 @@
 import {
+  IsIn,
   IsArray,
   IsBoolean,
   IsEmail,
   IsEnum,
   IsInt,
   IsOptional,
+  IsNotEmpty,
   IsString,
   Matches,
   Max,
@@ -46,6 +48,12 @@ export class CreateTenantDto {
   @IsOptional()
   @IsString()
   primaryColor?: string;
+
+  /** Kayıt sırasında seçilen paket kodu (yoksa varsayılan) */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  planCode?: string;
 
   @IsEmail()
   ownerEmail!: string;
@@ -285,6 +293,11 @@ export class UpdateTenantProfileDto {
   inviteHeadline?: string | null;
 
   @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsArray()
+  inviteLayout?: Array<Record<string, unknown>> | null;
+
+  @IsOptional()
   @ValidateIf((_, v) => v !== null && v !== '')
   @IsString()
   @MaxLength(200)
@@ -441,6 +454,18 @@ export class UpdateTenantProfileDto {
   @IsString()
   @MaxLength(500)
   passExtra3Value?: string | null;
+
+  /** PassMarket — vitrinde listelenme */
+  @IsOptional()
+  @IsBoolean()
+  marketplaceListingEnabled?: boolean;
+
+  /** PassMarket — MP plan slug (vitrin | buyume | isletme-pro) */
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== '')
+  @IsString()
+  @MaxLength(64)
+  marketplacePlanSlug?: string | null;
 }
 
 export class UpdateRewardRuleDto {
@@ -457,6 +482,18 @@ export class UpdateRewardRuleDto {
   rewardLabel?: string;
 }
 
+export class OwnerFeedbackDto {
+  @IsString()
+  @MinLength(3)
+  @MaxLength(2000)
+  message!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  category?: string;
+}
+
 export class InviteCashierDto {
   @IsEmail()
   email!: string;
@@ -468,6 +505,23 @@ export class InviteCashierDto {
   @IsString()
   @MinLength(8)
   password!: string;
+
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+}
+
+export class BroadcastAudienceDto {
+  @IsIn(['all', 'segment', 'vip'])
+  type!: 'all' | 'segment' | 'vip';
+
+  @IsOptional()
+  @IsString()
+  segmentId?: string;
+
+  @IsOptional()
+  @IsString()
+  vipTierId?: string;
 }
 
 export class BroadcastNotificationDto {
@@ -475,4 +529,16 @@ export class BroadcastNotificationDto {
   @MinLength(2)
   @MaxLength(120)
   message!: string;
+
+  /** Yoksa veya all ise kafe geneli (eski davranış) */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BroadcastAudienceDto)
+  audience?: BroadcastAudienceDto;
+}
+
+export class ChangePlanDto {
+  @IsString()
+  @IsNotEmpty()
+  planCode!: string;
 }

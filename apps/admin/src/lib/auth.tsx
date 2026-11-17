@@ -18,10 +18,21 @@ import {
   login as apiLogin,
   onSessionExpired,
   api,
+  SessionExpiredError,
   type AuthUser,
   type Role,
 } from "./api";
-import { invalidateCache } from "./query-cache";
+
+/** Eski sürümlerin bıraktığı cache kayıtlarını temizle (cache kaldırıldı). */
+function clearLegacyCacheStorage() {
+  try {
+    sessionStorage.removeItem("ngl_query_cache_v1");
+    sessionStorage.removeItem("ngl_query_cache");
+    localStorage.removeItem("ngl_plan_menu_v1");
+  } catch {
+    /* ignore */
+  }
+}
 
 type AuthState = {
   user: AuthUser | null;
@@ -39,27 +50,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setUser(getStoredUser());
+    const stored = getStoredUser();
+    setUser(stored);
     setReady(true);
+    clearLegacyCacheStorage();
   }, []);
 
   useEffect(() => {
     return onSessionExpired(() => {
-      clearSession();
-      invalidateCache();
       setUser(null);
       router.replace("/login");
     });
   }, [router]);
 
+  /** Oturum süresi dolduğunda Next.js error overlay'i engelle. */
+  useEffect(() => {
+    const onRejection = (event: PromiseRejectionEvent) => {
+      if (event.reason instanceof SessionExpiredError) {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => window.removeEventListener("unhandledrejection", onRejection);
+  }, []);
+
   /** Sekme tekrar açıldığında access token süresi dolmadan yenile. */
   useEffect(() => {
+    /** Sekmeler arası hızlı geçişte her seferinde /auth/me atma */
+    let lastCheck = 0;
     async function refreshIfNeeded() {
       if (!getStoredTokens()?.refreshToken) return;
+      if (Date.now() - lastCheck < 60_000) return;
+      lastCheck = Date.now();
       try {
         await api("/auth/me");
-      } catch {
-        /* refresh veya login yönlendirmesi api katmanında */
+      } catch (err) {
+        if (err instanceof SessionExpiredError) return;
       }
     }
 
@@ -80,7 +106,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     clearSession();
-    invalidateCache();
     setUser(null);
   }, []);
 

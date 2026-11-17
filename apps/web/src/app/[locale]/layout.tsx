@@ -1,11 +1,9 @@
-import { Fraunces, Space_Grotesk } from "next/font/google";
+import { DM_Sans, Space_Mono } from "next/font/google";
 import { notFound } from "next/navigation";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import { routing } from "../../i18n/routing";
-import { SiteFooter } from "../../components/SiteFooter";
-import { SiteHeader } from "../../components/SiteHeader";
-import { SmoothScroll } from "../../components/SmoothScroll";
+import { MarketingShell } from "../../components/MarketingShell";
 import { DemoModalProvider } from "../../components/marketing/DemoModal";
 import {
   JsonLd,
@@ -14,17 +12,16 @@ import {
 } from "../../components/JsonLd";
 import "../globals.css";
 
-const display = Fraunces({
-  variable: "--font-display",
+const sans = DM_Sans({
+  variable: "--font-sans",
   subsets: ["latin", "latin-ext"],
   weight: ["300", "400", "500", "600", "700"],
-  style: ["normal", "italic"],
 });
 
-const body = Space_Grotesk({
-  variable: "--font-body",
-  subsets: ["latin", "latin-ext"],
-  weight: ["300", "400", "500", "600", "700"],
+const mono = Space_Mono({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  weight: ["400", "700"],
 });
 
 export function generateStaticParams() {
@@ -44,6 +41,11 @@ export async function generateMetadata({
       template: `%s · ${t("title")}`,
     },
     description: t("description"),
+    icons: {
+      icon: [{ url: "/favicon.png", type: "image/png" }],
+      shortcut: "/favicon.png",
+      apple: "/favicon.png",
+    },
   };
 }
 
@@ -61,16 +63,12 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale}>
-      <body className={`${display.variable} ${body.variable} antialiased`}>
+      <body className={`${sans.variable} ${mono.variable} overflow-x-hidden font-sans antialiased`}>
         <JsonLd data={organizationJsonLd(locale)} />
         <JsonLd data={softwareJsonLd(locale)} />
         <NextIntlClientProvider messages={messages}>
           <DemoModalProvider>
-            <SmoothScroll>
-              <SiteHeader />
-              {children}
-              <SiteFooter />
-            </SmoothScroll>
+            <MarketingShell>{children}</MarketingShell>
           </DemoModalProvider>
         </NextIntlClientProvider>
       </body>

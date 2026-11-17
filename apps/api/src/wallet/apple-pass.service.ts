@@ -56,6 +56,10 @@ export type ApplePassInput = {
   backFields?: ApplePassBackField[];
   stripPng?: Buffer;
   strip2xPng?: Buffer;
+  strip3xPng?: Buffer;
+  backgroundPng?: Buffer;
+  background2xPng?: Buffer;
+  background3xPng?: Buffer;
   logoPng?: Buffer;
   logo2xPng?: Buffer;
   iconPng?: Buffer;
@@ -63,6 +67,10 @@ export type ApplePassInput = {
   icon3xPng?: Buffer;
   authenticationToken?: string;
   webServiceURL?: string;
+  /** MultiStamp Mod A — ek ön yüz alanları (max 3) */
+  extraAuxiliaryFields?: { key: string; label: string; value: string }[];
+  /** Damga bildirimi için özelleştirilmiş değer (Mod B çarpan vb.) */
+  stampNotifyValue?: string;
 };
 
 @Injectable()
@@ -120,7 +128,7 @@ export class ApplePassService implements OnModuleInit {
     const kind = input.updateKind ?? 'sync';
     if (kind === 'sync') return null;
 
-    const stampDisplay = `${input.stampCount} / ${input.stampsRequired}`;
+    const stampDisplay = input.stampNotifyValue?.trim() || `${input.stampCount} / ${input.stampsRequired}`;
 
     if (kind === 'redeem') {
       return {
@@ -307,6 +315,15 @@ export class ApplePassService implements OnModuleInit {
       backFields.push(...withoutDup);
     }
 
+    for (const extra of input.extraAuxiliaryFields ?? []) {
+      if (auxiliaryFields.length >= 4) break;
+      auxiliaryFields.push({
+        key: extra.key,
+        label: extra.label.toUpperCase().slice(0, 20),
+        value: extra.value.slice(0, 40),
+      });
+    }
+
     const storeCard: Record<string, unknown> = {
       primaryFields: [],
       secondaryFields,
@@ -387,6 +404,10 @@ export class ApplePassService implements OnModuleInit {
     }
     if (input.stripPng) assets['strip.png'] = input.stripPng;
     if (input.strip2xPng) assets['strip' + at2x] = input.strip2xPng;
+    if (input.strip3xPng) assets['strip' + at3x] = input.strip3xPng;
+    if (input.backgroundPng) assets['background.png'] = input.backgroundPng;
+    if (input.background2xPng) assets['background' + at2x] = input.background2xPng;
+    if (input.background3xPng) assets['background' + at3x] = input.background3xPng;
 
     if (input.iconPng) {
       this.logger.log(

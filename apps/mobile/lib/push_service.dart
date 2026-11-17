@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -9,7 +10,11 @@ import 'models.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.android);
+  await Firebase.initializeApp(
+    options: Platform.isIOS
+        ? DefaultFirebaseOptions.ios
+        : DefaultFirebaseOptions.android,
+  );
 }
 
 class PushService {
@@ -17,6 +22,7 @@ class PushService {
 
   static FirebaseMessaging? _messaging;
   static bool _initialized = false;
+  static StreamSubscription<String>? _tokenRefreshSub;
 
   static FirebaseOptions _platformOptions() {
     if (Platform.isIOS) return DefaultFirebaseOptions.ios;
@@ -33,6 +39,9 @@ class PushService {
       _messaging = FirebaseMessaging.instance;
       _initialized = true;
     }
+
+    await _tokenRefreshSub?.cancel();
+    _tokenRefreshSub = null;
 
     final settings = await api.pushSettings();
     if (!settings.enabled) {
@@ -55,7 +64,7 @@ class PushService {
       );
     }
 
-    FirebaseMessaging.instance.onTokenRefresh.listen((next) {
+    _tokenRefreshSub = FirebaseMessaging.instance.onTokenRefresh.listen((next) {
       api.registerPushDevice(next, Platform.isIOS ? 'IOS' : 'ANDROID');
     });
   }
@@ -70,6 +79,8 @@ class PushService {
   }
 
   static Future<void> teardown(ApiClient api) async {
+    await _tokenRefreshSub?.cancel();
+    _tokenRefreshSub = null;
     await _unregisterCurrent(api);
   }
 

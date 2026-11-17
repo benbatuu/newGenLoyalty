@@ -4,12 +4,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function apiBase(): string {
+  if (process.env.NODE_ENV !== "production") {
+    return "http://localhost:3001";
+  }
   const raw =
     process.env.API_URL?.trim() ||
     process.env.NEXT_PUBLIC_API_URL?.trim() ||
-    (process.env.NODE_ENV !== "production"
-      ? "http://localhost:3001"
-      : "");
+    "";
   if (!raw) {
     throw new Error(
       "API_URL is not set on this Vercel project (Runtime). Example: https://newgenloyalty.onrender.com",
@@ -33,6 +34,15 @@ async function proxy(
     if (authorization) headers.set("authorization", authorization);
     const accept = req.headers.get("accept");
     if (accept) headers.set("accept", accept);
+    // Oturum cihaz bilgisi için tarayıcının User-Agent'ı ve IP'si iletilir.
+    // "Bu oturum" işareti için mevcut refresh token iletilir.
+    const sessionToken = req.headers.get("x-session-token");
+    if (sessionToken) headers.set("x-session-token", sessionToken);
+    const userAgent = req.headers.get("user-agent");
+    if (userAgent) headers.set("user-agent", userAgent);
+    const forwardedFor =
+      req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip");
+    if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
 
     const init: RequestInit = {
       method: req.method,

@@ -4,11 +4,16 @@ type JsonLdProps = {
   data: Record<string, unknown> | Record<string, unknown>[];
 };
 
+/** Escape `<` so FAQ/copy cannot break out of the script tag. */
+function safeJsonLd(data: JsonLdProps["data"]): string {
+  return JSON.stringify(data).replace(/</g, "\\u003c");
+}
+
 export function JsonLd({ data }: JsonLdProps) {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+      dangerouslySetInnerHTML={{ __html: safeJsonLd(data) }}
     />
   );
 }
@@ -18,17 +23,20 @@ export function organizationJsonLd(locale: string) {
   return {
     "@context": "https://schema.org",
     "@type": "Organization",
-    name: "Dokun & Kazan",
+    name: "StampWell",
+    alternateName: "StampWell Loyalty",
     url: `${SITE}/${locale}`,
+    logo: `${SITE}/logo.png`,
+    image: `${SITE}/logo.png`,
     description:
       locale === "tr"
-        ? "Küçük kafeler için Wallet tabanlı dijital damga kartı."
-        : "Wallet-based digital stamp cards for small cafés.",
+        ? "Küçük kafeler için Wallet tabanlı sadakat platformu."
+        : "Wallet-based loyalty platform for modern businesses.",
     areaServed: {
       "@type": "Country",
       name: "Turkey",
     },
-    availableLanguage: ["tr", "en"],
+    availableLanguage: ["tr", "en","ru"],
   };
 }
 
@@ -37,7 +45,8 @@ export function softwareJsonLd(locale: string) {
   return {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name: "Dokun & Kazan",
+    name: "StampWell",
+    alternateName: "StampWell Loyalty",
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web, iOS Wallet, Android Wallet",
     offers: {

@@ -13,6 +13,7 @@ import {
   StreamableFile,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { IsString, MinLength } from 'class-validator';
 import type { Response } from 'express';
 import { WalletService } from './wallet.service';
@@ -28,6 +29,7 @@ class RegisterDeviceDto {
  * Paths are fixed under /v1 — webServiceURL on the pass points at the API root.
  */
 @Controller('v1')
+@ApiTags("v1")
 export class PassKitController {
   private readonly logger = new Logger(PassKitController.name);
 

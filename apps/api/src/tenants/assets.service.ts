@@ -9,13 +9,21 @@ import * as path from 'path';
 import sharp from 'sharp';
 import { ObjectStorageService } from '../storage/object-storage.service';
 
-export type AssetSlot = 'stampFilled' | 'stampEmpty' | 'logo' | 'icon';
+export type AssetSlot =
+  | 'stampFilled'
+  | 'stampEmpty'
+  | 'logo'
+  | 'icon'
+  | 'passBackground'
+  | 'passStrip';
 
 const SLOT_FILE: Record<AssetSlot, string> = {
   stampFilled: 'stamp-filled.png',
   stampEmpty: 'stamp-empty.png',
   logo: 'logo.png',
   icon: 'notify-icon.png',
+  passBackground: 'pass-background.png',
+  passStrip: 'pass-strip.png',
 };
 
 const ALLOWED_MIME = new Set([
@@ -102,6 +110,7 @@ export class AssetsService {
     tenantId: string,
     slot: AssetSlot,
     file: Express.Multer.File,
+    programId?: string,
   ): Promise<{ url: string }> {
     if (!file?.buffer?.length) {
       throw new BadRequestException('Dosya gerekli');
@@ -111,8 +120,8 @@ export class AssetsService {
         'Sadece PNG, JPEG, WebP, GIF veya SVG yükleyin',
       );
     }
-    if (file.size > 2.5 * 1024 * 1024) {
-      throw new BadRequestException('Dosya en fazla 2.5 MB olabilir');
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException('Dosya en fazla 5 MB olabilir');
     }
 
     const filename = SLOT_FILE[slot];
@@ -121,6 +130,16 @@ export class AssetsService {
       if (slot === 'icon') {
         const prepared = await this.prepareNotifyIconSquare(file.buffer);
         png = await sharp(prepared).png().toBuffer();
+      } else if (slot === 'passStrip') {
+        png = await sharp(file.buffer)
+          .resize(1125, 369, { fit: 'cover', position: 'centre' })
+          .png()
+          .toBuffer();
+      } else if (slot === 'passBackground') {
+        png = await sharp(file.buffer)
+          .resize(540, 660, { fit: 'cover', position: 'centre' })
+          .png()
+          .toBuffer();
       } else {
         const size = slot === 'logo' ? 640 : 256;
         png = await sharp(file.buffer)
@@ -138,16 +157,19 @@ export class AssetsService {
       );
     }
 
-    const key = `tenants/${tenantId}/${filename}`;
+    const objectKey =
+      programId && (slot === 'passStrip' || slot === 'passBackground')
+        ? `tenants/${tenantId}/programs/${programId}/${filename}`
+        : `tenants/${tenantId}/${filename}`;
 
     if (this.objects.isConfigured()) {
       try {
         const stored = await this.objects.putObject({
-          key,
+          key: objectKey,
           body: png,
           contentType: 'image/png',
         });
-        this.logger.log(`Asset → R2 ${key}`);
+        this.logger.log(`Asset → R2 ${objectKey}`);
         return { url: stored.url };
       } catch (err) {
         this.logger.error(
@@ -156,11 +178,13 @@ export class AssetsService {
       }
     }
 
-    const dir = this.tenantDir(tenantId);
-    await fs.mkdir(dir, { recursive: true });
-    const dest = path.join(dir, filename);
+    const keyParts = objectKey.split('/').filter(Boolean);
+    const fileName = keyParts.pop()!;
+    const localDir = path.join(this.uploadsRoot, ...keyParts);
+    await fs.mkdir(localDir, { recursive: true });
+    const dest = path.join(localDir, fileName);
     await fs.writeFile(dest, png);
-    const url = `${this.publicBaseUrl()}/uploads/${key}?v=${Date.now()}`;
+    const url = `${this.publicBaseUrl()}/uploads/${objectKey}?v=${Date.now()}`;
     this.logger.warn(`Asset → local disk ${dest} (ephemeral on Render)`);
     return { url };
   }
@@ -298,5 +322,68 @@ export class AssetsService {
       ])
       .png()
       .toBuffer();
+  }
+
+  /** E-posta builder — PNG/JPEG/WebP/GIF (GIF animasyon korunur) */
+  async saveEmailMedia(
+    tenantId: string,
+    file: Express.Multer.File,
+  ): Promise<{ url: string }> {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('Dosya gerekli');
+    }
+    if (!ALLOWED_MIME.has(file.mimetype)) {
+      throw new BadRequestException(
+        'Sadece PNG, JPEG, WebP, GIF veya SVG yükleyin',
+      );
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException('Dosya en fazla 5 MB olabilir');
+    }
+
+    let body: Buffer;
+    let contentType = file.mimetype;
+    let filename: string;
+    const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    if (file.mimetype === 'image/gif') {
+      body = file.buffer;
+      filename = `email-${stamp}.gif`;
+    } else if (file.mimetype === 'image/svg+xml') {
+      body = file.buffer;
+      filename = `email-${stamp}.svg`;
+    } else {
+      body = await sharp(file.buffer)
+        .resize(560, undefined, { fit: 'inside', withoutEnlargement: true })
+        .png()
+        .toBuffer();
+      contentType = 'image/png';
+      filename = `email-${stamp}.png`;
+    }
+
+    const objectKey = `tenants/${tenantId}/email/${filename}`;
+
+    if (this.objects.isConfigured()) {
+      try {
+        const stored = await this.objects.putObject({
+          key: objectKey,
+          body,
+          contentType,
+        });
+        return { url: stored.url };
+      } catch (err) {
+        this.logger.error(
+          `R2 email media failed, local fallback: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    const localDir = path.join(this.uploadsRoot, 'tenants', tenantId, 'email');
+    await fs.mkdir(localDir, { recursive: true });
+    const dest = path.join(localDir, filename);
+    await fs.writeFile(dest, body);
+    return {
+      url: `${this.publicBaseUrl()}/uploads/${objectKey}?v=${Date.now()}`,
+    };
   }
 }

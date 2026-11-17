@@ -1,7 +1,58 @@
 import { PrismaClient, Role, StampLedgerType, StampSource, SubscriptionStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { buildDefaultPlanRows } from '../src/plans/plans.seed-data';
 
 const prisma = new PrismaClient();
+
+async function seedPlans() {
+  const rows = buildDefaultPlanRows();
+  for (const row of rows) {
+    await prisma.subscriptionPlan.upsert({
+      where: { code: row.code },
+      update: {
+        labelTr: row.labelTr,
+        labelEn: row.labelEn,
+        priceTry: row.priceTry,
+        maxPrograms: row.maxPrograms,
+        allowedProgramTypes: row.allowedProgramTypes,
+        maxByType: row.maxByType,
+        features: row.features,
+        menuKeys: row.menuKeys,
+        maxBranches: row.maxBranches,
+        sortOrder: row.sortOrder,
+        isActive: row.isActive,
+        isPublic: row.isPublic,
+        badgeTr: row.badgeTr,
+        badgeEn: row.badgeEn,
+        noteTr: row.noteTr,
+        noteEn: row.noteEn,
+        includesTr: row.includesTr,
+        includesEn: row.includesEn,
+      },
+      create: {
+        code: row.code,
+        labelTr: row.labelTr,
+        labelEn: row.labelEn,
+        priceTry: row.priceTry,
+        maxPrograms: row.maxPrograms,
+        allowedProgramTypes: row.allowedProgramTypes,
+        maxByType: row.maxByType,
+        features: row.features,
+        menuKeys: row.menuKeys,
+        maxBranches: row.maxBranches,
+        sortOrder: row.sortOrder,
+        isActive: row.isActive,
+        isPublic: row.isPublic,
+        badgeTr: row.badgeTr,
+        badgeEn: row.badgeEn,
+        noteTr: row.noteTr,
+        noteEn: row.noteEn,
+        includesTr: row.includesTr,
+        includesEn: row.includesEn,
+      },
+    });
+  }
+}
 
 const PERMISSIONS: { code: string; description: string; roles: Role[] }[] = [
   {
@@ -53,14 +104,18 @@ async function ensureTenant(opts: {
   stampsRequired: number;
   rewardLabel: string;
   subscriptionStatus: SubscriptionStatus;
+  planCode?: string;
+  planPriceTry?: number;
 }) {
+  const planCode = opts.planCode ?? 'cafe';
+  const planPriceTry = opts.planPriceTry ?? 990;
   const tenant = await prisma.tenant.upsert({
     where: { slug: opts.slug },
     update: {
       name: opts.name,
       primaryColor: opts.color,
-      planCode: 'cafe',
-      planPriceTry: 990,
+      planCode,
+      planPriceTry,
       subscriptionStatus: opts.subscriptionStatus,
       isActive: true,
     },
@@ -68,8 +123,8 @@ async function ensureTenant(opts: {
       name: opts.name,
       slug: opts.slug,
       primaryColor: opts.color,
-      planCode: 'cafe',
-      planPriceTry: 990,
+      planCode,
+      planPriceTry,
       subscriptionStatus: opts.subscriptionStatus,
     },
   });
@@ -127,6 +182,8 @@ async function ensureTenant(opts: {
 }
 
 async function main() {
+  await seedPlans();
+
   for (const item of PERMISSIONS) {
     const permission = await prisma.permission.upsert({
       where: { code: item.code },
@@ -170,6 +227,8 @@ async function main() {
     stampsRequired: 10,
     rewardLabel: '1 bedava kahve',
     subscriptionStatus: SubscriptionStatus.TRIAL,
+    planCode: 'business',
+    planPriceTry: 2990,
   });
 
   const pilot = await ensureTenant({
@@ -188,15 +247,16 @@ async function main() {
 
   await prisma.tenant.update({
     where: { id: pilot.tenant.id },
-    data: { subscriptionActivatedAt: new Date() },
+    data: {
+      subscriptionActivatedAt: new Date(),
+      subscriptionPeriodEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    },
   });
 
   // Demo müşteri + birkaç damga (idempotent telefon)
   const samplePhone = '5551112233';
-  let customer = await prisma.customer.findUnique({
-    where: {
-      tenantId_phone: { tenantId: demo.tenant.id, phone: samplePhone },
-    },
+  let customer = await prisma.customer.findFirst({
+    where: { tenantId: demo.tenant.id, phone: samplePhone },
   });
   if (!customer) {
     customer = await prisma.customer.create({

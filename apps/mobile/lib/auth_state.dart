@@ -5,17 +5,31 @@ import 'models.dart';
 import 'push_service.dart';
 
 class AuthState extends ChangeNotifier {
-  AuthState(this.api);
+  AuthState(this.api) {
+    api.onSessionExpired = _handleSessionExpired;
+  }
 
   final ApiClient api;
   bool ready = false;
   String? error;
+  bool _handlingExpiry = false;
 
   AuthUser? get user => api.user;
   bool get isLoggedIn => user != null;
 
+  void _handleSessionExpired() {
+    if (_handlingExpiry) return;
+    _handlingExpiry = true;
+    logout(skipPushTeardown: true).whenComplete(() {
+      _handlingExpiry = false;
+    });
+  }
+
   Future<void> bootstrap() async {
     await api.loadSession();
+    if (api.user != null) {
+      await api.validateSession();
+    }
     ready = true;
     notifyListeners();
     if (user?.isOwner == true) {
@@ -43,8 +57,8 @@ class AuthState extends ChangeNotifier {
     }
   }
 
-  Future<void> logout() async {
-    if (user?.isOwner == true) {
+  Future<void> logout({bool skipPushTeardown = false}) async {
+    if (user?.isOwner == true && !skipPushTeardown) {
       await PushService.teardown(api);
     }
     await api.clearSession();

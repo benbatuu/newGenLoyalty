@@ -79,11 +79,14 @@ export class ObjectStorageService implements OnModuleInit {
       const base = this.env('R2_PUBLIC_BASE_URL')!.replace(/\/$/, '');
       return `${base}/${clean}?v=${Date.now()}`;
     }
+    // Absolute API media URL (admin rewrites to /backend/media/* for preview)
     return `${this.apiPublicBase()}/media/${clean}?v=${Date.now()}`;
   }
 
   private apiPublicBase(): string {
+    // Prefer PUBLIC_API_URL for phone/LAN, else API_URL, else local default
     const raw =
+      this.env('PUBLIC_API_URL') ||
       this.env('API_URL') ||
       this.env('APPLE_WEB_SERVICE_URL') ||
       (process.env.NODE_ENV !== 'production'

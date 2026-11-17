@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { PageShell } from "@/components/PageShell";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DemoCta } from "@/components/marketing/DemoCta";
+import { PricingCompareSection } from "@/components/marketing/PricingCompareSection";
+import { PricingFeatureMatrix } from "@/components/marketing/PricingFeatureMatrix";
+import { PricingCards } from "@/components/marketing/home/PricingCards";
+import {
+  InnerChecklistPanel,
+  InnerFaqAccordion,
+  InnerMetricStrip,
+  InnerPageSection,
+  InnerSectionIntro,
+} from "@/components/marketing/inner";
+import { CtaBand } from "@/components/marketing/home/CtaBand";
 import { buildPageMetadata } from "@/lib/seo";
-import { Check, X } from "lucide-react";
+import { fetchPublicPlans, resolveDisplayPlans } from "@/lib/plans";
 
 export async function generateMetadata({
   params,
@@ -30,7 +38,8 @@ export default async function PricingPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("pricingPage");
-  const plans = t.raw("plans") as {
+  const sections = await getTranslations("sections");
+  const staticPlans = t.raw("plans") as {
     id: string;
     name: string;
     price: string;
@@ -38,98 +47,74 @@ export default async function PricingPage({
     badge: string;
     note: string;
     includes: string[];
-    cta: string;
   }[];
   const compareIn = t.raw("compareIn") as string[];
   const compareOut = t.raw("compareOut") as string[];
+  const metrics = t.raw("metrics") as { value: string; label: string; hint?: string }[];
+  const billingBullets = t.raw("billingBullets") as string[];
+  const faq = t.raw("faq") as { q: string; a: string }[];
+  const featureMatrix = t.raw("featureMatrix") as {
+    label: string;
+    cells: (boolean | string)[];
+  }[];
+  const dbPlans = await fetchPublicPlans();
+  const plans = resolveDisplayPlans(locale, dbPlans, staticPlans, t("buyCta"));
 
   return (
-    <PageShell
-      title={t("title")}
-      intro={t("intro")}
-      wide
-      heroImage="https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=2000&q=80"
-      heroAlt={t("title")}
-    >
-      <div className="grid gap-6 lg:grid-cols-2">
-        {plans.map((plan) => (
-          <Card
-            key={plan.id}
-            className={
-              plan.id === "cafe"
-                ? "border-[var(--accent)]/40 shadow-[0_20px_50px_rgba(22,53,40,0.08)]"
-                : undefined
-            }
-          >
-            <CardHeader>
-              <div className="flex items-center justify-between gap-3">
-                <CardTitle>{plan.name}</CardTitle>
-                <Badge variant={plan.id === "cafe" ? "default" : "outline"}>
-                  {plan.badge}
-                </Badge>
-              </div>
-              <p className="mt-4 font-display text-5xl tracking-tight">
-                {plan.price}
-                <span className="ml-2 font-sans text-base font-light text-[var(--muted)]">
-                  {plan.period}
-                </span>
-              </p>
-              <CardDescription>{plan.note}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2.5">
-                {plan.includes.map((line) => (
-                  <li key={line} className="flex gap-2 text-sm font-light">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]" />
-                    {line}
-                  </li>
-                ))}
-              </ul>
-              <DemoCta label={plan.cta} className="mt-8 w-full" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+    <>
+      <PageShell
+        title={t("title")}
+        intro={t("intro")}
+        eyebrow={t("eyebrow")}
+        wide
+      >
+        <PricingCards
+          title={t("title")}
+          intro={t("intro")}
+          plans={plans}
+          pricingPageTitle={t("title")}
+          hideHeader
+          hidePricingPageLink
+          embedded
+        />
 
-      <section className="mt-20">
-        <h2 className="font-display text-3xl tracking-tight">{t("compareTitle")}</h2>
-        <div className="mt-8 grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">
-                {locale === "tr" ? "Dahil" : "Included"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-3">
-                {compareIn.map((line) => (
-                  <li key={line} className="flex gap-2 text-sm font-light">
-                    <Check className="h-4 w-4 shrink-0 text-[var(--accent)]" />
-                    {line}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">
-                {locale === "tr" ? "Şimdilik yok" : "Not yet"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-3">
-                {compareOut.map((line) => (
-                  <li key={line} className="flex gap-2 text-sm font-light text-[var(--muted)]">
-                    <X className="h-4 w-4 shrink-0" />
-                    {line}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-    </PageShell>
+        <InnerPageSection bordered={false}>
+          <InnerMetricStrip items={metrics} />
+        </InnerPageSection>
+
+        <PricingFeatureMatrix
+          title={t("featureMatrixTitle")}
+          featureLabel={t("featureMatrixLabel")}
+          plans={plans}
+          rows={featureMatrix}
+        />
+
+        <PricingCompareSection
+          title={t("compareTitle")}
+          includedLabel={locale === "tr" ? "Dahil" : "Included"}
+          excludedLabel={locale === "tr" ? "Şimdilik yok" : "Not yet"}
+          compareIn={compareIn}
+          compareOut={compareOut}
+        />
+
+        <InnerPageSection>
+          <InnerChecklistPanel
+            title={t("billingTitle")}
+            description={t("billingIntro")}
+            items={billingBullets}
+          />
+        </InnerPageSection>
+
+        <InnerPageSection>
+          <InnerSectionIntro title={t("faqTitle")} />
+          <InnerFaqAccordion items={faq} />
+        </InnerPageSection>
+      </PageShell>
+      <CtaBand
+        title={sections("ctaBandTitle")}
+        body={sections("ctaBandBody")}
+        button={sections("ctaBandButton")}
+      />
+    </>
   );
 }

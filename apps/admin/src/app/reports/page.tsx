@@ -1,295 +1,371 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Badge,
   ErrorBanner,
   PageHeader,
-  PageSkeleton,
   Panel,
   PanelHeader,
   RequireAuth,
-  SoftBox,
-  StatCard,
+  Skeleton,
   SuccessBanner,
-  btnGhost,
 } from "../../components/ui";
 import { ApiError, apiDownload } from "../../lib/api";
 import { useApiQuery } from "../../lib/use-api-query";
-
-type ActivityRow = {
-  id: string;
-  type: "STAMP" | "REDEEM" | "ADJUST";
-  createdAt: string;
-  phone: string;
-  customerId: string;
-  byName: string | null;
-  note: string | null;
-};
-
-type NearReward = {
-  id: string;
-  phone: string;
-  stampCount: number;
-  remaining: number;
-};
-
-type Reports = {
-  stampsRequired: number;
-  rewardLabel: string;
-  totals: {
-    stampsToday: number;
-    redeemsToday: number;
-    stampsWeek: number;
-    redeemsWeek: number;
-    stampsMonth: number;
-    redeemsMonth: number;
-    totalCustomers: number;
-    newCustomersWeek: number;
-    rewardReadyCount: number;
-  };
-  recentActivity: ActivityRow[];
-  nearReward: NearReward[];
-};
+import {
+  detectPreset,
+  formatRangeLabel,
+  isoDaysAgo,
+  isoToday,
+  presetRange,
+  type DatePreset,
+} from "./_components/date-utils";
+import {
+  ActivityFeed,
+  BranchBreakdown,
+  BusyHeatmap,
+  NearRewardList,
+  ProgramBreakdown,
+} from "./_components/insights";
+import { KpiCard, MiniStat } from "./_components/kpi-card";
+import { RangeBar } from "./_components/range-bar";
+import { TrendChart } from "./_components/trend-chart";
+import { fmtInt, fmtKurus, pct, SERIES, type Dashboard } from "./_components/types";
 
 export default function ReportsPage() {
   return (
     <RequireAuth roles={["STORE_OWNER"]}>
-      <ReportsContent />
+      <Suspense fallback={<ReportsSkeleton />}>
+        <ReportsContent />
+      </Suspense>
     </RequireAuth>
   );
 }
 
-function activityLabel(type: ActivityRow["type"]) {
-  switch (type) {
-    case "STAMP":
-      return "Damga";
-    case "REDEEM":
-      return "Ödül";
-    case "ADJUST":
-      return "Düzeltme";
-  }
-}
-
-function activityTone(type: ActivityRow["type"]) {
-  switch (type) {
-    case "STAMP":
-      return "neutral" as const;
-    case "REDEEM":
-      return "success" as const;
-    case "ADJUST":
-      return "warning" as const;
-  }
-}
-
 function ReportsContent() {
-  const { data, error, loading, refreshing, reload } = useApiQuery<Reports>(
-    "reports:stamps",
-    "/stamps/reports",
-    { ttlMs: 30_000 },
-  );
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const from = searchParams.get("from") ?? isoDaysAgo(6);
+  const to = searchParams.get("to") ?? isoToday();
+  const [preset, setPreset] = useState<DatePreset>(() => detectPreset(from, to));
+
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportOk, setExportOk] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<"ledger" | "near" | null>(null);
 
-  const redeemRate = useMemo(() => {
-    if (!data?.totals.stampsMonth) return 0;
-    return Math.round(
-      (data.totals.redeemsMonth / data.totals.stampsMonth) * 100,
-    );
-  }, [data]);
+  const setRange = useCallback(
+    (nextFrom: string, nextTo: string) => {
+      const params = new URLSearchParams({ from: nextFrom, to: nextTo });
+      router.replace(`/reports?${params.toString()}`, { scroll: false });
+    },
+    [router],
+  );
 
-  async function exportLedger() {
-    setExporting(true);
+  // Eski ?tab= bağlantıları
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "history" || tab === "today") {
+      const r = tab === "history" ? presetRange("30d") : presetRange("today");
+      setRange(r.from, r.to);
+    }
+  }, [searchParams, setRange]);
+
+  useEffect(() => {
+    setPreset(detectPreset(from, to));
+  }, [from, to]);
+
+  // Tek istek — sayfanın tüm verisi
+  const path = `/analytics/dashboard?from=${from}&to=${to}`;
+  const { data, error, loading, refreshing, reload } = useApiQuery<Dashboard>(path, path);
+
+  /** Elle "Yenile" → veri ekranda kalır; dönem değişimi → iskelet */
+  const [manualRefresh, setManualRefresh] = useState(false);
+  useEffect(() => {
+    if (!refreshing) setManualRefresh(false);
+  }, [refreshing]);
+  const showSkeleton = (loading && !data) || (refreshing && !manualRefresh);
+
+  async function download(kind: "ledger" | "near") {
+    setExporting(kind);
     setExportError(null);
     setExportOk(null);
     try {
-      await apiDownload("/stamps/ledger/export.csv", "stamp-ledger.csv");
-      setExportOk("Damga defteri indirildi");
+      if (kind === "ledger") {
+        await apiDownload("/stamps/ledger/export.csv", "hareketler.csv");
+        setExportOk("Tüm hareketler indirildi.");
+      } else {
+        await apiDownload("/stamps/reports/near-reward/export.csv", "odule-yakin-musteriler.csv");
+        setExportOk("Ödüle yakın müşteri listesi indirildi.");
+      }
     } catch (err) {
-      setExportError(
-        err instanceof ApiError ? err.message : "CSV indirilemedi",
-      );
+      setExportError(err instanceof ApiError ? err.message : "Dosya indirilemedi");
     } finally {
-      setExporting(false);
+      setExporting(null);
     }
   }
 
-  if (loading && !data) {
-    return <PageSkeleton cards={6} chart />;
-  }
-
-  const t = data?.totals;
+  const rangeLabel = formatRangeLabel(from, to);
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-5">
       <PageHeader
-        eyebrow="Genel"
-        title="Raporlar"
-        subtitle="Damga, ödül ve müşteri hareketlerini dönem bazında incele."
+        eyebrow="İşletmem"
+        title="Özet ve raporlar"
+        subtitle={`${rangeLabel} · önceki aynı uzunluktaki dönemle karşılaştırılır`}
+        help="Üstten dönem seçin. Kartlardaki yüzdeler, seçtiğiniz dönemi bir önceki aynı uzunluktaki dönemle karşılaştırır. Müşteri durumu ve ödüle yakın müşteriler anlık bilgidir."
         actions={
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className={btnGhost()}
-              disabled={exporting}
-              onClick={() => void exportLedger()}
-            >
-              {exporting ? "İndiriliyor…" : "Defter CSV"}
-            </button>
-            <button
-              type="button"
-              className={btnGhost()}
-              disabled={refreshing}
-              onClick={() => void reload(true)}
-            >
-              {refreshing ? "Yenileniyor…" : "Yenile"}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => void download("ledger")}
+            disabled={exporting !== null}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--line)] bg-[var(--panel)] px-3 text-[0.8125rem] font-medium text-[var(--ink)] transition hover:bg-[var(--surface)] disabled:opacity-60"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+            </svg>
+            {exporting === "ledger" ? "İndiriliyor…" : "Tüm hareketleri indir"}
+          </button>
         }
       />
+
+      <RangeBar
+        preset={preset}
+        from={from}
+        to={to}
+        refreshing={refreshing}
+        onPreset={(id) => {
+          setPreset(id);
+          const r = presetRange(id);
+          setRange(r.from, r.to);
+        }}
+        onApplyCustom={(a, b) => {
+          setPreset("custom");
+          setRange(a, b);
+        }}
+        onRefresh={() => {
+          setManualRefresh(true);
+          void reload(true);
+        }}
+      />
+
       <ErrorBanner message={error || exportError} />
       <SuccessBanner message={exportOk} />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Bugün damga / ödül"
-          value={`${t?.stampsToday ?? "—"} / ${t?.redeemsToday ?? "—"}`}
-          hint="00:00’dan beri"
-          accent
-        />
-        <StatCard
-          label="Bu hafta damga / ödül"
-          value={`${t?.stampsWeek ?? "—"} / ${t?.redeemsWeek ?? "—"}`}
-          hint="Son 7 gün"
-        />
-        <StatCard
-          label="Bu ay damga / ödül"
-          value={`${t?.stampsMonth ?? "—"} / ${t?.redeemsMonth ?? "—"}`}
-          hint={`Ödül oranı %${redeemRate}`}
-        />
-        <StatCard
-          label="Ödül hazır"
-          value={t?.rewardReadyCount ?? "—"}
-          hint={data?.rewardLabel ? `Hedef: ${data.rewardLabel}` : undefined}
-          accent
-        />
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <SoftBox>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-            Toplam müşteri
-          </p>
-          <p className="mt-1 font-[family-name:var(--font-display)] text-2xl tabular-nums">
-            {t?.totalCustomers ?? "—"}
-          </p>
-        </SoftBox>
-        <SoftBox>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-            Bu hafta yeni kayıt
-          </p>
-          <p className="mt-1 font-[family-name:var(--font-display)] text-2xl tabular-nums">
-            {t?.newCustomersWeek ?? "—"}
-          </p>
-        </SoftBox>
-        <SoftBox>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-            Ödül kuralı
-          </p>
-          <p className="mt-1 text-sm font-medium text-[var(--ink)]">
-            {data?.stampsRequired ?? 10} damga → {data?.rewardLabel || "—"}
-          </p>
-        </SoftBox>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <Panel padded={false}>
-          <div className="border-b border-[var(--line)] px-5 py-4 sm:px-6">
-            <PanelHeader
-              title="Son hareketler"
-              description="En son 15 damga, ödül ve düzeltme kaydı."
+      {showSkeleton ? (
+        <ReportsSkeleton bare />
+      ) : data ? (
+        <div className={`space-y-5 transition-opacity duration-200 ${refreshing ? "opacity-60" : ""}`} aria-busy={refreshing}>
+          {/* Ana göstergeler */}
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Ana göstergeler">
+            <KpiCard
+              primary
+              label="Gelen müşteri"
+              hint="Dönemde en az bir kez işlem yapan farklı müşteri"
+              metric={data.kpis.visitors}
             />
+            <KpiCard
+              label="Verilen damga"
+              metric={data.kpis.stamps}
+              trend={data.daily.map((d) => d.stamps)}
+              color={SERIES.stamps.color}
+            />
+            <KpiCard
+              label="Kullanılan ödül"
+              metric={data.kpis.redeems}
+              trend={data.daily.map((d) => d.redeems)}
+              color={SERIES.redeems.color}
+              hint={
+                data.kpis.stamps.value
+                  ? `Damgaların %${pct(data.kpis.redeems.value, data.kpis.stamps.value)}'i kadar ödül`
+                  : undefined
+              }
+            />
+            <KpiCard
+              label="Yeni müşteri"
+              metric={data.kpis.newCustomers}
+              trend={data.daily.map((d) => d.newCustomers)}
+              color={SERIES.stamps.color}
+            />
+          </section>
+
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <Panel>
+              <PanelHeader
+                title="Günlük hareket"
+                description="Grafiğin üzerinde gezinerek gün gün görün"
+              />
+              <TrendChart rows={data.daily} />
+            </Panel>
+
+            <Panel>
+              <PanelHeader title="Müşteri durumu" description="Şu anki tablo" />
+              <div className="grid grid-cols-2 gap-2">
+                <MiniStat label="Toplam müşteri" value={fmtInt(data.snapshot.totalCustomers)} />
+                <MiniStat
+                  label="Kartını kullanan"
+                  value={`%${pct(data.snapshot.activeCustomers, data.snapshot.totalCustomers)}`}
+                  sub={`${fmtInt(data.snapshot.activeCustomers)} müşteri`}
+                />
+                <MiniStat
+                  label="Telefonunda kart"
+                  value={`%${pct(data.snapshot.walletPasses, data.snapshot.totalCustomers)}`}
+                  sub={`${fmtInt(data.snapshot.walletPasses)} Apple Wallet`}
+                />
+                <MiniStat
+                  label="Ödülü hazır"
+                  value={fmtInt(data.snapshot.rewardReadyCount)}
+                  sub={data.reward.rewardLabel || undefined}
+                />
+                {data.kpis.pointsEarned.value > 0 ? (
+                  <MiniStat label="Kazanılan puan" value={fmtInt(data.kpis.pointsEarned.value)} sub="Seçilen dönem" />
+                ) : null}
+                {data.snapshot.cashbackOutstandingKurus > 0 || data.kpis.cashbackEarnKurus.value > 0 ? (
+                  <>
+                    <MiniStat
+                      label="Cashback kazanılan"
+                      value={fmtKurus(data.kpis.cashbackEarnKurus.value)}
+                      sub={`Kullanılan ${fmtKurus(data.kpis.cashbackRedeemKurus.value)}`}
+                    />
+                    <MiniStat
+                      label="Bekleyen cashback"
+                      value={fmtKurus(data.snapshot.cashbackOutstandingKurus)}
+                      sub={`${fmtInt(data.snapshot.cashbackCustomers)} müşteride`}
+                    />
+                  </>
+                ) : null}
+              </div>
+            </Panel>
           </div>
-          {!data?.recentActivity.length ? (
-            <div className="px-5 py-10 text-center text-sm text-[var(--muted)] sm:px-6">
-              Henüz hareket yok.
-            </div>
-          ) : (
-            <ul className="divide-y divide-[var(--line)]">
-              {data.recentActivity.map((row) => (
-                <li
-                  key={row.id}
-                  className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 sm:px-6"
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge tone={activityTone(row.type)}>
-                        {activityLabel(row.type)}
-                      </Badge>
-                      <span className="font-medium tabular-nums text-[var(--ink)]">
-                        0{row.phone}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-[var(--muted)]">
-                      {row.byName ? `${row.byName} · ` : ""}
-                      {new Date(row.createdAt).toLocaleString("tr-TR")}
-                      {row.note ? ` · ${row.note}` : ""}
-                    </p>
-                  </div>
-                  <Link
-                    href={`/counter?phone=${encodeURIComponent(row.phone)}`}
-                    className="text-xs font-medium text-[var(--accent)] hover:underline"
+
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <Panel>
+              <PanelHeader title="En yoğun saatler" description="Hangi gün ve saatte daha çok müşteri geliyor" />
+              <BusyHeatmap grid={data.heatmap} />
+            </Panel>
+
+            <Panel>
+              <PanelHeader
+                title="Ödüle yakın müşteriler"
+                description={`${data.reward.stampsRequired} damgada ödül`}
+                action={
+                  <button
+                    type="button"
+                    onClick={() => void download("near")}
+                    disabled={exporting !== null}
+                    className="text-[0.75rem] font-medium text-[var(--brand)] hover:underline disabled:opacity-60"
                   >
-                    Tezgâhta aç →
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-
-        <Panel padded={false}>
-          <div className="border-b border-[var(--line)] px-5 py-4 sm:px-6">
-            <PanelHeader
-              title="Ödüle yakın"
-              description="En çok damgaya sahip müşteriler."
-            />
+                    {exporting === "near" ? "İndiriliyor…" : "Listeyi indir"}
+                  </button>
+                }
+              />
+              <NearRewardList rows={data.nearReward} stampsRequired={data.reward.stampsRequired} />
+            </Panel>
           </div>
-          {!data?.nearReward.length ? (
-            <div className="px-5 py-10 text-center text-sm text-[var(--muted)] sm:px-6">
-              Henüz aktif müşteri yok.
+
+          <div className="grid gap-5 xl:grid-cols-2">
+            <Panel>
+              <PanelHeader title="Son hareketler" description="Seçilen dönemdeki en yeni işlemler" />
+              <ActivityFeed rows={data.recentActivity} />
+            </Panel>
+
+            <div className="space-y-5">
+              {data.byProgramType.length > 0 ? (
+                <Panel>
+                  <PanelHeader title="Kart türüne göre" description="Hangi kartınız daha çok kullanılıyor" />
+                  <ProgramBreakdown rows={data.byProgramType} />
+                </Panel>
+              ) : null}
+              {data.branches.length > 1 ? (
+                <Panel>
+                  <PanelHeader title="Şubelere göre" description="Verilen damga" />
+                  <BranchBreakdown rows={data.branches} />
+                </Panel>
+              ) : null}
             </div>
-          ) : (
-            <ul className="divide-y divide-[var(--line)]">
-              {data.nearReward.map((c) => (
-                <li
-                  key={c.id}
-                  className="flex items-center justify-between gap-3 px-5 py-3.5 sm:px-6"
-                >
-                  <div>
-                    <p className="font-medium tabular-nums">0{c.phone}</p>
-                    <p className="text-xs text-[var(--muted)]">
-                      {c.stampCount}/{data.stampsRequired} damga
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold tabular-nums text-[var(--accent)]">
-                      {c.remaining} kaldı
-                    </p>
-                    <Link
-                      href={`/counter?phone=${encodeURIComponent(c.phone)}`}
-                      className="text-[11px] text-[var(--muted)] hover:text-[var(--accent)]"
-                    >
-                      Tezgâh →
-                    </Link>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ReportsSkeleton({ bare = false }: { bare?: boolean }) {
+  return (
+    <div className="w-full space-y-5" aria-busy="true" aria-label="Raporlar yükleniyor">
+      {bare ? null : (
+        <div className="space-y-2">
+          <Skeleton className="h-2.5 w-20" />
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-8 w-80" />
+        </div>
+      )}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Panel key={i}>
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="mt-3 h-7 w-16" />
+            <Skeleton className="mt-3 h-8 w-full" />
+          </Panel>
+        ))}
+      </div>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <Panel>
+          <Skeleton className="mb-4 h-4 w-32" />
+          <Skeleton className="h-[240px] w-full" />
         </Panel>
+        <Panel>
+          <Skeleton className="mb-4 h-4 w-28" />
+          <div className="grid grid-cols-2 gap-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-16" />
+            ))}
+          </div>
+        </Panel>
+      </div>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <Panel>
+          <Skeleton className="mb-2 h-4 w-32" />
+          <Skeleton className="mb-4 h-3 w-56" />
+          <div className="grid grid-cols-[34px_repeat(15,minmax(0,1fr))] gap-[3px]">
+            {Array.from({ length: 7 * 16 }).map((_, i) =>
+              i % 16 === 0 ? (
+                <Skeleton key={i} className="h-3 w-6 self-center" />
+              ) : (
+                <Skeleton key={i} className="h-6 rounded-[4px]" />
+              ),
+            )}
+          </div>
+        </Panel>
+        <Panel>
+          <Skeleton className="mb-4 h-4 w-40" />
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-1.5 flex-1" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </div>
+      <div className="grid gap-5 xl:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, p) => (
+          <Panel key={p}>
+            <Skeleton className="mb-4 h-4 w-32" />
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <Skeleton className="h-2 w-2 rounded-full" />
+                  <Skeleton className="h-3 flex-1" />
+                  <Skeleton className="h-3 w-12" />
+                </div>
+              ))}
+            </div>
+          </Panel>
+        ))}
       </div>
     </div>
   );

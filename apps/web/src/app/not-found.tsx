@@ -1,6 +1,9 @@
 import Link from "next/link";
 
-/** Fallback when 404 is rendered outside `[locale]` (rare with localePrefix: always). */
+/**
+ * Fallback when a request never reaches [locale] (e.g. unmatched middleware path).
+ * Localized 404s use app/[locale]/not-found.tsx via [...rest] catch-all.
+ */
 export default function RootNotFound() {
   return (
     <html lang="tr">
@@ -12,33 +15,35 @@ export default function RootNotFound() {
           alignItems: "center",
           justifyContent: "center",
           fontFamily: "system-ui, sans-serif",
-          background: "#0c0b0a",
-          color: "#f5f0e8",
+          background: "#faf9f7",
+          color: "#1a1917",
         }}
       >
         <main style={{ textAlign: "center", padding: "2rem" }}>
           <p
             style={{
-              fontSize: "0.7rem",
-              letterSpacing: "0.2em",
+              fontSize: "0.75rem",
+              letterSpacing: "0.16em",
               textTransform: "uppercase",
-              opacity: 0.6,
+              opacity: 0.55,
+              margin: 0,
             }}
           >
-            Dokun &amp; Kazan
+            StampWell · 404
           </p>
-          <h1 style={{ fontSize: "2rem", fontWeight: 300, margin: "1rem 0" }}>
+          <h1 style={{ fontSize: "1.75rem", fontWeight: 600, margin: "1rem 0 0.75rem" }}>
             Sayfa bulunamadı
           </h1>
-          <p style={{ opacity: 0.7, maxWidth: "28rem", margin: "0 auto 2rem" }}>
+          <p style={{ opacity: 0.65, maxWidth: "28rem", margin: "0 auto 1.75rem", lineHeight: 1.5 }}>
             Aradığınız sayfa mevcut değil.
           </p>
           <Link
             href="/tr"
             style={{
-              color: "#c9a962",
+              color: "#1a1917",
               textDecoration: "underline",
               textUnderlineOffset: "4px",
+              fontWeight: 500,
             }}
           >
             Ana sayfaya dön

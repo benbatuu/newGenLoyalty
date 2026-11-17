@@ -2,6 +2,13 @@
 
 Her deploy / pilot öncesi. Ortam: API + Admin (+ isteğe bağlı Flutter).
 
+## PII / KVKK (prod)
+
+- [ ] `PII_ENCRYPTION_KEY` Render/Vercel secret'ta
+- [ ] `pnpm pii:backfill` prod DB'de çalıştırıldı
+- [ ] `pnpm pii:verify` — düz metin telefon/e-posta kalmadı
+- [ ] Admin counter/reports'ta telefon maskeli görünüyor
+
 ## Auth
 
 - [ ] Login: SuperAdmin / Owner / Cashier (yanlış şifre reddedilir)

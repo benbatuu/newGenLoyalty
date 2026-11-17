@@ -2,42 +2,33 @@
 
 import Link from "next/link";
 import { FormEvent, Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import {
-  ErrorBanner,
-  Field,
-  SuccessBanner,
-  btnPrimary,
-  inputClassName,
-} from "../../components/ui";
-import { ApiError } from "../../lib/api";
-import { getApiUrl } from "../../lib/public-urls";
+import { useSearchParams } from "next/navigation";
+import { AuthShell, authButtonClass, authFieldClass } from "../../components/auth-shell";
+import { authPost } from "../../lib/auth-request";
 
+/** E-posta bağlantısıyla (token) şifre sıfırlama — personel/yönetici bağlantıları için. */
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<div className="grid min-h-screen place-items-center text-sm text-[var(--muted)]">Yükleniyor…</div>}>
+    <Suspense fallback={null}>
       <ResetPasswordForm />
     </Suspense>
   );
 }
 
 function ResetPasswordForm() {
-  const API_URL = getApiUrl();
   const params = useSearchParams();
-  const router = useRouter();
   const token = params.get("token") ?? "";
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setOk(null);
     if (!token) {
-      setError("Geçersiz bağlantı — token yok");
+      setError("Bağlantı geçersiz. Yeni bir sıfırlama kodu isteyin.");
       return;
     }
     if (password !== confirm) {
@@ -45,99 +36,49 @@ function ResetPasswordForm() {
       return;
     }
     setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/auth/reset-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password }),
-      });
-      if (!res.ok) {
-        let message = "Sıfırlama başarısız";
-        try {
-          const body = (await res.json()) as { message?: string | string[] };
-          if (Array.isArray(body.message)) message = body.message.join(", ");
-          else if (body.message) message = body.message;
-        } catch {
-          /* ignore */
-        }
-        throw new ApiError(res.status, message);
-      }
-      setOk("Şifre güncellendi. Giriş sayfasına yönlendiriliyorsun…");
-      window.setTimeout(() => router.replace("/login"), 1200);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Sıfırlama başarısız");
-    } finally {
-      setLoading(false);
+    const res = await authPost<{ ok: true }>("/auth/reset-password", { token, password });
+    setLoading(false);
+    if (!res.ok) {
+      setError(res.message);
+      return;
     }
+    setDone(true);
   }
 
   return (
-    <div className="relative grid min-h-screen place-items-center overflow-hidden px-4 py-10">
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(ellipse 70% 50% at 15% 20%, rgba(26,61,46,0.12), transparent 55%), radial-gradient(ellipse 50% 40% at 90% 80%, rgba(26,61,46,0.08), transparent 50%)",
-        }}
-      />
-      <div className="relative w-full max-w-md">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-          Hesap
-        </p>
-        <p className="mt-2 font-[family-name:var(--font-display)] text-4xl tracking-tight text-[var(--ink)]">
-          Yeni şifre
-        </p>
-        <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
-          En az 8 karakter; bağlantı 2 saat geçerlidir.
-        </p>
+    <AuthShell
+      image="/login-hero.png"
+      asideTitle="Yeni şifrenizi belirleyin."
+      asideText="Bağlantı tek kullanımlıktır ve kısa süre geçerlidir."
+      eyebrow={done ? "Tamamlandı" : "Şifre sıfırlama"}
+      title={done ? "Şifreniz güncellendi" : "Yeni şifre"}
+      subtitle={done ? "Yeni şifrenizle giriş yapabilirsiniz." : "En az 8 karakter kullanın."}
+    >
+      {error ? (
+        <div role="alert" className="mb-4 rounded-lg border border-[rgba(239,35,60,0.35)] bg-[var(--accent-soft)] px-3.5 py-2.5 text-sm text-[var(--ink)]">
+          {error}
+        </div>
+      ) : null}
 
-        <form
-          onSubmit={onSubmit}
-          className="mt-8 space-y-4 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--panel)] p-6 shadow-[var(--shadow-lg)] sm:p-7"
-        >
-          <ErrorBanner message={error} />
-          <SuccessBanner message={ok} />
-          {!token ? (
-            <p className="text-sm text-red-600">
-              Bağlantıda token yok. Şifremi unuttum akışından yeniden dene.
-            </p>
-          ) : null}
-          <Field label="Yeni şifre">
-            <input
-              className={inputClassName()}
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-            />
-          </Field>
-          <Field label="Şifre tekrar">
-            <input
-              className={inputClassName()}
-              type="password"
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-              minLength={8}
-            />
-          </Field>
-          <button
-            type="submit"
-            className={`${btnPrimary()} w-full`}
-            disabled={loading || !token}
-          >
+      {done ? (
+        <Link href="/login" className={authButtonClass}>
+          Giriş yap
+        </Link>
+      ) : (
+        <form onSubmit={onSubmit} className="space-y-4">
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium text-[var(--ink)]">Yeni şifre</span>
+            <input className={authFieldClass} type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} maxLength={100} required />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium text-[var(--ink)]">Yeni şifre (tekrar)</span>
+            <input className={authFieldClass} type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} minLength={8} maxLength={100} required />
+          </label>
+          <button type="submit" disabled={loading} className={authButtonClass}>
             {loading ? "Kaydediliyor…" : "Şifreyi güncelle"}
           </button>
-          <p className="text-center text-sm text-[var(--muted)]">
-            <Link href="/login" className="text-[var(--accent)] hover:underline">
-              ← Girişe dön
-            </Link>
-          </p>
         </form>
-      </div>
-    </div>
+      )}
+    </AuthShell>
   );
 }

@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
@@ -13,6 +14,8 @@ import {
 import { OwnerPushService } from './owner-push.service';
 
 @Controller('users/me/push')
+@ApiTags("users-me-push")
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.STORE_OWNER)
 export class OwnerPushController {

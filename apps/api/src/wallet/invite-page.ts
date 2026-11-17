@@ -1,6 +1,115 @@
+import { resolveStampIconSrc } from '@ngl/shared';
+import { presetIconSvg } from './stamp-presets';
 export type InvitePolicy = { title: string; body: string };
 
+/** Sayfa blokları — sahip panelden sürükleyip ekleyebilir */
+export const INVITE_BLOCK_TYPES = [
+  'card', 'text', 'image', 'spacer', 'divider', 'wallet', 'form', 'legal', 'policies',
+] as const;
+export type InviteBlockType = (typeof INVITE_BLOCK_TYPES)[number];
+export type InviteBlock = { id: string; type: InviteBlockType; props: Record<string, unknown> };
+
+const MAX_BLOCKS = 30;
+
+function clampStr(v: unknown, max: number): string | null {
+  return typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null;
+}
+
+/** Ham JSON'u güvenli bloklara çevirir; geçersiz ya da boşsa null (varsayılan düzen) */
+export function sanitizeInviteLayout(raw: unknown): InviteBlock[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: InviteBlock[] = [];
+  let hasWallet = false;
+  for (const item of raw.slice(0, MAX_BLOCKS)) {
+    if (!item || typeof item !== 'object') continue;
+    const b = item as { id?: unknown; type?: unknown; props?: unknown };
+    if (typeof b.type !== 'string' || !(INVITE_BLOCK_TYPES as readonly string[]).includes(b.type)) continue;
+    const type = b.type as InviteBlockType;
+    // Cüzdan düğmeleri ve form sayfada tek kez olabilir
+    if (type === 'wallet') { if (hasWallet) continue; hasWallet = true; }
+    const pr = (b.props && typeof b.props === 'object' ? b.props : {}) as Record<string, unknown>;
+    const props: Record<string, unknown> = {};
+    switch (type) {
+      case 'card':
+        props.headline = clampStr(pr.headline, 80);
+        props.subtitle = clampStr(pr.subtitle, 160);
+        props.statusText = clampStr(pr.statusText, 120);
+        props.showLogo = pr.showLogo !== false;
+        props.showDots = pr.showDots !== false;
+        const hex = (v: unknown) => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v.trim()) ? v.trim() : null);
+        props.bgColor = hex(pr.bgColor);
+        props.fgColor = hex(pr.fgColor);
+        const num = (v: unknown, min: number, max: number, d: number) => { const n = Number(v); return Number.isFinite(n) ? Math.min(Math.max(Math.round(n), min), max) : d; };
+        props.logoWidth = num(pr.logoWidth, 40, 320, 150);
+        props.logoHeight = num(pr.logoHeight, 16, 140, 40);
+        props.logoUrl = clampStr(pr.logoUrl, 500) && /^https?:\/\//i.test(String(pr.logoUrl)) ? clampStr(pr.logoUrl, 500) : null;
+        break;
+      case 'text':
+        props.text = clampStr(pr.text, 600) ?? '';
+        props.align = pr.align === 'center' ? 'center' : 'left';
+        props.size = pr.size === 'lg' ? 'lg' : pr.size === 'sm' ? 'sm' : 'md';
+        break;
+      case 'image': {
+        const url = clampStr(pr.url, 500);
+        props.url = url && /^https?:\/\//i.test(url) ? url : null;
+        const h = Number(pr.height);
+        props.height = Number.isFinite(h) ? Math.min(Math.max(Math.round(h), 40), 400) : 160;
+        break;
+      }
+      case 'spacer': {
+        const h = Number(pr.height);
+        props.height = Number.isFinite(h) ? Math.min(Math.max(Math.round(h), 4), 160) : 24;
+        break;
+      }
+      case 'wallet':
+        props.ctaHint = clampStr(pr.ctaHint, 160);
+        break;
+      case 'legal':
+        props.text = clampStr(pr.text, 1000);
+        break;
+      case 'policies':
+        props.items = Array.isArray(pr.items)
+          ? pr.items
+              .slice(0, 8)
+              .map((x: unknown) => {
+                const o = (x && typeof x === 'object' ? x : {}) as { title?: unknown; body?: unknown };
+                return { title: clampStr(o.title, 60) ?? '', body: clampStr(o.body, 12000) ?? '' };
+              })
+              .filter((x) => x.title && x.body)
+          : null;
+        break;
+      default:
+        break;
+    }
+    out.push({
+      id: clampStr(b.id, 40) ?? `${type}-${out.length}`,
+      type,
+      props,
+    });
+  }
+  return out.length ? out : null;
+}
+
+/** Varsayılan düzen: mevcut sayfanın birebir karşılığı */
+export const DEFAULT_INVITE_LAYOUT: InviteBlock[] = [
+  { id: 'card', type: 'card', props: { showLogo: true, showDots: true } },
+  { id: 'form', type: 'form', props: {} },
+  { id: 'wallet', type: 'wallet', props: {} },
+  { id: 'legal', type: 'legal', props: {} },
+  { id: 'policies', type: 'policies', props: {} },
+];
+
 export type InviteLocale = 'tr' | 'en';
+
+export type InviteWalletCard = {
+  programId: string;
+  name: string;
+  type: string;
+  typeLabel: string;
+  summary: string;
+  appleDownloadUrl: string | null;
+  googleSaveUrl?: string | null;
+};
 
 export type InvitePageRenderData = {
   token: string;
@@ -27,6 +136,7 @@ export type InvitePageRenderData = {
   appleAvailable: boolean;
   googleSaveUrl: string | null;
   appleDownloadUrl: string | null;
+  walletCards?: InviteWalletCard[];
   profileComplete: boolean;
   collect: { name: boolean; birthday: boolean };
   profile: {
@@ -35,6 +145,11 @@ export type InvitePageRenderData = {
     birthDay: number | null;
   };
   locale: InviteLocale;
+  /** Sahibin tanımladığı blok düzeni (yoksa varsayılan) */
+  layout?: unknown;
+  stampIconFilledUrl?: string | null;
+  stampIconEmptyUrl?: string | null;
+  stampTheme?: string | null;
   /** Cihaz OS — apple | google | both */
   platform: InvitePlatform;
   /** Owner önizleme — Wallet indirimi kapalı, banner göster */
@@ -62,8 +177,14 @@ type InviteStrings = {
   birthdayHint: string;
   saveContinue: string;
   saveFailed: string;
+  fieldsMissing: string;
+  nameShort: string;
+  birthdayMissing: string;
   appleUnavailable: string;
   googleUnavailable: string;
+  cardsTitle: string;
+  addAllApple: string;
+  addCardApple: string;
   close: string;
   policiesLabel: string;
   defaultLegal: string;
@@ -90,8 +211,14 @@ const STRINGS: Record<InviteLocale, InviteStrings> = {
     birthdayHint: 'Yıl sormuyoruz — sadece doğum günü sürprizi için.',
     saveContinue: 'Kaydet ve devam et',
     saveFailed: 'Kayıt başarısız',
+    fieldsMissing: 'Devam etmek için lütfen eksik alanları doldurun.',
+    nameShort: 'Adınız en az 2 karakter olmalı.',
+    birthdayMissing: 'Doğum ayı ve günü seçin.',
     appleUnavailable: 'Apple Wallet şu an yapılandırılmamış.',
     googleUnavailable: 'Google Wallet şu an yapılandırılmamış.',
+    cardsTitle: 'Kartlarınız',
+    addAllApple: 'Tümünü Apple Wallet’a ekle',
+    addCardApple: 'Ekle',
     close: 'Kapat',
     policiesLabel: 'Politikalar',
     defaultLegal:
@@ -131,8 +258,14 @@ const STRINGS: Record<InviteLocale, InviteStrings> = {
     birthdayHint: 'We don’t ask for the year — only for a birthday surprise.',
     saveContinue: 'Save and continue',
     saveFailed: 'Could not save',
+    fieldsMissing: 'Please fill in the missing fields to continue.',
+    nameShort: 'Your name must be at least 2 characters.',
+    birthdayMissing: 'Please choose your birth month and day.',
     appleUnavailable: 'Apple Wallet is not configured yet.',
     googleUnavailable: 'Google Wallet is not configured yet.',
+    cardsTitle: 'Your cards',
+    addAllApple: 'Add all to Apple Wallet',
+    addCardApple: 'Add',
     close: 'Close',
     policiesLabel: 'Policies',
     defaultLegal:
@@ -273,22 +406,52 @@ export function renderInviteHtml(data: InvitePageRenderData): string {
     ? `<div class="preview-banner">${escapeHtml(t.previewBanner)}</div>`
     : '';
 
+  const walletCards = data.walletCards ?? [];
+  const multiApple =
+    walletCards.length > 1 &&
+    walletCards.some((c) => c.appleDownloadUrl);
+
   let appleBtn = '';
   let googleBtn = '';
+  let multiCardBlock = '';
   const appleInner = `${APPLE_LOGO_SVG}<span>${escapeHtml(appleLabel)}</span>`;
   const googleInner = `${GOOGLE_LOGO_SVG}<span>${escapeHtml(googleLabel)}</span>`;
   if (preview) {
     appleBtn = `<span class="btn apple disabled" data-wallet="apple">${appleInner}</span>`;
     googleBtn = `<span class="btn google disabled" data-wallet="google">${googleInner}</span>`;
+    if (walletCards.length > 1) {
+      multiCardBlock = `<div class="card-list preview-list">${walletCards
+        .map(
+          (c) =>
+            `<div class="wallet-card-row"><div><strong>${escapeHtml(c.name)}</strong><span>${escapeHtml(c.typeLabel)} · ${escapeHtml(c.summary)}</span></div><span class="btn apple disabled">${escapeHtml(t.addCardApple)}</span></div>`,
+        )
+        .join('')}</div>`;
+    }
   } else if (data.profileComplete) {
-    if (showApple) {
+    if (multiApple && showApple) {
+      const appleLinks = walletCards
+        .filter((c) => c.appleDownloadUrl)
+        .map((c) => c.appleDownloadUrl!);
+      multiCardBlock = `<div class="card-list">
+        <p class="cards-title">${escapeHtml(t.cardsTitle)}</p>
+        ${walletCards
+          .map((c) =>
+            c.appleDownloadUrl
+              ? `<div class="wallet-card-row"><div><strong>${escapeHtml(c.name)}</strong><span>${escapeHtml(c.typeLabel)} · ${escapeHtml(c.summary)}</span></div><a class="btn apple card-add" data-wallet="apple" href="${escapeHtml(c.appleDownloadUrl)}">${escapeHtml(t.addCardApple)}</a></div>`
+              : '',
+          )
+          .join('')}
+        <button type="button" class="btn apple" id="add-all-apple" data-wallet="apple">${APPLE_LOGO_SVG}<span>${escapeHtml(t.addAllApple)}</span></button>
+        <script type="application/json" id="apple-links">${JSON.stringify(appleLinks).replace(/</g, '\\u003c')}</script>
+      </div>`;
+    } else if (showApple) {
       appleBtn = data.appleDownloadUrl
         ? `<a class="btn apple" data-wallet="apple" href="${escapeHtml(data.appleDownloadUrl)}">${appleInner}</a>`
         : data.appleAvailable
           ? ''
           : `<p class="muted" data-wallet="apple">${escapeHtml(t.appleUnavailable)}</p>`;
     }
-    if (showGoogle) {
+    if (showGoogle && !multiApple) {
       googleBtn = data.googleSaveUrl
         ? `<a class="btn google" data-wallet="google" href="${escapeHtml(data.googleSaveUrl)}">${googleInner}</a>`
         : `<p class="muted" data-wallet="google">${escapeHtml(t.googleUnavailable)}</p>`;
@@ -318,7 +481,7 @@ export function renderInviteHtml(data: InvitePageRenderData): string {
     : '';
 
   const formBlock = needsForm
-    ? `<form id="profile-form" class="form">
+    ? `<form id="profile-form" class="form" novalidate>
         <p class="form-title">${escapeHtml(formTitle)}</p>
         ${nameField}
         ${bdayField}
@@ -335,15 +498,44 @@ export function renderInviteHtml(data: InvitePageRenderData): string {
   const actionsBlock = showActions
     ? `<div class="actions" id="wallet-actions">
         <p class="cta-hint">${escapeHtml(ctaHint)}</p>
+        ${multiCardBlock}
         ${appleBtn}
         ${googleBtn}
       </div>`
     : `<div class="actions" id="wallet-actions" hidden></div>`;
 
-  const policiesHtml =
-    data.invitePolicies.length > 0
+  const addAllScript =
+    !preview && multiApple
+      ? `<script>
+(function () {
+  var btn = document.getElementById('add-all-apple');
+  var raw = document.getElementById('apple-links');
+  if (!btn || !raw) return;
+  btn.addEventListener('click', function () {
+    var links = [];
+    try { links = JSON.parse(raw.textContent || '[]'); } catch (e) { return; }
+    if (!links.length) return;
+    var i = 0;
+    function next() {
+      if (i >= links.length) return;
+      var a = document.createElement('a');
+      a.href = links[i++];
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      if (i < links.length) setTimeout(next, 1400);
+    }
+    next();
+  });
+})();
+</script>`
+      : '';
+
+  const renderPolicies = (policyList: InvitePolicy[]): string =>
+    policyList.length > 0
       ? `<nav class="policies" aria-label="${escapeHtml(t.policiesLabel)}">
-        ${data.invitePolicies
+        ${policyList
           .map(
             (p, i) =>
               `<button type="button" class="policy-link" data-policy-open="${i}">${escapeHtml(p.title)}</button>`,
@@ -360,8 +552,9 @@ export function renderInviteHtml(data: InvitePageRenderData): string {
           <div id="policy-modal-body" class="policy-modal-body"></div>
         </div>
       </div>
-      <script type="application/json" id="policy-data">${JSON.stringify(data.invitePolicies).replace(/</g, '\\u003c')}</script>`
+      <script type="application/json" id="policy-data">${JSON.stringify(policyList).replace(/</g, '\\u003c')}</script>`
       : '';
+  const policiesHtml = renderPolicies(data.invitePolicies);
 
   const policyModalScript =
     data.invitePolicies.length > 0
@@ -411,9 +604,24 @@ export function renderInviteHtml(data: InvitePageRenderData): string {
       if (!form) return;
       var err = document.getElementById('form-error');
       var saveFailed = ${saveFailedMsg};
+      var msgs = ${JSON.stringify({ nameShort: t.nameShort, birthdayMissing: t.birthdayMissing, fieldsMissing: t.fieldsMissing })};
       form.addEventListener('submit', function (e) {
         e.preventDefault();
         err.hidden = true;
+        // Tarayıcının doğrulama balonu mobilde görünmeyebiliyor; hatayı kendimiz gösteriyoruz
+        var nameEl = form.querySelector('input[name="displayName"]');
+        var monthEl = form.querySelector('select[name="birthMonth"]');
+        var dayEl = form.querySelector('select[name="birthDay"]');
+        var problem = null, target = null;
+        if (nameEl && (nameEl.value || '').trim().length < 2) { problem = msgs.nameShort; target = nameEl; }
+        else if (monthEl && !monthEl.value) { problem = msgs.birthdayMissing; target = monthEl; }
+        else if (dayEl && !dayEl.value) { problem = msgs.birthdayMissing; target = dayEl; }
+        if (problem) {
+          err.textContent = problem;
+          err.hidden = false;
+          if (target) { target.focus(); target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+          return;
+        }
         var fd = new FormData(form);
         var payload = {};
         if (fd.has('displayName')) payload.displayName = String(fd.get('displayName') || '').trim();
@@ -492,6 +700,96 @@ export function renderInviteHtml(data: InvitePageRenderData): string {
       : ' (Önizleme)'
     : '';
 
+  const dotCount = Math.min(Math.max(data.stampsRequired, 1), 20);
+  const filledIcon = data.stampIconFilledUrl ? escapeHtml(data.stampIconFilledUrl) : '';
+  const emptyIcon = data.stampIconEmptyUrl ? escapeHtml(data.stampIconEmptyUrl) : '';
+  // Kartın kendi damga görseli varsa onu, yoksa varsayılan daireleri kullan
+  const themeName = (data.stampTheme || 'COFFEE').toUpperCase();
+  const dotsFor = (fg: string) =>
+    Array.from({ length: dotCount }, (_, i) => {
+      const on = i < data.stampCount;
+      if (on && filledIcon) return `<span class="dot on dot-img"><img src="${filledIcon}" alt="" /></span>`;
+      if (!on && emptyIcon) return `<span class="dot dot-img"><img src="${emptyIcon}" alt="" /></span>`;
+      // Hazır tema: cüzdan kartıyla aynı 3D görsel; yoksa çizim
+      const src = resolveStampIconSrc(themeName, on);
+      if (src) return `<span class="dot dot-img${on ? ' on' : ''}"><img src="${escapeHtml(src)}" alt="" /></span>`;
+      const svg = presetIconSvg(themeName, on, fg);
+      return `<span class="dot dot-svg${on ? ' on' : ''}"><svg viewBox="0 0 64 64" aria-hidden="true">${svg}</svg></span>`;
+    }).join('');
+  const customLayout = sanitizeInviteLayout(data.layout) !== null;
+  const layout = sanitizeInviteLayout(data.layout) ?? DEFAULT_INVITE_LAYOUT;
+  const hasWallet = layout.some((b) => b.type === 'wallet');
+  const str = (v: unknown, fallback: string) =>
+    typeof v === 'string' && v ? v : fallback;
+
+  const renderBlock = (b: InviteBlock): string => {
+    const p = b.props;
+    switch (b.type) {
+      case 'card': {
+        const showLogo = p.showLogo !== false;
+        const showDots = p.showDots !== false;
+        const cardLogo = typeof p.logoUrl === 'string' && p.logoUrl
+          ? `<img class="logo" src="${escapeHtml(p.logoUrl)}" alt="" />`
+          : logoBlock;
+        const sized = `<img class="logo" style="width:${Number(p.logoWidth) || 150}px;height:${Number(p.logoHeight) || 40}px" src="${escapeHtml(typeof p.logoUrl === 'string' && p.logoUrl ? p.logoUrl : (data.logoUrl ?? ''))}" alt="" />`;
+        const logoOut = data.logoUrl || (typeof p.logoUrl === 'string' && p.logoUrl) ? sized : '';
+        const cardStyle = [
+          p.bgColor ? `background:${escapeHtml(String(p.bgColor))}` : '',
+          p.fgColor ? `color:${escapeHtml(String(p.fgColor))}` : '',
+        ].filter(Boolean).join(';');
+        // Özel düzende boş alan hiç gösterilmez; varsayılan düzende genel ayarlar kullanılır
+        const pick = (v: unknown, fallback: string) =>
+          customLayout ? (typeof v === 'string' ? v.trim() : '') : str(v, fallback).trim();
+        const hl = pick(p.headline, headline);
+        const sub = pick(p.subtitle, subtitle);
+        const status = pick(p.statusText, statusLine);
+        return `<div class="card"${cardStyle ? ` style="${cardStyle}"` : ''}>
+      ${showLogo ? logoOut || cardLogo : ''}
+      ${hl ? `<h1>${escapeHtml(hl)}</h1>` : ''}
+      ${sub ? `<div class="meta">${escapeHtml(sub)}</div>` : ''}
+      ${showDots ? `<div class="dots" aria-hidden="true">${dotsFor(String(p.fgColor || fg || '#FFFFFF'))}</div>` : ''}
+      <div class="stamp">${data.stampCount} / ${data.stampsRequired}</div>
+      ${status ? `<div class="meta">${escapeHtml(status)}</div>` : ''}
+    </div>`;
+      }
+      case 'text': {
+        const align = p.align === 'center' ? 'center' : 'left';
+        const size = p.size === 'lg' ? '1.15rem' : p.size === 'sm' ? '.85rem' : '1rem';
+        return `<div class="block-text" style="text-align:${align};font-size:${size}">${escapeHtml(String(p.text ?? '')).replace(/\n/g, '<br/>')}</div>`;
+      }
+      case 'image':
+        return p.url
+          ? `<div class="block-image" style="height:${Number(p.height) || 160}px"><img src="${escapeHtml(String(p.url))}" alt="" /></div>`
+          : '';
+      case 'spacer':
+        return `<div style="height:${Number(p.height) || 24}px" aria-hidden="true"></div>`;
+      case 'divider':
+        return '<hr class="block-divider" />';
+      case 'wallet':
+        if (!showActions) return '';
+        return `<div class="actions" id="wallet-actions">
+        <p class="cta-hint">${escapeHtml(str(p.ctaHint, ctaHint))}</p>
+        ${multiCardBlock}
+        ${appleBtn}
+        ${googleBtn}
+      </div>`;
+      case 'form':
+        return formBlock;
+      case 'legal':
+        return `<p class="note">${escapeHtml(str(p.text, legalText)).replace(/\n/g, '<br/>')}</p>`;
+      case 'policies':
+        return Array.isArray(p.items) && p.items.length
+          ? renderPolicies(p.items as InvitePolicy[])
+          : policiesHtml;
+      default:
+        return '';
+    }
+  };
+
+  const blocksHtml =
+    layout.map(renderBlock).join('\n') +
+    (hasWallet ? '' : `<div class="actions" id="wallet-actions" hidden></div>`);
+
   return `<!doctype html>
 <html lang="${data.locale}">
 <head>
@@ -500,56 +798,95 @@ export function renderInviteHtml(data: InvitePageRenderData): string {
   <title>${escapeHtml(data.tenantName)} — ${escapeHtml(t.pageTitleSuffix)}${previewSuffix}</title>
   ${localeSyncScript}
   <style>
-    :root { color-scheme: light dark; }
-    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin: 0; background: ${escapeHtml(pageBg)}; color: #f4f4f4; min-height: 100vh; }
-    .preview-banner { background: #f59e0b; color: #1a1a1a; text-align: center; font-size: .8rem; font-weight: 600; padding: 8px 12px; }
-    .wrap { max-width: 420px; margin: 0 auto; padding: 32px 20px 48px; }
-    .card {
-      background: ${escapeHtml(color)};
-      color: ${escapeHtml(fg)};
-      border-radius: 22px;
-      padding: 28px 24px;
-      box-shadow: 0 16px 48px rgba(0,0,0,.28);
+    :root { color-scheme: dark; --radius: 20px; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(120% 80% at 50% -10%, ${escapeHtml(pageBg)}, #0b0f0d 70%);
+      color: #f4f4f4; min-height: 100vh; -webkit-font-smoothing: antialiased;
     }
-    .logo { display: block; max-height: 48px; max-width: 160px; margin: 0 0 16px; object-fit: contain; }
-    h1 { font-size: 1.45rem; margin: 0 0 8px; letter-spacing: -0.02em; line-height: 1.2; }
-    .meta { opacity: .88; font-size: .95rem; line-height: 1.45; }
-    .stamp { font-size: 2.1rem; font-weight: 700; margin: 18px 0 6px; letter-spacing: -0.03em; }
-    .actions, .form { display: grid; gap: 12px; margin-top: 24px; }
-    .cta-hint { margin: 0 0 4px; font-size: .9rem; opacity: .75; line-height: 1.4; }
-    .btn { display: flex; align-items: center; justify-content: center; gap: 10px; text-align: center; text-decoration: none; padding: 14px 16px; border-radius: 12px; font-weight: 600; border: none; cursor: pointer; font-size: 1rem; box-sizing: border-box; }
-    .btn-logo { width: 24px; height: 24px; flex-shrink: 0; display: block; }
+    .preview-banner { background: #f59e0b; color: #1a1a1a; text-align: center; font-size: .8rem; font-weight: 600; padding: 10px 12px; }
+    .wrap { width: 100%; max-width: 460px; margin: 0 auto; padding: 20px 16px 40px; }
+    @media (min-width: 640px) { .wrap { padding: 40px 24px 56px; } }
+
+    .lang-switch { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(255,255,255,.08); margin: 0 0 16px auto; width: max-content; }
+    .lang-switch { display: flex; justify-content: flex-end; }
+    .lang-switch a { color: rgba(255,255,255,.6); font-size: .75rem; text-decoration: none; font-weight: 600; padding: 5px 11px; border-radius: 999px; }
+    .lang-switch a.active { background: #fff; color: #111; }
+
+    .card {
+      position: relative; overflow: hidden;
+      background: ${escapeHtml(color)}; color: ${escapeHtml(fg)};
+      border-radius: var(--radius); padding: 24px;
+      box-shadow: 0 18px 50px rgba(0,0,0,.35);
+    }
+    .card::after { content: ""; position: absolute; inset: auto -40% -60% auto; width: 240px; height: 240px; border-radius: 50%; background: rgba(255,255,255,.08); pointer-events: none; }
+    .logo { display: block; height: 40px; width: auto; max-width: 100%; margin: 0 0 14px; object-fit: contain; object-position: left center; }
+    h1 { font-size: clamp(1.25rem, 4.5vw, 1.5rem); margin: 0 0 6px; letter-spacing: -0.02em; line-height: 1.2; }
+    .meta { opacity: .88; font-size: .92rem; line-height: 1.45; }
+    .stamp { font-size: clamp(1.9rem, 8vw, 2.4rem); font-weight: 750; margin: 18px 0 10px; letter-spacing: -0.03em; }
+    .dots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px 0 16px; width: 100%; }
+    .dot-img img { width: 100%; height: 100%; object-fit: contain; border-radius: 50%; }
+    .dot-svg { border: none; background: transparent; padding: 0; opacity: 1; }
+    .dot-svg svg { width: 100%; height: 100%; display: block; }
+    .dot-img { padding: 0; overflow: hidden; border: none; background: transparent; }
+    .dot { aspect-ratio: 1; border-radius: 50%; border: 1.5px dashed rgba(255,255,255,.55); display: grid; place-items: center; font-size: .7rem; font-weight: 700; opacity: .8; }
+    .dot.on { background: #fff; color: ${escapeHtml(color)}; border: 1.5px solid #fff; opacity: 1; }
+
+    .actions, .form { display: grid; gap: 12px; margin-top: 22px; }
+    .cta-hint { margin: 0 0 2px; font-size: .9rem; opacity: .75; line-height: 1.45; }
+    .btn { display: flex; align-items: center; justify-content: center; gap: 10px; text-align: center; text-decoration: none; min-height: 52px; padding: 14px 16px; border-radius: 14px; font-weight: 600; border: none; cursor: pointer; font-size: 1rem; width: 100%; font-family: inherit; transition: transform .15s ease, opacity .15s ease; }
+    .btn:active { transform: scale(.985); }
+    .btn-logo { width: 22px; height: 22px; flex-shrink: 0; display: block; }
     .btn.apple { background: #000; color: #fff; border: 1px solid #333; }
     .btn.google { background: #fff; color: #1f1f1f; border: 1px solid #dadce0; }
-    .btn.save { background: #fff; color: #111; display: block; }
+    .btn.save { background: #fff; color: #111; }
     .btn.disabled { opacity: .85; cursor: default; pointer-events: none; }
+    .card-list { display: grid; gap: 10px; width: 100%; }
+    .cards-title { margin: 0 0 2px; font-size: .78rem; font-weight: 600; opacity: .85; text-transform: uppercase; letter-spacing: .08em; }
+    .wallet-card-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); }
+    .wallet-card-row strong { display: block; font-size: .95rem; }
+    .wallet-card-row span { display: block; font-size: .78rem; opacity: .7; margin-top: 2px; }
+    .btn.card-add { width: auto; min-height: 40px; padding: 8px 14px; font-size: .85rem; flex-shrink: 0; }
     .muted { opacity: .7; font-size: .9rem; }
-    .note { margin-top: 28px; font-size: .78rem; opacity: .55; line-height: 1.45; white-space: pre-wrap; }
-    .form-title { font-weight: 600; margin: 0; }
-    label { display: grid; gap: 6px; font-size: .85rem; opacity: .9; }
-    input, select { padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.28); color: #fff; font-size: 1rem; }
+    .note { margin-top: 26px; font-size: .78rem; opacity: .6; line-height: 1.5; white-space: pre-wrap; }
+
+    .form { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); border-radius: var(--radius); padding: 18px; }
+    .form-title { font-weight: 650; margin: 0 0 2px; font-size: 1rem; }
+    label { display: grid; gap: 6px; font-size: .85rem; opacity: .92; }
+    input, select {
+      width: 100%; min-height: 48px; padding: 12px 14px; border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.16); background: rgba(0,0,0,.3); color: #fff;
+      font-size: 16px; /* iOS yakınlaştırmasını önler */ font-family: inherit; outline: none;
+    }
+    input:focus, select:focus { border-color: ${escapeHtml(color)}; box-shadow: 0 0 0 3px rgba(255,255,255,.12); }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .hint { font-size: .75rem; opacity: .6; margin: 0; }
     .error { color: #ffb4a8; font-size: .85rem; margin: 0; }
-    .policies { margin-top: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; }
-    .policy-link { background: none; border: none; padding: 0; color: rgba(255,255,255,.65); font-size: .78rem; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-family: inherit; }
+    .policies { margin-top: 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 6px; }
+    .policy-link { background: none; border: none; padding: 4px 0; color: rgba(255,255,255,.7); font-size: .8rem; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-family: inherit; }
     .policy-link:hover { color: #fff; }
-    .policy-sep { color: rgba(255,255,255,.35); font-size: .78rem; user-select: none; }
-    .policy-modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end; justify-content: center; padding: 16px; }
+    .policy-sep { color: rgba(255,255,255,.35); font-size: .8rem; user-select: none; }
+    .policy-modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end; justify-content: center; padding: 12px; }
     .policy-modal[hidden] { display: none !important; }
-    .policy-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.55); }
-    .policy-modal-sheet { position: relative; width: 100%; max-width: 420px; max-height: min(72vh, 560px); overflow: auto; background: #1a1f1c; color: #f4f4f4; border-radius: 18px; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 20px 50px rgba(0,0,0,.45); padding: 18px 18px 22px; }
+    .policy-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.6); }
+    .policy-modal-sheet { position: relative; width: 100%; max-width: 480px; max-height: min(78vh, 600px); overflow: auto; background: #161b18; color: #f4f4f4; border-radius: 20px; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 20px 50px rgba(0,0,0,.5); padding: 18px 18px 24px; }
     .policy-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
     .policy-modal-head h2 { margin: 0; font-size: 1.05rem; line-height: 1.3; }
-    .policy-modal-x { background: rgba(255,255,255,.08); border: none; color: #fff; width: 32px; height: 32px; border-radius: 999px; font-size: 1.25rem; line-height: 1; cursor: pointer; flex-shrink: 0; }
-    .policy-modal-body { font-size: .88rem; line-height: 1.55; opacity: .88; white-space: pre-wrap; }
-    .lang-switch { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 12px; }
-    .lang-switch a { color: rgba(255,255,255,.55); font-size: .75rem; text-decoration: none; font-weight: 600; }
-    .lang-switch a.active { color: #fff; }
+    .policy-modal-x { background: rgba(255,255,255,.08); border: none; color: #fff; width: 36px; height: 36px; border-radius: 999px; font-size: 1.25rem; line-height: 1; cursor: pointer; flex-shrink: 0; }
+    .policy-modal-body { font-size: .9rem; line-height: 1.6; opacity: .9; white-space: pre-wrap; }
+    .block-text { margin: 18px 4px 0; line-height: 1.55; }
+    .block-image { margin: 18px 0 0; border-radius: 16px; overflow: hidden; background: rgba(255,255,255,.04); }
+    .block-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .block-divider { border: 0; border-top: 1px solid rgba(255,255,255,.12); margin: 22px 0; }
+    .wrap > * + * { margin-top: 0; }
     [data-wallet][hidden] { display: none !important; }
     @media (min-width: 480px) {
       .policy-modal { align-items: center; }
+      .actions.two { grid-template-columns: 1fr 1fr; }
     }
+    @media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
   </style>
 </head>
 <body>
@@ -559,19 +896,10 @@ export function renderInviteHtml(data: InvitePageRenderData): string {
       <a href="?lang=tr" class="${data.locale === 'tr' ? 'active' : ''}">TR</a>
       <a href="?lang=en" class="${data.locale === 'en' ? 'active' : ''}">EN</a>
     </div>
-    <div class="card">
-      ${logoBlock}
-      <h1>${escapeHtml(headline)}</h1>
-      <div class="meta">${escapeHtml(subtitle)}</div>
-      <div class="stamp">${data.stampCount} / ${data.stampsRequired}</div>
-      <div class="meta">${escapeHtml(statusLine)}</div>
-    </div>
-    ${formBlock}
-    ${actionsBlock}
-    <p class="note">${escapeHtml(legalText).replace(/\n/g, '<br/>')}</p>
-    ${policiesHtml}
+    ${blocksHtml}
   </div>
   ${platformRefineScript}
+  ${addAllScript}
   ${policyModalScript}
   ${scriptBlock}
 </body>

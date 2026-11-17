@@ -69,8 +69,8 @@ export default function PlatformHelpPage() {
       <div className="w-full space-y-6">
         <PageHeader
           eyebrow="Destek"
-          title="Platform yardımı"
-          subtitle="Tenant oluşturma, abonelik ve operasyon rehberi."
+          title="Yönetici rehberi"
+          subtitle="İşletme açma, abonelik ve operasyon rehberi."
           actions={
             <Link href="/platform" className={btnGhost()}>
               ← Özet

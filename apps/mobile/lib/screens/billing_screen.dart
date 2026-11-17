@@ -69,8 +69,9 @@ class _BillingScreenState extends State<BillingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: kAccent));
+      return Center(child: CircularProgressIndicator(color: c.accent));
     }
     if (_error != null) {
       return EmptyState(title: _error!);
@@ -95,7 +96,7 @@ class _BillingScreenState extends State<BillingScreen> {
               Text(
                 t.isActive ? 'Hesap açık' : 'Hesap kapalı',
                 style: TextStyle(
-                  color: t.isActive ? kAccent : Colors.red,
+                  color: t.isActive ? c.accent : Colors.red,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -146,8 +147,8 @@ class _BillingScreenState extends State<BillingScreen> {
                         width: 6,
                         height: 6,
                         margin: const EdgeInsets.only(top: 7, right: 10),
-                        decoration: const BoxDecoration(
-                          color: kAccent,
+                        decoration: BoxDecoration(
+                          color: c.accent,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -159,12 +160,12 @@ class _BillingScreenState extends State<BillingScreen> {
               const SizedBox(height: 8),
               Text(
                 _statusHint(status),
-                style: const TextStyle(color: kMuted, height: 1.45, fontSize: 13),
+                style: TextStyle(color: c.muted, height: 1.45, fontSize: 13),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Faturalama: destek@dokunkazan.com',
-                style: TextStyle(color: kMuted, fontSize: 12),
+                style: TextStyle(color: c.muted, fontSize: 12),
               ),
             ],
           ),
@@ -188,12 +189,13 @@ class _BillingScreenState extends State<BillingScreen> {
   }
 
   Widget _row(String label, String value) {
+    final c = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: kMuted)),
+          Text(label, style: TextStyle(color: c.muted)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
       ),
