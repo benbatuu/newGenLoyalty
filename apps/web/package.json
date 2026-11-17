@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack --port 3000",
-    "build": "next build --turbopack",
+    "build": "pnpm --dir ../../packages/shared run build && next build --turbopack",
     "start": "next start --port 3000",
     "lint": "eslint",
     "test": "node --import tsx --test src/lib/*.test.ts scripts/*.test.mjs"
