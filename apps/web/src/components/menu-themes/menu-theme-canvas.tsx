@@ -1442,7 +1442,7 @@ function RenderBlock({
           <input
             value={search}
             onChange={(e) => onSearch(e.target.value)}
-            placeholder={block.placeholder || tt("search")}
+            placeholder={pickMenuLocale(block.placeholder, lang) || tt("search")}
             disabled={!interactive}
             style={{
               width: "100%",
