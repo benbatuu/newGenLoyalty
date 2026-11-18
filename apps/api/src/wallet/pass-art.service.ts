@@ -1,5 +1,6 @@
 import { presetIconSvg } from './stamp-presets';
 import { Injectable, Logger } from '@nestjs/common';
+import { ObjectStorageService } from '../storage/object-storage.service';
 import {
   MAX_WALLET_STAMP_SLOTS,
   computeStampGrid,
@@ -83,6 +84,7 @@ export { computeStampGrid, MAX_WALLET_STAMP_SLOTS };
 @Injectable()
 export class PassArtService {
   private readonly logger = new Logger(PassArtService.name);
+  constructor(private readonly objects: ObjectStorageService) {}
   /** Aynı Thiings URL'sini strip başına tekrar indirmeyi önler */
   private readonly remotePngCache = new Map<string, Promise<Buffer | null>>();
 
@@ -600,6 +602,14 @@ export class PassArtService {
         if (local) return local;
       }
 
+      // Depolama anahtarı (tenants/...) varsa CDN/özel host fark etmeksizin R2'den oku
+      const tenantsIdx = url.indexOf('tenants/');
+      if (tenantsIdx >= 0 && this.objects.isConfigured()) {
+        const key = url.slice(tenantsIdx).split('?')[0]!;
+        const obj = await this.objects.getObject(key);
+        if (obj?.body?.length) return obj.body;
+      }
+
       let fetchUrl = url;
       try {
         const u = new URL(url);
@@ -610,6 +620,11 @@ export class PassArtService {
             if (parts.length >= 2 && parts[1] === 'tenants') {
               key = parts.slice(1).join('/');
             }
+          }
+          // Önce R2'den doğrudan oku (HTTP zaman aşımı / yetki sorunlarını atlar)
+          if (key.startsWith('tenants/') && this.objects.isConfigured()) {
+            const obj = await this.objects.getObject(key);
+            if (obj?.body?.length) return obj.body;
           }
           if (key.startsWith('tenants/')) {
             const api =
