@@ -55,7 +55,7 @@ export function ApplePassFront({
         <div className="flex min-w-0 items-center gap-2">
           {logo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logo} alt="" className="h-[30px] max-w-[120px] object-contain object-left" />
+            <img src={logo} alt="" className="h-[45px] max-w-[145px] object-contain object-left" />
           ) : null}
           {logoText ? (
             <span className="truncate text-[15px] leading-tight">{logoText}</span>

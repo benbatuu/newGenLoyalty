@@ -478,60 +478,39 @@ export class PassArtService {
   }
 
   /**
-   * Pass header logo (@1x / @2x).
-   * Apple slot ≈ 160×50 pt (320×100 @2x). Square uploads must be LEFT-aligned
-   * and height-maximized — `fit:contain` centering leaves empty gap on the left
-   * (looks like reserved logoText space even when logoText is omitted).
+   * Pass header logo (@1x / @2x / @3x). Apple üst logo alanı en fazla
+   * 160×50pt: @1x 160×50, @2x 320×100, @3x 480×150 px. Yüklenen görsel
+   * kırpılmaz; en-boy korunarak bu kutuya sığdırılır (küçükse büyütülür).
    */
   async buildLogoAssets(
     logoUrl: string | null | undefined,
-  ): Promise<{ logo: Buffer; logo2x: Buffer } | null> {
+  ): Promise<{ logo: Buffer; logo2x: Buffer; logo3x: Buffer } | null> {
     const buf = await this.loadImageBuffer(logoUrl);
     if (!buf) return null;
     try {
-      // Önizlemeyle aynı görsel: kenar kırpma yok, en-boy korunur
-      const source = buf;
-
-      const fitted2x = await sharp(source)
-        .resize({
-          width: LOGO_W,
-          height: LOGO_H,
-          fit: 'inside',
-          background: { r: 0, g: 0, b: 0, alpha: 0 },
-        })
-        .ensureAlpha()
-        .png()
-        .toBuffer();
-
-      const meta = await sharp(fitted2x).metadata();
-      const w = meta.width ?? LOGO_W;
-      const h = meta.height ?? LOGO_H;
-      const top = Math.max(0, Math.floor((LOGO_H - h) / 2));
-
-      const logo2x = await sharp({
-        create: {
-          width: LOGO_W,
-          height: LOGO_H,
-          channels: 4,
-          background: { r: 0, g: 0, b: 0, alpha: 0 },
-        },
-      })
-        .composite([{ input: fitted2x, left: 0, top }])
-        .png()
-        .toBuffer();
-
-      const logo = await sharp(logo2x)
-        .resize(Math.floor(LOGO_W / 2), Math.floor(LOGO_H / 2))
-        .png()
-        .toBuffer();
-      return { logo, logo2x };
+      const fit = (w: number, h: number) =>
+        sharp(buf)
+          .resize({
+            width: w,
+            height: h,
+            fit: 'inside',
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+          })
+          .ensureAlpha()
+          .png()
+          .toBuffer();
+      const [logo, logo2x, logo3x] = await Promise.all([
+        fit(LOGO_W / 2, LOGO_H / 2),
+        fit(LOGO_W, LOGO_H),
+        fit(LOGO_W * 1.5, LOGO_H * 1.5),
+      ]);
+      return { logo, logo2x, logo3x };
     } catch (err) {
       this.logger.warn(`Logo indirilemedi: ${(err as Error).message}`);
       return null;
     }
   }
 
-  /** Lock-screen / Wallet bildirim ikonu — koyu zemin şeffaflaştırılır, açık plaka */
   async buildNotifyIconAssets(
     iconUrl: string | null | undefined,
     _backgroundColor?: string | null,

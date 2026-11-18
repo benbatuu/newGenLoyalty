@@ -1835,6 +1835,7 @@ export class WalletService {
       background3xPng: backgroundArt?.background3x,
       logoPng: logoArt?.logo,
       logo2xPng: logoArt?.logo2x,
+      logo3xPng: logoArt?.logo3x,
       iconPng: iconArt?.icon,
       icon2xPng: iconArt?.icon2x,
       icon3xPng: iconArt?.icon3x,
