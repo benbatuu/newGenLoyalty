@@ -86,7 +86,7 @@ export function CardCarousel({
         </p>
       </div>
 
-      <div className="grid justify-items-center gap-x-8 gap-y-10 pb-4 pt-2 sm:grid-cols-2 xl:grid-cols-3 [&>*]:w-full [&>*]:max-w-[340px]">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(0,340px))] justify-start gap-x-8 gap-y-10 pb-4 pt-2 [&>*]:w-full [&>*]:max-w-[340px]">
         {programs.map((p) => (
           <button
             key={p.id}

@@ -552,7 +552,7 @@ export class TenantsService {
       lastSentAt: tenant.passBroadcastAt,
       applePassCount: passCount,
       registeredDevices: deviceCount,
-      notifyIconUrl: tenant.notifyIconUrl,
+      notifyIconUrl: this.assets.rewriteStoredAssetUrl(tenant.notifyIconUrl),
       name: tenant.name,
       primaryColor: tenant.primaryColor,
       history: history.map((row) => ({

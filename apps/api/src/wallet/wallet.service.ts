@@ -29,7 +29,7 @@ import { GoogleWalletService } from './google-wallet.service';
 import { PassArtService } from './pass-art.service';
 import {
   stripBroadcastStamps,
-  withBroadcastStamp,
+  withBroadcastMarker,
 } from './broadcast-message.util';
 import { parseInvitePolicies, sanitizeInviteLayout } from './invite-page';
 import {
@@ -877,9 +877,10 @@ export class WalletService {
     if (!tenant) throw new NotFoundException('Kafe bulunamadı');
 
     // Aynı metin tekrarında Apple changeMessage tetiklenmez — zaman damgası ekle
-    const previousClean = stripBroadcastStamps(tenant.passBroadcastMessage ?? '');
+    const previousRaw = tenant.passBroadcastMessage ?? '';
+    const previousClean = stripBroadcastStamps(previousRaw);
     const value =
-      previousClean === clean ? withBroadcastStamp(clean) : clean;
+      previousClean === clean ? withBroadcastMarker(clean, previousRaw) : clean;
 
     const sentAt = new Date();
     await this.prisma.tenant.update({
@@ -1771,10 +1772,13 @@ export class WalletService {
     const orgName = branding.orgName;
 
     // Logo varsa yalnızca kullanıcı açıkça üst yazı girdiyse onu göster (Apple logonun yanında yazar).
+    // "" = kullanıcı üst yazıyı bilerek boşalttı → orgName ile doldurma
     const explicitLogoText = branding.logoText?.trim();
-    const logoText = logoArt?.logo
-      ? explicitLogoText || undefined
-      : explicitLogoText || orgName;
+    const clearedTopText = branding.logoText === '';
+    const logoText =
+      logoArt?.logo || clearedTopText
+        ? explicitLogoText || undefined
+        : explicitLogoText || orgName;
 
     const enrichment = programId
       ? { extraAuxiliaryFields: display!.extraAuxiliaryFields, stampNotifyValue: undefined }
@@ -1807,7 +1811,9 @@ export class WalletService {
       showStampField: branding.showStampField,
       showRewardField: branding.showRewardField,
       showStatusField: branding.showStatusField,
-      showBroadcastField: tenant.showBroadcastField,
+      // Program kartında ön yüz yalnızca panel önizlemesindeki alanları gösterir;
+      // tenant duyurusu ön yüze eklenmez (arka yüz + changeMessage ile yine gider).
+      showBroadcastField: programId ? false : tenant.showBroadcastField,
       rewardReadyText: tenant.rewardReadyText ?? undefined,
       stampsRemainingTemplate: tenant.stampsRemainingTemplate ?? undefined,
       headerFieldLabel: tenant.headerFieldLabel ?? undefined,

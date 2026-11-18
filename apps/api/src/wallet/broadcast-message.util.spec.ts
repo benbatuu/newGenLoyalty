@@ -1,6 +1,6 @@
 import {
   stripBroadcastStamps,
-  withBroadcastStamp,
+  withBroadcastMarker,
 } from './broadcast-message.util';
 
 describe('broadcast-message.util', () => {
@@ -9,23 +9,26 @@ describe('broadcast-message.util', () => {
       expect(stripBroadcastStamps('  Merhabalar  ')).toBe('Merhabalar');
     });
 
-    it('removes one trailing time stamp', () => {
-      expect(stripBroadcastStamps('Merhabalar · 00:26')).toBe('Merhabalar');
-    });
-
-    it('removes multiple accumulated stamps', () => {
+    it('removes legacy time stamps', () => {
       expect(stripBroadcastStamps('Merhabalar · 00:26 · 00:31')).toBe(
         'Merhabalar',
       );
     });
+
+    it('removes invisible markers', () => {
+      expect(stripBroadcastStamps('Merhabalar​')).toBe('Merhabalar');
+    });
   });
 
-  describe('withBroadcastStamp', () => {
-    it('appends Turkish time suffix', () => {
-      const at = new Date('2026-09-03T00:26:00+03:00');
-      expect(withBroadcastStamp('Merhabalar', at)).toMatch(
-        /^Merhabalar · \d{2}:\d{2}$/,
+  describe('withBroadcastMarker', () => {
+    it('adds a marker only when the text is unchanged', () => {
+      expect(withBroadcastMarker('Merhabalar', 'Merhabalar')).toBe(
+        'Merhabalar​',
       );
+    });
+
+    it('keeps text as-is when it differs from the previous one', () => {
+      expect(withBroadcastMarker('Merhabalar', 'Eski')).toBe('Merhabalar');
     });
   });
 });

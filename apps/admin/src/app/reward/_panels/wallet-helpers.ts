@@ -94,8 +94,11 @@ export function draftFromProgramWallet(
     expirationDate: isoToLocalInput(wt.expirationDate as string | undefined),
     suppressStripShine: wt.suppressStripShine === true,
     sharingProhibited: wt.sharingProhibited === true,
+    // Kullanıcı alanı bilerek boşalttıysa (kayıtlı ""), tenant adını geri doldurma
     logoText:
-      (wt.logoText as string) || tenant.logoText || programName || tenant.name,
+      typeof wt.logoText === "string"
+        ? (wt.logoText as string)
+        : tenant.logoText || programName || tenant.name,
     passDescription:
       (wt.passDescription as string) ||
       tenant.passDescription ||
@@ -151,7 +154,7 @@ export function walletTemplatePayload(draft: ProgramWalletDraft) {
     expirationDate: localInputToIso(draft.expirationDate),
     suppressStripShine: draft.suppressStripShine,
     sharingProhibited: draft.sharingProhibited,
-    logoText: draft.logoText.trim() || null,
+    logoText: draft.logoText.trim(),
     passDescription: draft.passDescription.trim() || null,
     stampFieldLabel: draft.stampFieldLabel.trim() || null,
     rewardFieldLabel: draft.rewardFieldLabel.trim() || null,
