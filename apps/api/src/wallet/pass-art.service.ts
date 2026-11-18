@@ -489,8 +489,8 @@ export class PassArtService {
     const buf = await this.loadImageBuffer(logoUrl);
     if (!buf) return null;
     try {
-      const trimmed = await sharp(buf).trim({ threshold: 4 }).png().toBuffer();
-      const source = trimmed.length > 64 ? trimmed : buf;
+      // Önizlemeyle aynı görsel: kenar kırpma yok, en-boy korunur
+      const source = buf;
 
       const fitted2x = await sharp(source)
         .resize({
