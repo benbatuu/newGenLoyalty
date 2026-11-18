@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   STORE_CARD_IMAGE_SPECS,
   defaultGroupStampTheme,
@@ -12,9 +11,9 @@ import { StampGlyph, STAMP_THEMES } from "../../../components/stamp-glyph";
 import type { MultiStampDraft } from "../multi-stamp-panel";
 import { ColorField, IconUploadField } from "./wallet-fields";
 import { getGroupStampStyle } from "./wallet-helpers";
+import { StampsSection } from "./passkit-sections";
 import {
   BACK_FIELD_PRESETS,
-  INSETS,
   type GroupPreviewItem,
   type ProgramWalletDraft,
   type WalletBackField,
@@ -23,6 +22,7 @@ import {
 export type WalletDesignFormProps = {
   programId: string;
   programName: string;
+  stampsRequired: number;
   draft: ProgramWalletDraft;
   onChange: (draft: ProgramWalletDraft) => void;
   uploadBusy: string | null;
@@ -35,11 +35,15 @@ export type WalletDesignFormProps = {
   groupPreviewItems: GroupPreviewItem[];
   effectiveFilledUrl: string | null;
   effectiveEmptyUrl: string | null;
+  /** Kart detayı sayfasında düzenleyici zaten ayrı sekme: bağlantıyı gizle */
+  /** Hangi bölüm gösterilsin (sekmelere göre) */
+  section?: "brand" | "stamps" | "fields" | "back";
 };
 
 export function WalletDesignForm({
   programId,
   programName,
+  stampsRequired,
   draft,
   onChange,
   uploadBusy,
@@ -52,8 +56,8 @@ export function WalletDesignForm({
   groupPreviewItems,
   effectiveFilledUrl,
   effectiveEmptyUrl,
+  section = "brand",
 }: WalletDesignFormProps) {
-  const [face, setFace] = useState<"front" | "back">("front");
 
   function patchBackField(key: WalletBackField["key"], patch: Partial<WalletBackField>) {
     const existing = draft.backFields.find((f) => f.key === key);
@@ -102,108 +106,7 @@ export function WalletDesignForm({
 
   return (
     <div className="space-y-4">
-      {/* Front / Back Tab Switch */}
-      <div className="flex rounded-lg border border-[var(--line)] bg-[var(--surface)] p-1">
-        <button
-          type="button"
-          onClick={() => setFace("front")}
-          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${face === "front"
-            ? "bg-[var(--panel)] text-[var(--ink)] shadow-sm"
-            : "text-[var(--muted)] hover:text-[var(--ink)]"
-            }`}
-        >
-          🎨 Ön Yüz
-        </button>
-        <button
-          type="button"
-          onClick={() => setFace("back")}
-          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${face === "back"
-            ? "bg-[var(--panel)] text-[var(--ink)] shadow-sm"
-            : "text-[var(--muted)] hover:text-[var(--ink)]"
-            }`}
-        >
-          📝 Arka Yüz
-        </button>
-      </div>
-
-      {face === "back" ? (
-        <div className="space-y-4">
-          <SoftBox>
-            <p className="text-sm font-medium text-[var(--ink)]">Arka yüz alanları</p>
-            <p className="mt-0.5 text-xs text-[var(--muted)]">
-              Apple Wallet’da kartı çeviren müşteri, bu bilgileri görür. Doldurulmayanlar gösterilmez.
-            </p>
-          </SoftBox>
-
-          {BACK_FIELD_PRESETS.map((preset) => {
-            const field = getBackFieldValue(preset.key);
-            const currentLabel = field?.label ?? preset.label;
-            const currentValue = field?.value ?? "";
-
-            return (
-              <div
-                key={preset.key}
-                className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-[var(--ink)]">{preset.label}</p>
-                  {currentValue && (
-                    <button
-                      type="button"
-                      className="text-xs text-red-500 hover:text-red-700"
-                      onClick={() =>
-                        onChange({
-                          ...draft,
-                          backFields: draft.backFields.filter((f) => f.key !== preset.key),
-                        })
-                      }
-                    >
-                      ✕ Kaldır
-                    </button>
-                  )}
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Field label="Kısa yazı">
-                    <input
-                      className={inputClassName()}
-                      value={currentLabel}
-                      maxLength={50}
-                      placeholder={preset.label}
-                      onChange={(e) =>
-                        patchBackField(preset.key, {
-                          label: e.target.value,
-                          value: currentValue,
-                        })
-                      }
-                    />
-                  </Field>
-                  <Field label="Bilgi">
-                    <input
-                      className={inputClassName()}
-                      value={currentValue}
-                      placeholder={preset.placeholder}
-                      maxLength={200}
-                      onChange={(e) =>
-                        patchBackField(preset.key, {
-                          label: currentLabel,
-                          value: e.target.value,
-                        })
-                      }
-                    />
-                  </Field>
-                </div>
-                {(preset.type === "phone" || preset.type === "email" || preset.type === "url") && currentValue && (
-                  <p className="text-[11px] text-[var(--muted)]">
-                    {preset.type === "phone" && "☎️ Bağlantı linkħi otomatik oluşturulur (tel:...)"}
-                    {preset.type === "email" && "✉️ Bağlantı linkħi otomatik oluşturulur (mailto:...)"}
-                    {preset.type === "url" && "🔗 URL, tap’ta açılır"}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
+      {section === "brand" && (
         <>
           <div className="grid gap-3 sm:grid-cols-3">
             <ColorField
@@ -301,6 +204,37 @@ export function WalletDesignForm({
                 }
                 onClear={() => onChange({ ...draft, backgroundImageUrl: "" })}
               />
+            </div>
+          </SoftBox>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Kartın üst yazısı">
+          <input
+            className={inputClassName()}
+            value={draft.logoText}
+            onChange={(e) => onChange({ ...draft, logoText: e.target.value })}
+            placeholder={programName}
+            maxLength={40}
+          />
+        </Field>
+        <Field label="Kartın kısa açıklaması">
+          <input
+            className={inputClassName()}
+            value={draft.passDescription}
+            onChange={(e) =>
+              onChange({ ...draft, passDescription: e.target.value })
+            }
+            placeholder={programName}
+            maxLength={120}
+          />
+        </Field>
+      </div>
+
+        </>
+      )}
+
+      {section === "stamps" && showStampStrip && (
+        <>
               {showStampStrip && (
                 <IconUploadField
                   label="Damga şeridi resmi"
@@ -316,13 +250,6 @@ export function WalletDesignForm({
                   onClear={() => onChange({ ...draft, stripImageUrl: "" })}
                 />
               )}
-            </div>
-          </SoftBox>
-        </>
-      )}
-
-      {showStampStrip && (
-        <>
           {!isMultiStampCombined && (
             <>
               <Field label="Damga simgesi">
@@ -512,50 +439,19 @@ export function WalletDesignForm({
             </div>
           )}
 
-          <Field label="Damgaların kenar boşluğu">
-            <div className="flex flex-wrap gap-2">
-              {INSETS.map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  title={opt.hint}
-                  className={`rounded-lg border px-3 py-2 text-sm transition ${draft.stampInset === opt.id
-                    ? "border-[var(--ink)] bg-[var(--surface)] font-medium"
-                    : "border-[var(--line)] hover:bg-[var(--surface)]"
-                    }`}
-                  onClick={() => onChange({ ...draft, stampInset: opt.id })}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </Field>
+          <StampsSection
+            draft={draft}
+            onChange={onChange}
+            stampsRequired={stampsRequired}
+            showEditor={!isMultiStampCombined}
+            filledUrl={effectiveFilledUrl}
+            emptyUrl={effectiveEmptyUrl}
+          />
         </>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Kartın üst yazısı">
-          <input
-            className={inputClassName()}
-            value={draft.logoText}
-            onChange={(e) => onChange({ ...draft, logoText: e.target.value })}
-            placeholder={programName}
-            maxLength={40}
-          />
-        </Field>
-        <Field label="Kartın kısa açıklaması">
-          <input
-            className={inputClassName()}
-            value={draft.passDescription}
-            onChange={(e) =>
-              onChange({ ...draft, passDescription: e.target.value })
-            }
-            placeholder={programName}
-            maxLength={120}
-          />
-        </Field>
-      </div>
-
+      {section === "fields" && (
+        <>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Damga yazısı">
           <input
@@ -585,6 +481,87 @@ export function WalletDesignForm({
           />
         </Field>
       </div>
+        </>
+      )}
+
+      {section === "back" && (
+        <div className="space-y-4">
+          <SoftBox>
+            <p className="text-sm font-medium text-[var(--ink)]">Arka yüz alanları</p>
+            <p className="mt-0.5 text-xs text-[var(--muted)]">
+              Apple Wallet’da kartı çeviren müşteri, bu bilgileri görür. Doldurulmayanlar gösterilmez.
+            </p>
+          </SoftBox>
+
+          {BACK_FIELD_PRESETS.map((preset) => {
+            const field = getBackFieldValue(preset.key);
+            const currentLabel = field?.label ?? preset.label;
+            const currentValue = field?.value ?? "";
+
+            return (
+              <div
+                key={preset.key}
+                className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-[var(--ink)]">{preset.label}</p>
+                  {currentValue && (
+                    <button
+                      type="button"
+                      className="text-xs text-red-500 hover:text-red-700"
+                      onClick={() =>
+                        onChange({
+                          ...draft,
+                          backFields: draft.backFields.filter((f) => f.key !== preset.key),
+                        })
+                      }
+                    >
+                      ✕ Kaldır
+                    </button>
+                  )}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Field label="Kısa yazı">
+                    <input
+                      className={inputClassName()}
+                      value={currentLabel}
+                      maxLength={50}
+                      placeholder={preset.label}
+                      onChange={(e) =>
+                        patchBackField(preset.key, {
+                          label: e.target.value,
+                          value: currentValue,
+                        })
+                      }
+                    />
+                  </Field>
+                  <Field label="Bilgi">
+                    <input
+                      className={inputClassName()}
+                      value={currentValue}
+                      placeholder={preset.placeholder}
+                      maxLength={200}
+                      onChange={(e) =>
+                        patchBackField(preset.key, {
+                          label: currentLabel,
+                          value: e.target.value,
+                        })
+                      }
+                    />
+                  </Field>
+                </div>
+                {(preset.type === "phone" || preset.type === "email" || preset.type === "url") && currentValue && (
+                  <p className="text-[11px] text-[var(--muted)]">
+                    {preset.type === "phone" && "☎️ Bağlantı linkħi otomatik oluşturulur (tel:...)"}
+                    {preset.type === "email" && "✉️ Bağlantı linkħi otomatik oluşturulur (mailto:...)"}
+                    {preset.type === "url" && "🔗 URL, tap’ta açılır"}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

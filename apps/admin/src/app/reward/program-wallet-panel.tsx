@@ -50,6 +50,8 @@ type ProgramWalletPanelProps = {
   onMultiStampChange?: (draft: MultiStampDraft) => void;
   barcodeFormat: BarcodeFormat;
   onBarcodeFormatChange: (f: BarcodeFormat) => void;
+  /** Formda hangi bölüm gösterilsin */
+  formSection?: "brand" | "stamps" | "fields" | "back";
   /**
    * Yerleşimi dışarıdan belirle (stüdyo görünümü): form ve önizleme aynı
    * state'i paylaşır ama sayfanın farklı yerlerine konabilir.
@@ -75,6 +77,7 @@ export function ProgramWalletPanel({
   renderLayout,
   barcodeFormat,
   onBarcodeFormatChange,
+  formSection,
 }: ProgramWalletPanelProps) {
   const [uploadBusy, setUploadBusy] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -256,6 +259,8 @@ export function ProgramWalletPanel({
         <WalletDesignForm
           programId={programId}
           programName={programName}
+          stampsRequired={stampsRequired}
+          section={formSection}
           draft={draft}
           onChange={onChange}
           uploadBusy={uploadBusy}

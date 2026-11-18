@@ -607,7 +607,7 @@ export class WalletService {
   async syncPasses(
     customerId: string,
     tenantId: string,
-    opts?: { notifyKind?: PassNotifyKind },
+    opts?: { notifyKind?: PassNotifyKind; skipApple?: boolean },
   ) {
     const { customer, rule, tenant } = await this.loadCustomerContext(
       customerId,
@@ -633,7 +633,9 @@ export class WalletService {
         ? applePasses.map((p) => p.externalId)
         : [appleSerial];
 
-    if (this.apple.isConfigured()) {
+    if (opts?.skipApple) {
+      // Apple tarafı toplu yenileme ile zaten yapıldı (syncTenantPasses)
+    } else if (this.apple.isConfigured()) {
       try {
         let totalDevices = 0;
         for (const serial of serialsToBump) {
@@ -724,33 +726,68 @@ export class WalletService {
         passes: { some: {} },
       },
       select: { id: true },
-      take: 1000,
     });
 
-    let synced = 0;
+    // Apple: tek UPDATE + tek APNs çağrısı (müşteri başına sıralı işlem yok → yanıt hızlı)
     let devices = 0;
+    if (this.apple.isConfigured() && customers.length > 0) {
+      try {
+        devices = (await this.bumpAllApplePassesForTenant(tenantId)).deviceCount;
+      } catch (err) {
+        this.logger.warn(`Tenant Apple bump: ${(err as Error).message}`);
+      }
+    }
+
+    // Google (ve kalan müşteri işleri) arka planda — isteği bekletmez
+    void this.syncGoogleInBackground(
+      customers.map((c) => c.id),
+      tenantId,
+    );
+
+    this.logger.log(
+      `Tenant pass design sync: tenant=${tenantId} customers=${customers.length} devices=${devices}`,
+    );
+    return { synced: customers.length, devices };
+  }
+
+  private async bumpAllApplePassesForTenant(
+    tenantId: string,
+  ): Promise<{ deviceCount: number }> {
+    const where = { tenantId, platform: PassPlatform.APPLE };
+    await this.prisma.pass.updateMany({
+      where,
+      data: { contentVersion: { increment: 1 }, pendingNotifyKind: null },
+    });
+    const regs = await this.prisma.appleDeviceRegistration.findMany({
+      where: { pass: where },
+      select: { pushToken: true },
+    });
+    const tokens = [...new Set(regs.map((r) => r.pushToken))];
+    if (tokens.length === 0) return { deviceCount: 0 };
+    await this.apns.pushPassUpdate(tokens);
+    return { deviceCount: tokens.length };
+  }
+
+  private async syncGoogleInBackground(
+    customerIds: string[],
+    tenantId: string,
+  ): Promise<void> {
     const chunkSize = 10;
-    for (let i = 0; i < customers.length; i += chunkSize) {
-      const chunk = customers.slice(i, i + chunkSize);
+    for (let i = 0; i < customerIds.length; i += chunkSize) {
+      const chunk = customerIds.slice(i, i + chunkSize);
       const outcomes = await Promise.allSettled(
-        chunk.map((c) => this.syncPasses(c.id, tenantId)),
+        chunk.map((id) =>
+          this.syncPasses(id, tenantId, { skipApple: true }),
+        ),
       );
       for (const o of outcomes) {
-        if (o.status === 'fulfilled') {
-          synced += 1;
-          devices += o.value.apple?.deviceCount ?? 0;
-        } else {
+        if (o.status === 'rejected') {
           this.logger.warn(
-            `Tenant pass sync fail: ${(o.reason as Error)?.message ?? o.reason}`,
+            `Tenant Google sync fail: ${(o.reason as Error)?.message ?? o.reason}`,
           );
         }
       }
     }
-
-    this.logger.log(
-      `Tenant pass design sync: tenant=${tenantId} synced=${synced}/${customers.length} devices=${devices}`,
-    );
-    return { synced, devices };
   }
 
   /**
@@ -1707,6 +1744,18 @@ export class WalletService {
         stampIconFilledUrl: branding.stampIconFilledUrl,
         stampIconEmptyUrl: branding.stampIconEmptyUrl,
         inset: branding.stampInset,
+        stampRows: walletTemplate?.stampRows ?? null,
+        stampLayout: walletTemplate?.stampLayout ?? null,
+        stampGapX: walletTemplate?.stampGapX ?? null,
+        stampGapY: walletTemplate?.stampGapY ?? null,
+        stampLayoutOpts: {
+          iconScale: walletTemplate?.stampIconScale ?? null,
+          staggerRatio: walletTemplate?.stampStaggerRatio ?? null,
+          offsetX: walletTemplate?.stampOffsetX ?? null,
+          offsetY: walletTemplate?.stampOffsetY ?? null,
+          manual: walletTemplate?.stampPositions ?? null,
+          rowAdjust: walletTemplate?.stampRowAdjust ?? null,
+        },
         slotFilled: display?.walletSlotFilled,
         slotStyles: display?.walletSlotStyles,
         customStripUrl: walletTemplate?.stripImageUrl,
@@ -1721,9 +1770,11 @@ export class WalletService {
 
     const orgName = branding.orgName;
 
+    // Logo varsa yalnızca kullanıcı açıkça üst yazı girdiyse onu göster (Apple logonun yanında yazar).
+    const explicitLogoText = branding.logoText?.trim();
     const logoText = logoArt?.logo
-      ? undefined
-      : branding.logoText?.trim() || orgName;
+      ? explicitLogoText || undefined
+      : explicitLogoText || orgName;
 
     const enrichment = programId
       ? { extraAuxiliaryFields: display!.extraAuxiliaryFields, stampNotifyValue: undefined }
@@ -1746,7 +1797,8 @@ export class WalletService {
       rewardLabel,
       rewardReady,
       barcodeMessage: buildPassBarcodeMessage(customer.id, programId),
-      barcodeFormat: tenant.barcodeFormat ?? 'QR',
+      barcodeFormat: walletTemplate?.barcodeFormat ?? tenant.barcodeFormat ?? 'QR',
+      ...this.passKitExtras(walletTemplate),
       stampFieldLabel: display?.stampFieldLabel ?? branding.stampFieldLabel ?? undefined,
       rewardFieldLabel: display?.rewardFieldLabel ?? branding.rewardFieldLabel ?? undefined,
       statusFieldLabel: display?.statusFieldLabel ?? branding.statusFieldLabel ?? undefined,
@@ -1785,6 +1837,52 @@ export class WalletService {
       extraAuxiliaryFields: enrichment.extraAuxiliaryFields,
       stampNotifyValue: enrichment.stampNotifyValue,
     });
+  }
+
+  /** walletTemplate → PassKit ek seçenekleri (Apple sınırlarına göre kırpılır) */
+  private passKitExtras(
+    wt: ReturnType<typeof parseWalletTemplate> | null,
+  ): Partial<Parameters<ApplePassService['createPkPass']>[0]> {
+    if (!wt) return {};
+    const fields = (
+      list: { key?: string; label: string; value: string }[] | null | undefined,
+      prefix: string,
+      max: number,
+    ) =>
+      (list ?? [])
+        .filter((f) => f?.label?.trim() && f?.value?.trim())
+        .slice(0, max)
+        .map((f, i) => ({
+          key: `${prefix}${i + 1}`,
+          label: f.label.trim(),
+          value: f.value.trim(),
+        }));
+    const locations = (wt.locations ?? [])
+      .filter(
+        (l) =>
+          Number.isFinite(l?.latitude) &&
+          Number.isFinite(l?.longitude) &&
+          Math.abs(l.latitude) <= 90 &&
+          Math.abs(l.longitude) <= 180,
+      )
+      .slice(0, 10)
+      .map((l) => ({
+        latitude: l.latitude,
+        longitude: l.longitude,
+        relevantText: l.relevantText ?? undefined,
+      }));
+    return {
+      headerExtraFields: fields(wt.headerFields, 'hx', 3),
+      auxCustomFields: fields(wt.auxFields, 'ax', 4),
+      showBarcode: wt.showBarcode ?? true,
+      barcodeAltMode: wt.barcodeAltMode ?? 'CODE',
+      barcodeAltText: wt.barcodeAltText ?? undefined,
+      locations,
+      relevantDate: wt.relevantDate ?? undefined,
+      expirationDate: wt.expirationDate ?? undefined,
+      suppressStripShine: wt.suppressStripShine ?? false,
+      sharingProhibited: wt.sharingProhibited ?? false,
+    };
   }
 
   async buildApplePkPass(token: string, programId?: string): Promise<Buffer> {

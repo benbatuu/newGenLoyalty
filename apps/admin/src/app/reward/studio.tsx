@@ -47,7 +47,7 @@ export function CardCarousel({
   programs,
   selectedId,
   onSelect,
-  colorOf,
+  renderPreview,
   quota,
   creating,
   onCreate,
@@ -58,7 +58,7 @@ export function CardCarousel({
   programs: (ProgramCard & { config?: Record<string, unknown> })[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  colorOf: (p: ProgramCard & { config?: Record<string, unknown> }) => string;
+  renderPreview: (p: ProgramCard & { config?: Record<string, unknown> }) => ReactNode;
   quota: ProgramQuota;
   creating: boolean;
   onCreate: (type: string, branchId?: string) => void;
@@ -86,58 +86,38 @@ export function CardCarousel({
         </p>
       </div>
 
-      <div className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-4 pt-6">
-        {programs.map((p) => {
-          const bg = colorOf(p);
-          const fg = readableOn(bg);
-          const selected = p.id === selectedId;
-          return (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => onSelect(p.id)}
-              aria-current={selected ? "true" : undefined}
-              className={`relative flex aspect-[1.586/1] w-[260px] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-2xl p-3.5 text-left transition duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] ${
-                selected
-                  ? "-translate-y-1 shadow-[0_12px_28px_rgba(0,0,0,0.22)] ring-2 ring-[var(--ink)] ring-offset-2 ring-offset-[var(--background)]"
-                  : "opacity-80 shadow-[0_4px_12px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 hover:opacity-100"
-              }`}
-              style={{ background: bg, color: fg }}
-            >
-              {/* parıltı */}
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full opacity-20"
-                style={{ background: fg }}
-              />
-              <span className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] opacity-80">
-                  {programTypeLabel(p.type)}
-                </span>
-                {p.isPrimary ? (
-                  <span
-                    className="rounded-full px-1.5 py-px text-[9px] font-bold uppercase tracking-wide"
-                    style={{ background: fg, color: bg }}
-                  >
-                    Ana
-                  </span>
-                ) : null}
-              </span>
+      <div className="grid justify-items-center gap-x-8 gap-y-10 pb-4 pt-2 sm:grid-cols-2 xl:grid-cols-3 [&>*]:w-full [&>*]:max-w-[340px]">
+        {programs.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onSelect(p.id)}
+            className="group flex flex-col gap-3 rounded-[18px] text-left transition duration-200 hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--brand)]"
+          >
+            {renderPreview(p)}
+            <span className="flex items-center justify-between gap-2 px-1">
               <span className="min-w-0">
-                <span className="block truncate text-[0.9375rem] font-semibold">{p.name}</span>
-                <span className="block truncate text-[0.6875rem] opacity-80">{summary(p)}</span>
+                <span className="block truncate text-[0.9375rem] font-semibold text-[var(--ink)]">{p.name}</span>
+                <span className="block truncate text-[0.6875rem] text-[var(--muted)]">
+                  {programTypeLabel(p.type)} · {summary(p)}
+                </span>
               </span>
-            </button>
-          );
-        })}
+              {p.isPrimary ? (
+                <span className="shrink-0 rounded-full bg-[var(--ink)] px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-[var(--panel)]">
+                  Ana
+                </span>
+              ) : null}
+            </span>
+          </button>
+        ))}
 
-        {catalog.length > 0 ? (
+        {catalog.length > 0 && quota.remainingPrograms > 0 ? (
           <button
             type="button"
             disabled={creating}
             onClick={() => setPickerOpen((v) => !v)}
             aria-expanded={pickerOpen}
-            className="flex aspect-[1.586/1] w-[170px] shrink-0 snap-start flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--line-strong)] text-[var(--muted)] transition hover:border-[var(--ink)]/40 hover:text-[var(--ink)] disabled:opacity-50"
+            className="flex min-h-[220px] w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--line-strong)] text-[var(--muted)] transition hover:border-[var(--ink)]/40 hover:text-[var(--ink)] disabled:opacity-50"
           >
             <span className="text-2xl leading-none" aria-hidden="true">＋</span>
             <span className="text-[0.8125rem] font-medium">{creating ? "Oluşturuluyor…" : "Yeni kart"}</span>

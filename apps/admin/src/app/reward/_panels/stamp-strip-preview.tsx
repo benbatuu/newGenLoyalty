@@ -1,20 +1,24 @@
 "use client";
 
 import {
-  computeStampGrid,
+  WALLET_STRIP_H,
+  WALLET_STRIP_W,
   type GroupStampStyle,
 } from "@ngl/shared";
 import { StampGlyph, type StampTheme } from "../../../components/stamp-glyph";
-import { PREVIEW_PAD, type ProgramWalletDraft } from "./wallet-types";
+import { stampLayoutForDraft } from "./wallet-helpers";
+import type { ProgramWalletDraft } from "./wallet-types";
 
+/**
+ * Wallet damga şeridinin önizlemesi. Konumlar sunucudaki pass-art ile aynı
+ * (@ngl/shared computeWalletStampPositions) — 750×246 uzayı yüzdeye çevrilir.
+ */
 export function StampStripPreview({
   slotFilled,
   draft,
   filledUrl,
   emptyUrl,
-  segmentBoundaries,
   slotStyles,
-  transparent = false,
 }: {
   slotFilled: boolean[];
   draft: ProgramWalletDraft;
@@ -25,37 +29,49 @@ export function StampStripPreview({
   transparent?: boolean;
 }) {
   const total = slotFilled.length;
-  const grid = computeStampGrid(total);
+  if (total === 0) return null;
+  const { positions } = stampLayoutForDraft(draft, total);
+
   return (
     <div
-      className="relative justify-items-center gap-x-1.5 gap-y-2 rounded-xl"
+      className="relative w-full"
       style={{
-        background: transparent ? "rgba(0,0,0,0.28)" : "rgba(0,0,0,0.12)",
-        backdropFilter: transparent ? "blur(2px)" : undefined,
-        display: "grid",
-        gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`,
-        padding: transparent ? "0.4rem 0.6rem" : "0.75rem",
+        aspectRatio: `${WALLET_STRIP_W} / ${WALLET_STRIP_H}`,
       }}
     >
       {slotFilled.map((filled, i) => {
         const style = slotStyles?.[i];
+        const pos = positions[i];
+        if (!pos) return null;
         const theme = (style?.stampTheme ?? draft.stampTheme) as StampTheme;
         const useCustomIcons = theme === "CUSTOM";
         return (
-          <StampGlyph
+          <div
             key={i}
-            theme={theme}
-            filled={filled}
-            color={draft.foregroundColor}
-            filledUrl={
-              useCustomIcons
-                ? style?.stampIconFilledUrl ?? filledUrl
-                : undefined
-            }
-            emptyUrl={
-              useCustomIcons ? style?.stampIconEmptyUrl ?? emptyUrl : undefined
-            }
-          />
+            className="absolute [&_img]:!h-full [&_img]:!w-full [&_svg]:!h-full [&_svg]:!w-full"
+            style={{
+              left: `${(pos.x / WALLET_STRIP_W) * 100}%`,
+              top: `${(pos.y / WALLET_STRIP_H) * 100}%`,
+              width: `${(pos.iconSize / WALLET_STRIP_W) * 100}%`,
+              aspectRatio: "1 / 1",
+              zIndex: pos.z,
+            }}
+          >
+            <StampGlyph
+              theme={theme}
+              filled={filled}
+              color={draft.foregroundColor}
+              size={pos.iconSize}
+              filledUrl={
+                useCustomIcons
+                  ? style?.stampIconFilledUrl ?? filledUrl
+                  : undefined
+              }
+              emptyUrl={
+                useCustomIcons ? style?.stampIconEmptyUrl ?? emptyUrl : undefined
+              }
+            />
+          </div>
         );
       })}
     </div>

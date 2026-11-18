@@ -3,8 +3,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   MAX_WALLET_STAMP_SLOTS,
   computeStampGrid,
+  computeWalletStampPositions,
   getStampThemeIconUrls,
+  resolveWalletStampGrid,
   type GroupStampStyle,
+  type WalletStampLayoutOptions,
 } from '@ngl/shared';
 import sharp from 'sharp';
 
@@ -28,6 +31,16 @@ export type StampArtInput = {
   stampIconEmptyUrl?: string | null;
   /** Kenar boşluğu — owner ayarı */
   inset?: StampInset | string | null;
+  /** Satır sayısı (1–4). Boş/0 = otomatik ızgara. */
+  stampRows?: number | null;
+  stampLayout?: string | null;
+  stampGapX?: number | null;
+  stampGapY?: number | null;
+  /** Ölçek / kayma / ofset / elle konum (düzenleyiciden) */
+  stampLayoutOpts?: Pick<
+    WalletStampLayoutOptions,
+    'iconScale' | 'staggerRatio' | 'offsetX' | 'offsetY' | 'manual' | 'rowAdjust'
+  >;
   /** Multi-stamp: grup bazlı dolu/boş slot dizisi */
   slotFilled?: boolean[];
   /** Multi-stamp: slot başına tema / ikon */
@@ -53,15 +66,6 @@ const LOGO_H = 100;
 const ICON_1X = 29;
 const ICON_2X = 58;
 const ICON_3X = 87;
-
-const INSET_LAYOUT: Record<
-  StampInset,
-  { padX: number; padY: number; gapX: number; gapY: number; iconFill: number }
-> = {
-  TIGHT: { padX: 40, padY: 18, gapX: 10, gapY: 10, iconFill: 0.82 },
-  NORMAL: { padX: 72, padY: 26, gapX: 18, gapY: 14, iconFill: 0.7 },
-  WIDE: { padX: 108, padY: 30, gapX: 22, gapY: 16, iconFill: 0.6 },
-};
 
 export function normalizeStampInset(
   inset: string | null | undefined,
@@ -213,7 +217,7 @@ export class PassArtService {
       if (emptyUrl) urls.add(emptyUrl);
     }
     await Promise.all(
-      [...urls].map((url) => this.loadRemotePng(url, 128)),
+      [...urls].map((url) => this.loadRemotePng(url, 256)),
     );
   }
 
@@ -230,42 +234,6 @@ export class PassArtService {
     })
       .png()
       .toBuffer();
-  }
-
-  private stampPositions(
-    total: number,
-    cols: number,
-    rows: number,
-    inset: StampInset,
-  ): { x: number; y: number; iconSize: number }[] {
-    const { padX, padY, gapX, gapY, iconFill } = INSET_LAYOUT[inset];
-    const usableW = STRIP_W - padX * 2;
-    const usableH = STRIP_H - padY * 2;
-    const cellW = Math.floor((usableW - gapX * Math.max(cols - 1, 0)) / cols);
-    const cellH = Math.floor((usableH - gapY * Math.max(rows - 1, 0)) / rows);
-    const iconSize = Math.max(
-      24,
-      Math.min(80, Math.floor(Math.min(cellW, cellH) * iconFill)),
-    );
-    const gridW = cols * cellW + Math.max(cols - 1, 0) * gapX;
-    const gridH = rows * cellH + Math.max(rows - 1, 0) * gapY;
-    const originX = padX + Math.floor((usableW - gridW) / 2);
-    const originY = padY + Math.floor((usableH - gridH) / 2);
-
-    const positions: { x: number; y: number; iconSize: number }[] = [];
-    for (let i = 0; i < total; i++) {
-      const row = Math.floor(i / cols);
-      const colInRow = i % cols;
-      const itemsInRow = Math.min(cols, total - row * cols);
-      const startCol = Math.floor((cols - itemsInRow) / 2);
-      const col = startCol + colInRow;
-      positions.push({
-        x: originX + col * (cellW + gapX) + Math.floor((cellW - iconSize) / 2),
-        y: originY + row * (cellH + gapY) + Math.floor((cellH - iconSize) / 2),
-        iconSize,
-      });
-    }
-    return positions;
   }
 
   private async renderSlotIconBuffer(
@@ -287,8 +255,8 @@ export class PassArtService {
         : themeIcons?.emptyUrl;
 
     if (resolvedFilled || resolvedEmpty) {
-      const customFilled = await this.loadRemotePng(resolvedFilled, 128);
-      const customEmpty = await this.loadRemotePng(resolvedEmpty, 128);
+      const customFilled = await this.loadRemotePng(resolvedFilled, 256);
+      const customEmpty = await this.loadRemotePng(resolvedEmpty, 256);
       if (customFilled || customEmpty) {
         let icon = filled
           ? customFilled || customEmpty!
@@ -322,7 +290,7 @@ export class PassArtService {
 
   private async buildStripComposite(
     total: number,
-    positions: { x: number; y: number; iconSize: number }[],
+    positions: { x: number; y: number; iconSize: number; z?: number }[],
     slotFilled: boolean[] | null,
     filled: number,
     fg: string,
@@ -344,7 +312,11 @@ export class PassArtService {
     );
 
     const layers: sharp.OverlayOptions[] = [];
-    for (let i = 0; i < total; i++) {
+    // Katman sırası: z küçükten büyüğe (büyük olan üstte çizilir)
+    const order = Array.from({ length: total }, (_, i) => i).sort(
+      (a, b) => (positions[a]!.z ?? a) - (positions[b]!.z ?? b) || a - b,
+    );
+    for (const i of order) {
       const style = slotStyles?.[i];
       const slotTheme = this.normalizeTheme(
         style?.stampTheme ?? defaultTheme,
@@ -467,8 +439,25 @@ export class PassArtService {
     const fg = input.foregroundColor || '#FFFFFF';
     const bg = input.backgroundColor || '#1B4332';
     const inset = normalizeStampInset(input.inset);
-    const { cols, rows } = computeStampGrid(total);
-    const positions = this.stampPositions(total, cols, rows, inset);
+    const { cols, rows } = resolveWalletStampGrid(
+      total,
+      computeStampGrid(total),
+      input.stampRows,
+    );
+    const positions = computeWalletStampPositions(
+      total,
+      cols,
+      rows,
+      inset,
+      undefined,
+      undefined,
+      {
+        layout: input.stampLayout === 'STAGGERED' ? 'STAGGERED' : 'GRID',
+        gapX: input.stampGapX,
+        gapY: input.stampGapY,
+        ...input.stampLayoutOpts,
+      },
+    );
 
     const perSlotStyles = input.slotStyles?.length
       ? input.slotStyles.slice(0, total)

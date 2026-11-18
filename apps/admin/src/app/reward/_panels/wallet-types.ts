@@ -40,6 +40,38 @@ export type ProgramWalletDraft = {
   labelColor: string;
   stampTheme: StampTheme;
   stampInset: StampInset;
+  /** Damga satır sayısı; 0 = otomatik */
+  stampRows: number;
+  /** GRID veya STAGGERED (çift satırlar yarım adım kayar) */
+  stampLayout: "GRID" | "STAGGERED";
+  /** Boş (null) = kenar boşluğu varsayılanı */
+  stampGapX: number | null;
+  stampGapY: number | null;
+  /** Düzenleyici ayarları */
+  stampIconScale: number;
+  stampStaggerRatio: number;
+  stampOffsetX: number;
+  stampOffsetY: number;
+  /** Elle sürüklenen damga konumları (index'e göre; null = otomatik) */
+  stampPositions: StampManualPos[];
+  /** Satır başına kaydırma ve boyut çarpanı (satır indeksine göre) */
+  stampRowAdjust: StampRowAdjust[];
+  /** PassKit: ek header alanları (en fazla 3, tenant header ile birlikte) */
+  headerFields: PassKitField[];
+  /** PassKit: ek yardımcı alanlar (en fazla 4) */
+  auxFields: PassKitField[];
+  showBarcode: boolean;
+  /** Boş = işletme varsayılanı */
+  barcodeFormat: "" | BarcodeFormat;
+  barcodeAltMode: "CODE" | "NONE" | "CUSTOM";
+  barcodeAltText: string;
+  /** Kilit ekranında kartı öne çıkaran konumlar (en fazla 10) */
+  locations: PassKitLocation[];
+  /** datetime-local biçimi (YYYY-MM-DDTHH:mm) veya boş */
+  relevantDate: string;
+  expirationDate: string;
+  suppressStripShine: boolean;
+  sharingProhibited: boolean;
   logoText: string;
   passDescription: string;
   stampFieldLabel: string;
@@ -71,6 +103,8 @@ export type TenantWalletDefaults = {
   labelColor: string | null;
   stampTheme: string | null;
   stampInset: string | null;
+  /** Tenant düzeyi kart üst yazısı (Wallet header alanı etiketi) */
+  headerFieldLabel?: string | null;
   logoText: string | null;
   logoUrl: string | null;
   passDescription: string | null;
@@ -86,6 +120,25 @@ export const INSETS: { id: StampInset; label: string; hint: string }[] = [
   { id: "TIGHT", label: "Dar", hint: "Kenara yakın" },
   { id: "NORMAL", label: "Normal", hint: "Dengeli" },
   { id: "WIDE", label: "Geniş", hint: "Bol boşluk" },
+];
+
+/** 0 = otomatik (damga sayısına göre ızgara) */
+export type StampManualPos = { x: number; y: number; size?: number; z?: number } | null;
+export type StampRowAdjust = { offsetX: number; offsetY: number; scale: number };
+
+export type PassKitField = { label: string; value: string };
+export type PassKitLocation = {
+  latitude: number;
+  longitude: number;
+  relevantText: string;
+};
+
+export const STAMP_ROW_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: "Otomatik" },
+  { value: 1, label: "1 satır" },
+  { value: 2, label: "2 satır" },
+  { value: 3, label: "3 satır" },
+  { value: 4, label: "4 satır" },
 ];
 
 export const PREVIEW_PAD: Record<StampInset, string> = {

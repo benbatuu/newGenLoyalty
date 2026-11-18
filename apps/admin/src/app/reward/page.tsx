@@ -4,6 +4,14 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState, type ReactNode } from "react";
 import { CardCarousel, PreviewStage, StudioStep, cardColor } from "./studio";
 import type { BarcodeFormat } from "./_panels/wallet-types";
+import { stampEditorDraftKey } from "./_panels/wallet-helpers";
+import { PassPreviewCard } from "./pass-preview-card";
+import { ApplePreviewPane } from "./_panels/passkit-preview";
+import {
+  BarcodeSection,
+  FieldsSection,
+  RelevanceSection,
+} from "./_panels/passkit-sections";
 import {
   ErrorBanner,
   Field,
@@ -87,6 +95,16 @@ import {
   type TenantWalletDefaults,
 } from "./program-wallet-panel";
 
+type RewardTab =
+  | "rule"
+  | "wallet"
+  | "stamps"
+  | "fields"
+  | "back"
+  | "barcode"
+  | "relevance"
+  | "notify";
+
 type ProgramHubResponse = {
   quota: ProgramQuota;
   programs: (ProgramCard & {
@@ -122,6 +140,7 @@ type TenantReward = {
   stampTheme: string | null;
   stampInset: string | null;
   logoText: string | null;
+  headerFieldLabel?: string | null;
   logoUrl: string | null;
   passDescription: string | null;
   stampIconFilledUrl: string | null;
@@ -167,6 +186,7 @@ function tenantWalletDefaults(data: TenantReward | null | undefined): TenantWall
     stampTheme: data?.stampTheme ?? null,
     stampInset: data?.stampInset ?? null,
     logoText: data?.logoText ?? null,
+    headerFieldLabel: data?.headerFieldLabel ?? null,
     logoUrl: data?.logoUrl ?? null,
     passDescription: data?.passDescription ?? null,
     stampIconFilledUrl: data?.stampIconFilledUrl ?? null,
@@ -257,6 +277,18 @@ function RewardContent() {
     branchCtx?.branches.filter((b) => b.isActive) ?? [];
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** URL'deki ?programId= — yoksa kart ızgarası, varsa o kartın düzenleyicisi */
+  const [routeProgramId, setRouteProgramId] = useState<string | null>(null);
+  const [routeReady, setRouteReady] = useState(false);
+  useEffect(() => {
+    const read = () => {
+      setRouteProgramId(new URLSearchParams(window.location.search).get("programId"));
+      setRouteReady(true);
+    };
+    read();
+    window.addEventListener("popstate", read);
+    return () => window.removeEventListener("popstate", read);
+  }, []);
   const [cardName, setCardName] = useState("");
   const [multiStamp, setMultiStamp] = useState<MultiStampDraft>(() =>
     defaultMultiStampDraft(10, "1 bedava kahve"),
@@ -300,7 +332,7 @@ function RewardContent() {
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
   const [mobileCreateOpen, setMobileCreateOpen] = useState(false);
-  const [tab, setTab] = useState<"rule" | "wallet" | "notify">("rule");
+  const [tab, setTab] = useState<RewardTab>("rule");
   /** Vazgeç → formu sunucudaki değerlere döndür */
   const [resetToken, setResetToken] = useState(0);
   /** Form sunucudan doldurulduğunda artar → o anki değerler "kaydedilmiş" kabul edilir */
@@ -316,12 +348,13 @@ function RewardContent() {
   );
 
   useEffect(() => {
-    if (!hub?.programs.length) return;
-    const primary = hub.programs.find((p) => p.isPrimary) ?? hub.programs[0];
-    setSelectedId((prev) =>
-      prev && hub.programs.some((p) => p.id === prev) ? prev : primary.id,
-    );
-  }, [hub]);
+    if (!hub) return;
+    if (routeProgramId && hub.programs.some((p) => p.id === routeProgramId)) {
+      setSelectedId(routeProgramId);
+    } else {
+      setSelectedId(null);
+    }
+  }, [hub, routeProgramId]);
 
   useEffect(() => {
     if (!data) return;
@@ -434,9 +467,17 @@ function RewardContent() {
               walletTemplate: { ...own, backFields: donorTpl.backFields },
             }
           : selectedProgram.config;
-      setWalletDraft(
-        draftFromProgramWallet(config, tenantWalletDefaults(data), selectedProgram.name),
-      );
+      // Düzenleyici sayfasından dönüşte taslağı geri yükle
+      const carriedKey = stampEditorDraftKey(selectedProgram.id);
+      const carried = sessionStorage.getItem(carriedKey);
+      if (carried) {
+        sessionStorage.removeItem(carriedKey);
+        setWalletDraft(JSON.parse(carried) as ProgramWalletDraft);
+      } else {
+        setWalletDraft(
+          draftFromProgramWallet(config, tenantWalletDefaults(data), selectedProgram.name),
+        );
+      }
     }
     setHydrateToken((t) => t + 1);
   }, [selectedProgram, data, resetToken]);
@@ -477,13 +518,26 @@ function RewardContent() {
   }, [dirty]);
 
   /** Kart değiştirirken kaydedilmemiş değişiklikleri koru */
+  function navigateTo(id: string | null) {
+    window.history.pushState(null, "", id ? `/reward?programId=${encodeURIComponent(id)}` : "/reward");
+    setRouteProgramId(id);
+    setSelectedId(id);
+    setTab("rule");
+  }
+
   function selectCard(id: string) {
     if (id === selectedId) return;
     if (dirty && !window.confirm("Kaydedilmemiş değişiklikler kaybolacak. Devam edilsin mi?")) {
       return;
     }
-    setSelectedId(id);
-    setTab("rule");
+    navigateTo(id);
+  }
+
+  function backToGrid() {
+    if (dirty && !window.confirm("Kaydedilmemiş değişiklikler kaybolacak. Devam edilsin mi?")) {
+      return;
+    }
+    navigateTo(null);
   }
 
   async function createCard(type: string, branchId?: string) {
@@ -531,9 +585,9 @@ function RewardContent() {
         });
       }
 
-      setOk(`${programTypeLabel(type)} eklendi — soldan diğer kartlara geçebilirsiniz.`);
+      setOk(`${programTypeLabel(type)} eklendi.`);
       await reloadHub(true);
-      setSelectedId(created.id);
+      navigateTo(created.id);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Kart oluşturulamadı");
     } finally {
@@ -559,7 +613,7 @@ function RewardContent() {
       });
       setOk("Kart arşivlendi");
       await reloadHub(true);
-      setSelectedId(null);
+      navigateTo(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Arşivlenemedi");
     } finally {
@@ -582,7 +636,7 @@ function RewardContent() {
       await api(`/programs/${selectedProgram.id}`, { method: "DELETE" });
       setOk("Kart silindi");
       await reloadHub(true);
-      setSelectedId(null);
+      navigateTo(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Silinemedi");
     } finally {
@@ -784,17 +838,32 @@ function RewardContent() {
       <ErrorBanner message={error || loadError || hubError} />
       <SuccessBanner message={ok} />
 
-      {hub ? (
+      {hub && routeReady ? (
         <div className="space-y-5">
+          {routeProgramId ? (
+            <button
+              type="button"
+              onClick={backToGrid}
+              className="inline-flex items-center gap-1 text-[0.8125rem] font-medium text-[var(--muted)] hover:text-[var(--ink)]"
+            >
+              ← Tüm kartlar
+            </button>
+          ) : (
           <CardCarousel
             programs={hub.programs}
             selectedId={selectedId}
             onSelect={selectCard}
-            colorOf={(p) =>
-              p.id === selectedId && isWalletEligibleProgram(p.type)
-                ? walletDraft.primaryColor
-                : cardColor(p, data?.primaryColor ?? "#1B4332")
-            }
+            renderPreview={(p) => (
+              <PassPreviewCard
+                program={p}
+                tenant={
+                  p.id === selectedId && isWalletEligibleProgram(p.type)
+                    ? { ...tenantWalletDefaults(data), primaryColor: walletDraft.primaryColor }
+                    : tenantWalletDefaults(data)
+                }
+                barcodeFormat={barcodeFormat}
+              />
+            )}
             quota={hub.quota}
             creating={creating}
             onCreate={(type, branchId) => void createCard(type, branchId)}
@@ -802,8 +871,9 @@ function RewardContent() {
             branches={activeBranches}
             defaultBranchId={branchCtx?.defaultBranchId}
           />
+          )}
 
-          {!selectedProgram ? (
+          {!routeProgramId ? null : !selectedProgram ? (
             <div className="rounded-3xl border border-dashed border-[var(--line-strong)] px-6 py-16 text-center">
               <p className="text-[1rem] font-semibold text-[var(--ink)]">Bir kart seçin</p>
               <p className="mt-1 text-[0.8125rem] text-[var(--muted)]">
@@ -822,7 +892,16 @@ function RewardContent() {
 
                 const tabs = [
                   { id: "rule" as const, title: "Ödül ve kurallar", summary: ruleSummary },
-                  ...(walletEligible ? [{ id: "wallet" as const, title: "Görünüm", summary: "Renk, logo, damga" }] : []),
+                  ...(walletEligible
+                    ? [
+                        { id: "wallet" as const, title: "Görünüm", summary: "Renk, logo, üst yazı" },
+                        ...(isStampCard || isMultiStamp ? [{ id: "stamps" as const, title: "Damgalar", summary: "Simge, şerit, dizilim" }] : []),
+                        { id: "fields" as const, title: "Alanlar", summary: "Başlıklar, header, ek alan" },
+                        { id: "back" as const, title: "Arka yüz", summary: "İletişim, koşullar" },
+                        { id: "barcode" as const, title: "Barkod", summary: "Biçim, paylaşım" },
+                        { id: "relevance" as const, title: "Kilit ekranı", summary: "Konum, tarih" },
+                      ]
+                    : []),
                   ...(isPrimaryStamp ? [{ id: "notify" as const, title: "Bildirimler", summary: stampNotifyPreview }] : []),
                 ];
                 const inspector = (form: ReactNode, error: ReactNode) => (
@@ -855,7 +934,7 @@ function RewardContent() {
                       />
                     </section>
 
-                    <div role="tablist" aria-label="Kart ayarları" className="flex gap-1 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-1">
+                    <div role="tablist" aria-label="Kart ayarları" className="flex gap-1 overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-1">
                       {tabs.map((t) => (
                         <button
                           key={t.id}
@@ -863,7 +942,7 @@ function RewardContent() {
                           role="tab"
                           aria-selected={tab === t.id}
                           onClick={() => setTab(t.id)}
-                          className={`flex min-w-0 flex-1 flex-col items-start rounded-xl px-3 py-2 text-left transition ${
+                          className={`flex min-w-[112px] flex-1 shrink-0 flex-col items-start rounded-xl px-3 py-2 text-left transition ${
                             tab === t.id ? "bg-[var(--accent)] text-white shadow-[var(--shadow-sm)]" : "text-[var(--ink)] hover:bg-[var(--surface)]"
                           }`}
                         >
@@ -966,16 +1045,27 @@ function RewardContent() {
                     </>
                     ) : null}
 
-                    {tab === "wallet" && walletEligible ? (
-                    <>
-                                              <div className="flex justify-end">
+                    {walletEligible && (tab === "wallet" || tab === "stamps" || tab === "fields" || tab === "back") ? (
+                    <div className="space-y-6">
+                      {tab === "wallet" ? (
+                        <div className="flex justify-end">
                           <Link href="/settings/card" className="text-[0.75rem] font-medium text-[var(--brand)] hover:underline">
                             Marka varsayılanlarını düzenle →
                           </Link>
                         </div>
-                        {error}
-                        {form}
-                    </>
+                      ) : null}
+                      {error}
+                      {form}
+                      {tab === "fields" ? (
+                        <FieldsSection draft={walletDraft} onChange={setWalletDraft} tenantHasHeader={Boolean(data?.headerFieldLabel?.trim())} />
+                      ) : null}
+                    </div>
+                    ) : null}
+                    {tab === "barcode" && walletEligible ? (
+                      <BarcodeSection draft={walletDraft} onChange={setWalletDraft} />
+                    ) : null}
+                    {tab === "relevance" && walletEligible ? (
+                      <RelevanceSection draft={walletDraft} onChange={setWalletDraft} />
                     ) : null}
 
                     {tab === "notify" && isPrimaryStamp ? (
@@ -1021,11 +1111,31 @@ function RewardContent() {
                   </div>
                 );
 
+                const previewStamps = isMultiStamp
+                  ? multiStamp.tiers[0]?.threshold ?? selectedProgram.tiers[0]?.threshold ?? 10
+                  : isStampCard
+                    ? stampsRequired
+                    : selectedProgram.tiers[0]?.threshold ?? 100;
+                const previewReward = isMultiStamp
+                  ? multiStamp.tiers[0]?.rewardLabel ?? selectedProgram.tiers[0]?.rewardLabel ?? "Ödül"
+                  : isStampCard
+                    ? rewardLabel
+                    : isCashbackCard
+                      ? `%${cashbackCard.earnPercent} cashback`
+                      : selectedProgram.tiers[0]?.rewardLabel ?? "Ödül";
                 const studio = (preview: ReactNode, form: ReactNode, error: ReactNode) =>
                   preview ? (
-                    <div className="grid gap-5 xl:grid-cols-[minmax(0,auto)_minmax(0,1fr)] xl:items-start">
+                    <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)] xl:items-start">
                       <div className="xl:sticky xl:top-4">
-                        <PreviewStage color={walletDraft.primaryColor}>{preview}</PreviewStage>
+                        <ApplePreviewPane
+                          draft={walletDraft}
+                          tenant={tenantWalletDefaults(data)}
+                          isStamp={isStampCard || isMultiStamp}
+                          stampsRequired={previewStamps}
+                          rewardLabel={previewReward}
+                          remainingTemplate={remainingTpl}
+                          programName={cardName || selectedProgram.name}
+                        />
                       </div>
                       {inspector(form, error)}
                     </div>
@@ -1061,6 +1171,7 @@ function RewardContent() {
                       tenant={tenantWalletDefaults(data)}
                       barcodeFormat={barcodeFormat}
                       onBarcodeFormatChange={setBarcodeFormat}
+                      formSection={tab === "stamps" ? "stamps" : tab === "fields" ? "fields" : tab === "back" ? "back" : "brand"}
                       draft={walletDraft}
                       onChange={setWalletDraft}
                       multiStamp={isMultiStamp ? multiStamp : null}

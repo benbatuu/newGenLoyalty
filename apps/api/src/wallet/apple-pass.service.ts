@@ -71,6 +71,17 @@ export type ApplePassInput = {
   extraAuxiliaryFields?: { key: string; label: string; value: string }[];
   /** Damga bildirimi için özelleştirilmiş değer (Mod B çarpan vb.) */
   stampNotifyValue?: string;
+  /** Program düzeyi PassKit seçenekleri (walletTemplate) */
+  headerExtraFields?: { key: string; label: string; value: string }[];
+  auxCustomFields?: { key: string; label: string; value: string }[];
+  showBarcode?: boolean;
+  barcodeAltMode?: 'CODE' | 'NONE' | 'CUSTOM';
+  barcodeAltText?: string;
+  locations?: { latitude: number; longitude: number; relevantText?: string }[];
+  relevantDate?: string;
+  expirationDate?: string;
+  suppressStripShine?: boolean;
+  sharingProhibited?: boolean;
 };
 
 @Injectable()
@@ -324,20 +335,39 @@ export class ApplePassService implements OnModuleInit {
       });
     }
 
+    for (const custom of input.auxCustomFields ?? []) {
+      if (auxiliaryFields.length >= 4) break;
+      auxiliaryFields.push({
+        key: custom.key,
+        label: custom.label.toUpperCase().slice(0, 20),
+        value: custom.value.slice(0, 60),
+      });
+    }
+
     const storeCard: Record<string, unknown> = {
       primaryFields: [],
       secondaryFields,
       auxiliaryFields,
     };
 
+    const headerFields: Record<string, unknown>[] = [];
     if (headerLabel) {
-      storeCard.headerFields = [
-        {
-          key: 'header',
-          label: headerLabel.toUpperCase(),
-          value: `${input.stampCount}/${input.stampsRequired}`,
-        },
-      ];
+      headerFields.push({
+        key: 'header',
+        label: headerLabel.toUpperCase(),
+        value: `${input.stampCount}/${input.stampsRequired}`,
+      });
+    }
+    for (const extra of input.headerExtraFields ?? []) {
+      headerFields.push({
+        key: extra.key,
+        label: extra.label.toUpperCase().slice(0, 20),
+        value: extra.value.slice(0, 30),
+      });
+    }
+    if (headerFields.length > 0) {
+      // Apple: header alanları en fazla 3
+      storeCard.headerFields = headerFields.slice(0, 3);
     }
 
     if (backFields.length > 0) {
@@ -361,16 +391,42 @@ export class ApplePassService implements OnModuleInit {
       backgroundColor: bg,
       foregroundColor: fg,
       labelColor: label,
-      barcodes: [
-        {
-          message: input.barcodeMessage,
-          format: this.pkBarcodeFormat(input.barcodeFormat),
-          messageEncoding: 'iso-8859-1',
-          altText: input.barcodeMessage.slice(0, 20),
-        },
-      ],
       storeCard,
     };
+    if (input.showBarcode !== false) {
+      const mode = input.barcodeAltMode ?? 'CODE';
+      const barcode: Record<string, unknown> = {
+        message: input.barcodeMessage,
+        format: this.pkBarcodeFormat(input.barcodeFormat),
+        messageEncoding: 'iso-8859-1',
+      };
+      if (mode === 'CODE') barcode.altText = input.barcodeMessage.slice(0, 20);
+      if (mode === 'CUSTOM' && input.barcodeAltText?.trim()) {
+        barcode.altText = input.barcodeAltText.trim().slice(0, 40);
+      }
+      passJson.barcodes = [barcode];
+    }
+    if (input.locations?.length) {
+      // Apple: en fazla 10 konum (kilit ekranı bildirimi)
+      passJson.locations = input.locations.slice(0, 10).map((l) => ({
+        latitude: l.latitude,
+        longitude: l.longitude,
+        ...(l.relevantText?.trim()
+          ? { relevantText: l.relevantText.trim().slice(0, 60) }
+          : {}),
+      }));
+    }
+    const toIso = (v?: string) => {
+      if (!v) return undefined;
+      const d = new Date(v);
+      return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+    };
+    const relevantDate = toIso(input.relevantDate);
+    if (relevantDate) passJson.relevantDate = relevantDate;
+    const expirationDate = toIso(input.expirationDate);
+    if (expirationDate) passJson.expirationDate = expirationDate;
+    if (input.suppressStripShine) passJson.suppressStripShine = true;
+    if (input.sharingProhibited) passJson.sharingProhibited = true;
     const logoText = input.logoText?.trim();
     if (logoText) {
       passJson.logoText = logoText;

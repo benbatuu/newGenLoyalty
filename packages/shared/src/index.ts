@@ -112,6 +112,21 @@ export {
 } from './multi-stamp-wallet';
 
 export {
+  WALLET_STAMP_ICON_MAX,
+  WALLET_STAMP_ICON_MIN,
+  WALLET_STAMP_INSET_LAYOUT,
+  WALLET_STRIP_H,
+  WALLET_STRIP_W,
+  computeWalletStampPositions,
+  resolveWalletStampGrid,
+  type WalletStampInset,
+  type WalletStampLayoutOptions,
+  type WalletStampManualPosition,
+  type WalletStampPosition,
+  type WalletStampRowAdjust,
+} from './wallet-stamp-layout';
+
+export {
   STAMP_THEME_ICONS,
   STAMP_THEME_OPTIONS,
   DEFAULT_GROUP_STAMP_THEMES,

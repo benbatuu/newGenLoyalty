@@ -6,6 +6,38 @@ export type ProgramWalletTemplate = {
   labelColor?: string | null;
   stampTheme?: string | null;
   stampInset?: string | null;
+  /** Damga satır sayısı (0/boş = otomatik) */
+  stampRows?: number | null;
+  /** GRID (varsayılan) veya STAGGERED (çift satırlar yarım adım kayar) */
+  stampLayout?: string | null;
+  /** Yatay / dikey damga boşluğu (boş = kenar boşluğu varsayılanı) */
+  stampGapX?: number | null;
+  stampGapY?: number | null;
+  /** Düzenleyici: ikon ölçeği (0.5–1.5), dizgi kayması (0–1), genel ofset, damga başına elle konum */
+  stampIconScale?: number | null;
+  stampStaggerRatio?: number | null;
+  stampOffsetX?: number | null;
+  stampOffsetY?: number | null;
+  stampPositions?:
+    | ({ x: number; y: number; size?: number; z?: number } | null)[]
+    | null;
+  stampRowAdjust?:
+    | ({ offsetX?: number; offsetY?: number; scale?: number } | null)[]
+    | null;
+  /** PassKit: program düzeyi ek alanlar ve seçenekler */
+  headerFields?: { key?: string; label: string; value: string }[] | null;
+  auxFields?: { key?: string; label: string; value: string }[] | null;
+  showBarcode?: boolean | null;
+  barcodeFormat?: string | null;
+  barcodeAltMode?: 'CODE' | 'NONE' | 'CUSTOM' | null;
+  barcodeAltText?: string | null;
+  locations?:
+    | { latitude: number; longitude: number; relevantText?: string | null }[]
+    | null;
+  relevantDate?: string | null;
+  expirationDate?: string | null;
+  suppressStripShine?: boolean | null;
+  sharingProhibited?: boolean | null;
   logoText?: string | null;
   logoUrl?: string | null;
   passDescription?: string | null;

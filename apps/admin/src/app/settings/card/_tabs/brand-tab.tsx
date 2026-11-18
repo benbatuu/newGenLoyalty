@@ -60,7 +60,7 @@ export function BrandTab({
             required
           />
         </Field>
-        <Field label="Kart üst yazısı (logo yokken)">
+        <Field label="Kart üst yazısı">
           <input
             className={inputClassName()}
             value={logoText}
@@ -68,7 +68,7 @@ export function BrandTab({
             placeholder={name || "Boşsa kafe adı"}
           />
           <p className="mt-1 text-[11px] text-[var(--muted)]">
-            Logo yüklüyken Wallet&apos;ta yalnızca logo görünür; bu yazı gizlenir.
+            Logo yüklüyken bu yazı logonun yanında görünür. Boş bırakırsanız logo yüklüyken yalnızca logo gösterilir.
             Bildirim başlığı için kafe adı kullanılır.
           </p>
         </Field>

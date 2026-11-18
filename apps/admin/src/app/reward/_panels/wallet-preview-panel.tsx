@@ -8,6 +8,7 @@ import {
 } from "@ngl/shared";
 import { SoftBox } from "../../../components/ui";
 import { resolveAdminAssetUrl } from "../../../lib/public-urls";
+import { ApplePassFront } from "./apple-pass-front";
 import { StampStripPreview } from "./stamp-strip-preview";
 import { WalletBarcode } from "./wallet-barcode";
 import type {
@@ -16,6 +17,8 @@ import type {
   ProgramWalletDraft,
   TenantWalletDefaults,
 } from "./wallet-types";
+import { useLayoutEffect, useRef } from "react";
+import { passTextColors } from "../../../lib/wallet-text";
 
 export type WalletPreviewPanelProps = {
   draft: ProgramWalletDraft;
@@ -48,8 +51,8 @@ export type WalletPreviewPanelProps = {
   barcodeFormat: BarcodeFormat;
 };
 
-import { useLayoutEffect, useRef } from "react";
-import { passTextColors } from "../../../lib/wallet-text";
+/** Wallet barkodunun altında görünen kod (örnek) */
+const SAMPLE_ALT_TEXT = "769248";
 
 export function WalletPreviewPanel({
   draft,
@@ -93,6 +96,45 @@ export function WalletPreviewPanel({
   }, [showBack, draft, showStampStrip, previewFilled, previewRewardReady, walletLayout]);
   const filledBackFields = draft.backFields.filter((f) => f.value.trim() !== "");
 
+  // Wallet (createPkPass ile aynı kurallar): logo varken üst yazı yalnızca açıkça girildiyse görünür
+  const hasLogo = Boolean(draft.logoUrl || tenant.logoUrl);
+  const explicitTopText = draft.logoText.trim();
+  const topLeftText = hasLogo ? explicitTopText : explicitTopText || previewLogo;
+
+  const stampValue = isMultiStampCombined
+    ? `${totalPreviewFilled} / ${effectiveTotalSlots}`
+    : `${previewFilled} / ${stampsRequired}`;
+  const headerLabel = tenant.headerFieldLabel?.trim();
+  const rewardValue = previewRewardReady
+    ? tenant.rewardReadyText?.trim() || "Ödül hazır!"
+    : rewardLabel;
+
+  // Alt alanlar (pass'teki secondaryFields ile aynı sıra ve etiketler)
+  const firstValue = showStampStrip
+    ? stampValue
+    : isCashbackCard
+      ? `₺${previewBalanceTry}`
+      : isPointCard
+        ? previewFilled.toLocaleString("tr-TR")
+        : String(previewFilled);
+  const secondaryFields: { key: string; label: string; value: string }[] = [
+    {
+      key: "stamps",
+      label: (draft.stampFieldLabel || (showStampStrip ? "DAMGA" : "BAKİYE")).toUpperCase(),
+      value: firstValue,
+    },
+    {
+      key: "reward",
+      label: (draft.rewardFieldLabel || "ÖDÜL").toUpperCase(),
+      value: rewardValue,
+    },
+    {
+      key: "status",
+      label: (draft.statusFieldLabel || "DURUM").toUpperCase(),
+      value: previewStatus,
+    },
+  ];
+
   return (
     <SoftBox className="space-y-3">
       <div className="flex items-center justify-between">
@@ -114,82 +156,57 @@ export function WalletPreviewPanel({
           className="absolute inset-0 transition-transform duration-500 ease-out [transform-style:preserve-3d] motion-reduce:transition-none"
           style={{ transform: showBack ? "rotateY(180deg)" : "rotateY(0deg)" }}
         >
-          {/* Ön yüz */}
+          {/* Ön yüz — Apple storeCard düzeni: logo/üst yazı solda, header sağda, şerit, alanlar, barkod */}
           <div
             ref={frontRef}
             className="absolute inset-x-0 top-0 [backface-visibility:hidden]"
             aria-hidden={showBack}
           >
-            <div
-              className="flex flex-col overflow-hidden rounded-2xl shadow-lg"
-              style={{
-                background: draft.backgroundImageUrl
+            <ApplePassFront
+              background={
+                draft.backgroundImageUrl
                   ? `url(${resolveAdminAssetUrl(draft.backgroundImageUrl)}) center/cover no-repeat`
-                  : draft.primaryColor,
-                color: tc.fg,
-              }}
-            >
-              <div className="flex items-start justify-between gap-3 px-4 pt-4">
-                <div className="flex min-w-0 items-center gap-3">
-                  {draft.logoUrl || tenant.logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={resolveAdminAssetUrl(draft.logoUrl || tenant.logoUrl || "")}
-                      alt=""
-                      className="h-8 w-16 object-contain"
-                    />
-                  ) : (
-                    <p
-                      className="truncate text-[11px] uppercase tracking-[0.14em]"
-                      style={{ color: tc.label }}
-                    >
-                      {previewLogo}
-                    </p>
-                  )}
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-[9px] uppercase tracking-wider" style={{ color: tc.label }}>
-                    {programName}
-                  </p>
-                </div>
-              </div>
-
-              {showStampStrip ? (
-                <div className="mt-2 space-y-2 px-4">
-                  {isMultiStampCombined && walletLayout && (
-                    <div className="flex flex-wrap gap-2">
-                      {walletLayout.segments.map((seg) => (
-                        <span
-                          key={seg.laneId}
-                          className="rounded-md bg-black/15 px-2 py-0.5 text-[9px] uppercase tracking-wide"
-                          style={{ color: tc.label }}
-                        >
-                          {seg.label} {seg.filled}/{seg.threshold}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {draft.stripImageUrl ? (
-                    // Özel şerit: görsel tam genişlikte, damgalar onun üstünde (Wallet'taki gibi)
-                    <div className="relative -mx-4 overflow-hidden" style={{ aspectRatio: "375 / 123" }}>
+                  : draft.primaryColor
+              }
+              fg={tc.fg}
+              label={tc.label}
+              logo={hasLogo ? resolveAdminAssetUrl(draft.logoUrl || tenant.logoUrl || "") : null}
+              logoText={topLeftText}
+              header={
+                headerLabel
+                  ? [
+                      {
+                        key: "h",
+                        label: headerLabel.toUpperCase(),
+                        value: isCashbackCard
+                          ? `₺${previewBalanceTry}`
+                          : isPointCard
+                            ? previewFilled.toLocaleString("tr-TR")
+                            : stampValue,
+                      },
+                    ]
+                  : undefined
+              }
+              strip={
+                showStampStrip ? (
+                  draft.stripImageUrl ? (
+                    <div className="relative overflow-hidden" style={{ aspectRatio: "375 / 123" }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={resolveAdminAssetUrl(draft.stripImageUrl)}
                         alt=""
                         className="absolute inset-0 h-full w-full object-cover"
                       />
-                      <div className="absolute inset-0 flex items-center px-4">
-                        <div className="w-full rounded-lg">
-                          <StampStripPreview
-                            slotFilled={previewSlotFilled}
-                            draft={draft}
-                            filledUrl={effectiveFilledUrl}
-                            emptyUrl={effectiveEmptyUrl}
-                            segmentBoundaries={segmentBoundaries}
-                            slotStyles={previewSlotStyles}
-                            transparent
-                          />
-                        </div>
+                      <div className="absolute inset-0">
+                        <StampStripPreview
+                          slotFilled={previewSlotFilled}
+                          draft={draft}
+                          filledUrl={effectiveFilledUrl}
+                          emptyUrl={effectiveEmptyUrl}
+                          segmentBoundaries={segmentBoundaries}
+                          slotStyles={previewSlotStyles}
+                          transparent
+                        />
                       </div>
                     </div>
                   ) : (
@@ -201,58 +218,21 @@ export function WalletPreviewPanel({
                       segmentBoundaries={segmentBoundaries}
                       slotStyles={previewSlotStyles}
                     />
-                  )}
-                </div>
-              ) : (
-                <div className="mx-3 mt-2 rounded-xl bg-black/10 px-3 py-3 text-center">
-                  <p className="text-2xl font-semibold tabular-nums">
-                    {isCashbackCard
-                      ? `₺${previewBalanceTry}`
-                      : isPointCard
-                        ? previewFilled.toLocaleString("tr-TR")
-                        : previewFilled}
-                  </p>
-                  <p className="mt-1 text-[10px] uppercase tracking-wider" style={{ color: tc.label }}>
-                    {draft.stampFieldLabel || "BAKİYE"}
-                  </p>
-                </div>
-              )}
-
-              <div className="mt-auto grid grid-cols-3 gap-1.5 px-4 pb-2 pt-2">
-                <div>
-                  <p className="text-[9px] uppercase tracking-wider" style={{ color: tc.label }}>
-                    {draft.stampFieldLabel}
-                  </p>
-                  <p className="text-sm font-semibold tabular-nums">
-                    {showStampStrip
-                      ? isMultiStampCombined
-                        ? `${totalPreviewFilled}/${effectiveTotalSlots}`
-                        : `${previewFilled}/${stampsRequired}`
-                      : isCashbackCard
-                        ? `₺${previewBalanceTry}`
-                        : isPointCard
-                          ? previewFilled.toLocaleString("tr-TR")
-                          : String(previewFilled)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[9px] uppercase tracking-wider" style={{ color: tc.label }}>
-                    {draft.rewardFieldLabel}
-                  </p>
-                  <p className="truncate text-sm font-semibold">{rewardLabel}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] uppercase tracking-wider" style={{ color: tc.label }}>
-                    {draft.statusFieldLabel}
-                  </p>
-                  <p className="truncate text-sm font-semibold">{previewStatus}</p>
-                </div>
-              </div>
-              {/* Barkod — kullanıcının seçtiği format */}
-              <div className="mx-4 mb-3 grid place-items-center rounded-md bg-[var(--panel)] p-1.5">
-                <WalletBarcode format={barcodeFormat} width={150} />
-              </div>
-            </div>
+                  )
+                ) : undefined
+              }
+              primary={
+                showStampStrip
+                  ? undefined
+                  : {
+                      label: (draft.stampFieldLabel || "BAKİYE").toUpperCase(),
+                      value: firstValue,
+                    }
+              }
+              fields={secondaryFields}
+              barcode={<WalletBarcode format={barcodeFormat} width={150} />}
+              altText={SAMPLE_ALT_TEXT}
+            />
           </div>
 
           {/* Arka yüz — ön yüzle aynı hücrede, 180° çevrik */}
