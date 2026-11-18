@@ -62,6 +62,7 @@ export type ApplePassInput = {
   background3xPng?: Buffer;
   logoPng?: Buffer;
   logo2xPng?: Buffer;
+  logo3xPng?: Buffer;
   iconPng?: Buffer;
   icon2xPng?: Buffer;
   icon3xPng?: Buffer;
@@ -464,6 +465,7 @@ export class ApplePassService implements OnModuleInit {
     if (input.backgroundPng) assets['background.png'] = input.backgroundPng;
     if (input.background2xPng) assets['background' + at2x] = input.background2xPng;
     if (input.background3xPng) assets['background' + at3x] = input.background3xPng;
+    if (input.logo3xPng) assets['logo' + at3x] = input.logo3xPng;
 
     if (input.iconPng) {
       this.logger.log(
