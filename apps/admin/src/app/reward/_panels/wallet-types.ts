@@ -13,9 +13,14 @@ export type BackFieldKey =
   | "email"
   | "website"
   | "address"
+  | "hours"
+  | "about"
+  | "how"
   | "terms"
   | "custom1"
-  | "custom2";
+  | "custom2"
+  | "custom3"
+  | "custom4";
 
 export type WalletBackField = {
   key: BackFieldKey;
@@ -25,13 +30,18 @@ export type WalletBackField = {
 };
 
 export const BACK_FIELD_PRESETS: { key: BackFieldKey; label: string; placeholder: string; type?: string }[] = [
+  { key: "about", label: "Hakkında", placeholder: "İşletmeniz hakkında kısa bilgi" },
+  { key: "how", label: "Nasıl çalışır?", placeholder: "Damga nasıl toplanır, ödül nasıl alınır" },
+  { key: "terms", label: "Şartlar & Koşullar", placeholder: "Kampanya şartlarını buraya girin…" },
+  { key: "address", label: "Şubeler / Adres", placeholder: "Örn. Bağcılar Mah. No: 1, İstanbul" },
+  { key: "hours", label: "Çalışma saatleri", placeholder: "Hft içi 09:00–21:00" },
   { key: "phone", label: "Telefon", placeholder: "+90 555 000 00 00", type: "phone" },
   { key: "email", label: "E-posta", placeholder: "bilgi@isletme.com", type: "email" },
   { key: "website", label: "Web sitesi", placeholder: "https://isletme.com", type: "url" },
-  { key: "address", label: "Adres", placeholder: "Örn. Bağcılar Mah. No: 1, İstanbul" },
-  { key: "terms", label: "Şartlar & Koşullar", placeholder: "Kampanya şartlarını buraya girin…" },
   { key: "custom1", label: "Özel alan 1", placeholder: "" },
   { key: "custom2", label: "Özel alan 2", placeholder: "" },
+  { key: "custom3", label: "Özel alan 3", placeholder: "" },
+  { key: "custom4", label: "Özel alan 4", placeholder: "" },
 ];
 
 export type ProgramWalletDraft = {

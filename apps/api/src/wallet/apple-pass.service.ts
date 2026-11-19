@@ -1,3 +1,4 @@
+import type { ApplePassStyle } from './pass-style';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
@@ -11,6 +12,7 @@ export type ApplePassBackField = {
   key: string;
   label: string;
   value: string;
+  attributedValue?: string;
   changeMessage?: string;
 };
 
@@ -39,6 +41,8 @@ export type ApplePassInput = {
   showRewardField?: boolean;
   showStatusField?: boolean;
   showBroadcastField?: boolean;
+  /** Program türünden türetilir (pass-style.ts) */
+  passStyle?: ApplePassStyle;
   rewardReadyText?: string;
   stampsRemainingTemplate?: string;
   headerFieldLabel?: string;
@@ -261,7 +265,6 @@ export class ApplePassService implements OnModuleInit {
     const showStamp = input.showStampField !== false;
     const showReward = input.showRewardField !== false;
     const showStatus = input.showStatusField !== false;
-    const showBroadcast = input.showBroadcastField !== false;
 
     const secondaryFields: Record<string, unknown>[] = [];
     if (showStamp) {
@@ -305,47 +308,20 @@ export class ApplePassService implements OnModuleInit {
     if (walletNotify) {
       backFields.unshift(walletNotify);
     }
-    if (showBroadcast) {
-      auxiliaryFields.push({
-        key: 'broadcast',
-        label: broadcastLabel,
-        value: broadcast.slice(0, 120),
-        changeMessage: '%@',
-      });
-    } else {
-      // Ön yüzde yok → push için arka yüze al (aynı key ile changeMessage)
-      const withoutDup = backFields.filter(
-        (f) => f.key !== 'broadcast' && f.key !== 'broadcastDetail',
-      );
-      withoutDup.unshift({
-        key: 'broadcast',
-        label: broadcastLabel,
-        value: broadcast.slice(0, 120),
-        changeMessage: '%@',
-      });
-      backFields.length = 0;
-      backFields.push(...withoutDup);
-    }
+    // Yardımcı (aux) alanlar kullanılmıyor; duyuru arka yüze alınır (changeMessage ile bildirim çalışır)
+    const withoutDup = backFields.filter(
+      (f) => f.key !== 'broadcast' && f.key !== 'broadcastDetail',
+    );
+    withoutDup.unshift({
+      key: 'broadcast',
+      label: broadcastLabel,
+      value: broadcast.slice(0, 120),
+      changeMessage: '%@',
+    });
+    backFields.length = 0;
+    backFields.push(...withoutDup);
 
-    for (const extra of input.extraAuxiliaryFields ?? []) {
-      if (auxiliaryFields.length >= 4) break;
-      auxiliaryFields.push({
-        key: extra.key,
-        label: extra.label.toUpperCase().slice(0, 20),
-        value: extra.value.slice(0, 40),
-      });
-    }
-
-    for (const custom of input.auxCustomFields ?? []) {
-      if (auxiliaryFields.length >= 4) break;
-      auxiliaryFields.push({
-        key: custom.key,
-        label: custom.label.toUpperCase().slice(0, 20),
-        value: custom.value.slice(0, 60),
-      });
-    }
-
-    const storeCard: Record<string, unknown> = {
+    const styleBody: Record<string, unknown> = {
       primaryFields: [],
       secondaryFields,
       auxiliaryFields,
@@ -367,15 +343,16 @@ export class ApplePassService implements OnModuleInit {
       });
     }
     if (headerFields.length > 0) {
-      // Apple: header alanları en fazla 3
-      storeCard.headerFields = headerFields.slice(0, 3);
+      // Tasarım: header alanları en fazla 2
+      styleBody.headerFields = headerFields.slice(0, 2);
     }
 
     if (backFields.length > 0) {
-      storeCard.backFields = backFields.map((f) => ({
+      styleBody.backFields = backFields.map((f) => ({
         key: f.key,
         label: f.label,
         value: f.value.trim(),
+        ...(f.attributedValue ? { attributedValue: f.attributedValue } : {}),
         ...(f.changeMessage
           ? { changeMessage: this.changeMessage(f.changeMessage, '%@') }
           : {}),
@@ -392,7 +369,7 @@ export class ApplePassService implements OnModuleInit {
       backgroundColor: bg,
       foregroundColor: fg,
       labelColor: label,
-      storeCard,
+      [input.passStyle ?? 'storeCard']: styleBody,
     };
     if (input.showBarcode !== false) {
       const mode = input.barcodeAltMode ?? 'CODE';

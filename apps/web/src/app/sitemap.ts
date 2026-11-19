@@ -14,7 +14,6 @@ const pathnames: Exclude<Pathnames, "/sectors/[slug]">[] = [
   "/use-cases",
   "/contact",
   "/portal",
-  "/login",
   "/signup",
   "/kvkk",
   "/privacy",

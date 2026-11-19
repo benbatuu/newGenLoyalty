@@ -65,6 +65,12 @@ export function getAdminLoginUrl(): string {
   return base ? `${base}/login` : "";
 }
 
+/** Admin `/register` (kayıt), yoksa "" — çağıran taraf fallback'ini seçer. */
+export function getAdminRegisterUrl(): string {
+  const base = getAdminUrl();
+  return base ? `${base}/register` : "";
+}
+
 function mediaKeyFromUrl(raw: string): string | null {
   const mediaIdx = raw.indexOf("/media/");
   if (mediaIdx >= 0) {

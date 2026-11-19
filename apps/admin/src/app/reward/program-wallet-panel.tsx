@@ -234,28 +234,6 @@ export function ProgramWalletPanel({
 
   const formNode = (
     <>
-        <div className="space-y-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3">
-          <p className="text-sm font-medium text-[var(--ink)]">Barkod türü</p>
-          <p className="text-xs text-[var(--muted)]">Müşterinin telefonunda kartın altında görünür. Kasiyer bu kodu okutur.</p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Kasada okutulacak kod">
-            {BARCODE_OPTIONS.map((opt) => {
-              const active = barcodeFormat === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => onBarcodeFormatChange(opt.id)}
-                  className={`rounded-lg border px-3 py-2 text-left transition ${active ? "border-[var(--ink)] bg-[var(--surface)] ring-1 ring-[var(--ink)]/20" : "border-[var(--line)] hover:bg-[var(--surface)]"}`}
-                >
-                  <span className="block text-[0.8125rem] font-semibold text-[var(--ink)]">{opt.label}</span>
-                  <span className="block text-[0.6875rem] text-[var(--muted)]">{opt.hint}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
         <WalletDesignForm
           programId={programId}
           programName={programName}
@@ -333,5 +311,39 @@ export function ProgramWalletPanel({
         {previewNode}
       </div>
     </Panel>
+  );
+}
+
+/** Kasada okutulacak kod türü seçimi — yalnızca Barkod sekmesinde gösterilir */
+export function BarcodeTypePicker({
+  value,
+  onChange,
+}: {
+  value: BarcodeFormat;
+  onChange: (f: BarcodeFormat) => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3">
+      <p className="text-sm font-medium text-[var(--ink)]">Barkod türü</p>
+      <p className="text-xs text-[var(--muted)]">Müşterinin telefonunda kartın altında görünür. Kasiyer bu kodu okutur.</p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Kasada okutulacak kod">
+        {BARCODE_OPTIONS.map((opt) => {
+          const active = value === opt.id;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onChange(opt.id)}
+              className={`rounded-lg border px-3 py-2 text-left transition ${active ? "border-[var(--ink)] bg-[var(--surface)] ring-1 ring-[var(--ink)]/20" : "border-[var(--line)] hover:bg-[var(--surface)]"}`}
+            >
+              <span className="block text-[0.8125rem] font-semibold text-[var(--ink)]">{opt.label}</span>
+              <span className="block text-[0.6875rem] text-[var(--muted)]">{opt.hint}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }

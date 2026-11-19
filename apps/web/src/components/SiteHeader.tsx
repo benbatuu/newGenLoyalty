@@ -7,16 +7,12 @@ import { useParams } from "next/navigation";
 import { Link, usePathname } from "../i18n/navigation";
 import type { Locale } from "../i18n/routing";
 import { BrandLogo } from "@/components/marketing/BrandLogo";
-import { getAdminLoginUrl } from "@/lib/public-urls";
+import { getAdminLoginUrl, getAdminRegisterUrl } from "@/lib/public-urls";
 import { lockBodyScroll } from "@/lib/body-scroll-lock";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { cn } from "@/lib/utils";
 
 const LOCALES = ["tr", "en", "ru"] as const;
-
-function isExternal(url: string) {
-  return /^https?:\/\//i.test(url);
-}
 
 export function SiteHeader() {
   const t = useTranslations("nav");
@@ -30,6 +26,7 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const adminLogin = getAdminLoginUrl();
+  const adminRegister = getAdminRegisterUrl() || "/pricing";
   const panelRef = useRef<HTMLDivElement>(null);
   useFocusTrap(open, panelRef);
 
@@ -68,15 +65,11 @@ export function SiteHeader() {
   }, [open]);
 
   const LoginLink = ({ className }: { className: string }) =>
-    adminLogin && isExternal(adminLogin) ? (
+    adminLogin ? (
       <a href={adminLogin} className={className} rel="noopener noreferrer">
         {t("login")}
       </a>
-    ) : (
-      <Link href="/login" className={className}>
-        {t("login")}
-      </Link>
-    );
+    ) : null;
 
   return (
     <>
@@ -162,13 +155,13 @@ export function SiteHeader() {
 
             <LoginLink className="hidden h-9 items-center rounded-full px-3.5 text-sm font-medium text-[#DFE5EB]/75 transition-colors hover:text-[#DFE5EB] 2xl:inline-flex" />
 
-            <Link
-              href="/pricing"
+            <a
+              href={adminRegister}
               className="group hidden h-9 items-center gap-1.5 whitespace-nowrap rounded-full bg-[#D91E33] pl-4 pr-3.5 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_8px_24px_-10px_rgba(239,35,60,0.9)] transition-[transform,box-shadow] duration-200 hover:-translate-y-px hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_12px_28px_-10px_rgba(239,35,60,1)] 2xl:inline-flex"
             >
               {t("signup")}
               <span aria-hidden className="transition-transform duration-200 group-hover:translate-x-0.5">→</span>
-            </Link>
+            </a>
 
             <button
               type="button"
@@ -268,12 +261,12 @@ export function SiteHeader() {
 
               <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/10 pt-4">
                 <LoginLink className="flex h-11 items-center justify-center rounded-full border border-white/15 text-sm font-medium text-[#DFE5EB]" />
-                <Link
-                  href="/pricing"
+                <a
+                  href={adminRegister}
                   className="flex h-11 items-center justify-center rounded-full bg-[#D91E33] text-sm font-semibold text-white"
                 >
                   {t("signup")}
-                </Link>
+                </a>
               </div>
             </motion.div>
           ) : null}

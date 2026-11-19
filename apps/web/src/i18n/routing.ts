@@ -41,11 +41,6 @@ export const routing = defineRouting({
       en: "/contact",
       ru: "/контакты"
     },
-    "/login": {
-      tr: "/giris",
-      en: "/login",
-      ru: "/авторизоваться"
-    },
     "/signup": {
       tr: "/kayit",
       en: "/signup",
