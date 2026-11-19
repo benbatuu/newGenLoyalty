@@ -139,21 +139,12 @@ export function FieldsSection({
     <div className="space-y-8">
       <FieldList
         title="Üst sağ alanlar (header)"
-        hint={`Logonun karşısında, en üstte görünür. Apple en fazla 3 alana izin verir${tenantHasHeader ? "; işletme header'ı 1 yer kaplıyor." : "."}`}
+        hint={`Logonun karşısında, en üstte görünür. Tasarımı bozmamak için en fazla 2 alan${tenantHasHeader ? " (işletme header'ı 1 yer kaplıyor)" : ""}.`}
         items={draft.headerFields}
-        max={tenantHasHeader ? 2 : 3}
+        max={tenantHasHeader ? 1 : 2}
         onChange={(headerFields) => onChange({ ...draft, headerFields })}
         labelPlaceholder="Örn. SEVİYE"
         valuePlaceholder="Örn. Gold"
-      />
-      <FieldList
-        title="Yardımcı alanlar (auxiliary)"
-        hint="Damga / Ödül / Durum satırının altında ek bilgi satırı. En fazla 4 alan."
-        items={draft.auxFields}
-        max={4}
-        onChange={(auxFields) => onChange({ ...draft, auxFields })}
-        labelPlaceholder="Örn. ŞUBE"
-        valuePlaceholder="Örn. Kadıköy"
       />
     </div>
   );

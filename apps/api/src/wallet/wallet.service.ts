@@ -1,3 +1,4 @@
+import { resolvePassStyle } from './pass-style';
 import { randomInt } from 'crypto';
 import {
   BadRequestException,
@@ -1041,7 +1042,8 @@ export class WalletService {
     };
   }
 
-  private buildAppleBackFields(tenant: {
+  private buildAppleBackFields(
+    tenant: {
     name: string;
     passDescription: string | null;
     passHowItWorks: string | null;
@@ -1066,13 +1068,35 @@ export class WalletService {
     passBroadcastMessage: string | null;
     broadcastFieldLabel: string | null;
     broadcastEmptyText: string | null;
-  }) {
+  },
+    program: ReturnType<typeof parseWalletTemplate>,
+  ) {
     const fields: {
       key: string;
       label: string;
       value: string;
+      attributedValue?: string;
       changeMessage?: string;
     }[] = [];
+    // Program arka yüzü (admin "Arka yüz" sekmesi) önce gelir; anahtarlar tekil kalır
+    const usedKeys = new Set<string>();
+    (program?.backFields ?? []).forEach((f, i) => {
+      const label = f?.label?.trim();
+      const value = f?.value?.trim();
+      if (!label || !value) return;
+      let key = (f.key?.trim() || `prog${i + 1}`).replace(/[^A-Za-z0-9_-]/g, '');
+      // Panelde "Şubeler / Adres" anahtarı 'address'; tenant şube alanıyla aynı anahtarı paylaşsın
+      if (key === 'address') key = 'locations';
+      if (!key || usedKeys.has(key)) key = `prog${i + 1}`;
+      usedKeys.add(key);
+      const attributed = f.attributedValue?.trim();
+      fields.push({
+        key,
+        label: label.slice(0, 30),
+        value: value.slice(0, 500),
+        ...(attributed ? { attributedValue: attributed } : {}),
+      });
+    });
     const push = (
       key: string,
       defaultLabel: string,
@@ -1081,7 +1105,7 @@ export class WalletService {
       changeMessage?: string,
     ) => {
       const v = value?.trim();
-      if (!v) return;
+      if (!v || usedKeys.has(key)) return;
       fields.push({
         key,
         label: label?.trim() || defaultLabel,
@@ -1726,12 +1750,14 @@ export class WalletService {
     const rewardReady = display?.rewardReady ?? customer.rewardReady;
 
     let walletTemplate = null;
+    let programType: string | null = null;
     if (programId) {
       const program = await this.prisma.loyaltyProgram.findFirst({
         where: { id: programId, tenantId },
-        select: { config: true },
+        select: { config: true, type: true },
       });
       walletTemplate = parseWalletTemplate(program?.config);
+      programType = program?.type ?? null;
     }
     const branding = resolvePassBranding(tenant, walletTemplate);
 
@@ -1780,11 +1806,13 @@ export class WalletService {
         ? explicitLogoText || undefined
         : explicitLogoText || orgName;
 
+    // Yardımcı (aux) alanlar kaldırıldı: ek alan üretimi yok
     const enrichment = programId
-      ? { extraAuxiliaryFields: display!.extraAuxiliaryFields, stampNotifyValue: undefined }
-      : await this.buildPassEnrichment(tenantId, customerId, notifyKind);
+      ? { extraAuxiliaryFields: [], stampNotifyValue: undefined }
+      : { extraAuxiliaryFields: [], stampNotifyValue: undefined };
 
     return this.apple.createPkPass({
+      passStyle: resolvePassStyle(programType),
       serialNumber: this.appleSerial(customerId, programId),
       organizationName: orgName,
       description:
@@ -1826,7 +1854,7 @@ export class WalletService {
       customerDisplayName: customer.displayName,
       updateKind: this.notifyKindToUpdateKind(notifyKind),
       broadcastMessage: tenant.passBroadcastMessage,
-      backFields: this.buildAppleBackFields(tenant),
+      backFields: this.buildAppleBackFields(tenant, walletTemplate),
       stripPng: stripArt.strip,
       strip2xPng: stripArt.strip2x,
       strip3xPng: stripArt.strip3x,
@@ -1879,8 +1907,9 @@ export class WalletService {
         relevantText: l.relevantText ?? undefined,
       }));
     return {
-      headerExtraFields: fields(wt.headerFields, 'hx', 3),
-      auxCustomFields: fields(wt.auxFields, 'ax', 4),
+      headerExtraFields: fields(wt.headerFields, 'hx', 2),
+      // Yardımcı (aux) alanlar gösterilmiyor: Apple store card'da ikincil+yardımcı toplamını sınırlıyor
+      auxCustomFields: [],
       showBarcode: wt.showBarcode ?? true,
       barcodeAltMode: wt.barcodeAltMode ?? 'CODE',
       barcodeAltText: wt.barcodeAltText ?? undefined,

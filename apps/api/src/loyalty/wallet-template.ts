@@ -27,6 +27,15 @@ export type ProgramWalletTemplate = {
   /** PassKit: program düzeyi ek alanlar ve seçenekler */
   headerFields?: { key?: string; label: string; value: string }[] | null;
   auxFields?: { key?: string; label: string; value: string }[] | null;
+  /** PassKit arka yüz alanları (Apple backFields: key/label/value, attributedValue link için) */
+  backFields?:
+    | {
+        key?: string;
+        label: string;
+        value: string;
+        attributedValue?: string | null;
+      }[]
+    | null;
   showBarcode?: boolean | null;
   barcodeFormat?: string | null;
   barcodeAltMode?: 'CODE' | 'NONE' | 'CUSTOM' | null;

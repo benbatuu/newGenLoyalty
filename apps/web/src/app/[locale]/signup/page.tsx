@@ -1,11 +1,7 @@
-import { redirect } from "@/i18n/navigation";
+import { redirect } from "next/navigation";
+import { getAdminRegisterUrl } from "@/lib/public-urls";
 
-/** Kayıt artık fiyatlandırma sayfasından paket seçilerek yapılır. */
-export default async function SignupPage({
-  params,
-}: {
-  params: Promise<{ locale: string }>;
-}) {
-  const { locale } = await params;
-  redirect({ href: "/pricing", locale });
+/** Kayıt admin panelinde yapılır; admin kayıt adresi tanımlı değilse fiyatlandırmaya düşer. */
+export default function SignupPage() {
+  redirect(getAdminRegisterUrl() || "/pricing");
 }

@@ -138,7 +138,7 @@ export function walletTemplatePayload(draft: ProgramWalletDraft) {
     stampPositions: draft.stampPositions,
     stampRowAdjust: draft.stampRowAdjust,
     headerFields: draft.headerFields.filter((f) => f.label.trim() && f.value.trim()),
-    auxFields: draft.auxFields.filter((f) => f.label.trim() && f.value.trim()),
+    auxFields: [], // yardımcı alanlar kaldırıldı
     showBarcode: draft.showBarcode,
     barcodeFormat: draft.barcodeFormat || null,
     barcodeAltMode: draft.barcodeAltMode,

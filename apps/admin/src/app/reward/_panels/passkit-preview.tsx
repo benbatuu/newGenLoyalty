@@ -66,7 +66,7 @@ export function PassKitPreview({
     ...draft.headerFields
       .filter((f) => f.label.trim() && f.value.trim())
       .map((f, i) => ({ key: `h${i + 1}`, label: f.label.trim().toUpperCase(), value: f.value.trim() })),
-  ].slice(0, 3);
+  ].slice(0, 2);
 
   const fields = [
     {
@@ -77,10 +77,8 @@ export function PassKitPreview({
     { key: "r", label: (draft.rewardFieldLabel || "ÖDÜL").toUpperCase(), value: rewardLabel },
     { key: "d", label: (draft.statusFieldLabel || "DURUM").toUpperCase(), value: statusText },
   ];
-  const aux = draft.auxFields
-    .filter((f) => f.label.trim() && f.value.trim())
-    .slice(0, 4)
-    .map((f, i) => ({ key: `a${i}`, label: f.label.trim().toUpperCase(), value: f.value.trim() }));
+  // Yardımcı (aux) alanlar gösterilmiyor; wallet ile aynı
+  const aux: { key: string; label: string; value: string }[] = [];
 
   const format = (draft.barcodeFormat || tenant.barcodeFormat || "QR") as BarcodeFormat;
   const altText =

@@ -88,6 +88,7 @@ import {
 } from "./program-cards-hub";
 import {
   ProgramWalletPanel,
+  BarcodeTypePicker,
   draftFromProgramWallet,
   isWalletEligibleProgram,
   walletTemplatePayload,
@@ -1062,7 +1063,10 @@ function RewardContent() {
                     </div>
                     ) : null}
                     {tab === "barcode" && walletEligible ? (
-                      <BarcodeSection draft={walletDraft} onChange={setWalletDraft} />
+                      <>
+                        <BarcodeTypePicker value={barcodeFormat} onChange={setBarcodeFormat} />
+                        <BarcodeSection draft={walletDraft} onChange={setWalletDraft} />
+                      </>
                     ) : null}
                     {tab === "relevance" && walletEligible ? (
                       <RelevanceSection draft={walletDraft} onChange={setWalletDraft} />
