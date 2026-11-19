@@ -17,6 +17,7 @@ import {
 import { ApiError, api, updateSessionSubscription } from "../../lib/api";
 import { useApiQuery } from "../../lib/use-api-query";
 import { refreshSessionData } from "../../lib/session-data";
+import { SensitiveCodeDialog } from "../../components/sensitive-code-dialog";
 import { SettingsSectionHeader } from "../settings/_components/settings-section-header";
 
 type BillingTenant = {
@@ -97,6 +98,7 @@ export function BillingSettingsPanel() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionOk, setActionOk] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [cancelCodeOpen, setCancelCodeOpen] = useState(false);
 
   useEffect(() => {
     if (!sub) return;
@@ -112,13 +114,17 @@ export function BillingSettingsPanel() {
     key: string,
     path: string,
     confirmMsg: string,
+    verificationToken?: string,
   ) {
-    if (!window.confirm(confirmMsg)) return;
+    if (!verificationToken && !window.confirm(confirmMsg)) return;
     setBusy(key);
     setActionError(null);
     setActionOk(null);
     try {
-      const result = await api<SubscriptionSnapshot>(path, { method: "POST" });
+      const result = await api<SubscriptionSnapshot>(path, {
+        method: "POST",
+        ...(verificationToken ? { body: JSON.stringify({ verificationToken }) } : {}),
+      });
       await Promise.all([reload(true), reloadSub(true)]);
       refreshSessionData("plan"); // menüdeki paket bilgisi de tazelensin
       if (path.includes("suspend")) {
@@ -160,6 +166,15 @@ export function BillingSettingsPanel() {
 
   return (
     <div className="space-y-5">
+      <SensitiveCodeDialog
+        open={cancelCodeOpen}
+        purpose="ACCOUNT_CANCEL"
+        onClose={() => setCancelCodeOpen(false)}
+        onVerified={(token) => {
+          setCancelCodeOpen(false);
+          void runAction("cancel", "/tenants/me/subscription/cancel", "", token);
+        }}
+      />
       <SettingsSectionHeader
         title="Paket & abonelik"
         subtitle="Planınızı yönetin, iptal edin veya hesabı geçici olarak askıya alın."
@@ -286,13 +301,10 @@ export function BillingSettingsPanel() {
                   type="button"
                   className={`${btnGhost()} mt-3`}
                   disabled={!!busy}
-                  onClick={() =>
-                    void runAction(
-                      "cancel",
-                      "/tenants/me/subscription/cancel",
-                      `Aboneliği iptal etmek istediğinize emin misiniz? ${sub.daysRemaining} gün daha kullanabileceksiniz.`,
-                    )
-                  }
+                  onClick={() => {
+                    if (!window.confirm(`Aboneliği iptal etmek istediğinize emin misiniz? ${sub.daysRemaining} gün daha kullanabileceksiniz.`)) return;
+                    setCancelCodeOpen(true);
+                  }}
                 >
                   {busy === "cancel" ? "İşleniyor…" : "Aboneliği iptal et"}
                 </button>

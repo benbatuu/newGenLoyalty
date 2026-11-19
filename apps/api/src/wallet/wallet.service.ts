@@ -23,6 +23,7 @@ import {
   resolvePassBranding,
 } from '../loyalty/wallet-template';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { SmsService } from '../sms/sms.service';
 import { AppleApnsService } from './apple-apns.service';
 import { ApplePassService } from './apple-pass.service';
@@ -72,6 +73,7 @@ export class WalletService {
     private readonly walletPrograms: WalletProgramService,
     private readonly moduleRef: ModuleRef,
     private readonly pii: PiiService,
+    private readonly mail: MailService,
   ) {}
 
   private customerPhone(customer: {
@@ -1212,7 +1214,28 @@ export class WalletService {
       programIds,
     );
     await this.sendWalletInviteSms(customerId, tenantId, invite.link);
+    await this.sendWalletInviteEmail(customerId, tenantId, invite.link);
     return { ...sync, inviteUrl: invite.link, programIds: invite.programIds };
+  }
+
+  /** Müşteri e-postası varsa kart davet bağlantısını e-postayla da gönderir. */
+  private async sendWalletInviteEmail(customerId: string, tenantId: string, link: string) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, tenantId },
+      select: { email: true, displayName: true, tenant: { select: { name: true } } },
+    });
+    if (!customer?.email) return;
+    const body = this.mail.render(
+      `${customer.tenant.name} sadakat kartınız hazır`,
+      [
+        `${customer.displayName ? `Merhaba ${customer.displayName}, ` : ''}sadakat kartınızı telefonunuza eklemek için aşağıdaki bağlantıyı kullanın.`,
+      ],
+      { label: 'Kartımı ekle', url: link },
+    );
+    const result = await this.mail.send({ to: customer.email, subject: `${customer.tenant.name} sadakat kartı daveti`, ...body });
+    if (!result.ok) {
+      this.logger.warn(`Wallet davet e-postası gönderilemedi: ${result.error ?? 'bilinmeyen hata'}`);
+    }
   }
 
   async getInvitePageData(token: string) {

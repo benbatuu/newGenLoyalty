@@ -27,6 +27,7 @@ import { CrmService } from '../crm/crm.service';
 import { PlansService } from '../plans/plans.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssetsService } from '../tenants/assets.service';
+import { MailService } from '../mail/mail.service';
 import type { CreateEmailCampaignDto } from './dto/email-campaign.dto';
 import type { CreateFromStarterDto } from './dto/email-starter.dto';
 import type {
@@ -46,6 +47,7 @@ export class EmailService {
     private readonly plans: PlansService,
     private readonly crm: CrmService,
     private readonly assets: AssetsService,
+    private readonly mail: MailService,
   ) {}
 
   private env(key: string): string | undefined {
@@ -57,7 +59,7 @@ export class EmailService {
   }
 
   provider(): string {
-    return (this.env('EMAIL_PROVIDER') ?? 'mock').toLowerCase();
+    return this.mail.provider();
   }
 
   async assertEmailFeature(tenantId: string) {
@@ -121,48 +123,6 @@ export class EmailService {
     };
   }
 
-  private async sendViaResend(
-    to: string,
-    subject: string,
-    html: string,
-    text: string,
-  ): Promise<SendResult> {
-    const apiKey = this.env('RESEND_API_KEY');
-    const from =
-      this.env('EMAIL_FROM') ?? 'Dokun & Kazan <onboarding@resend.dev>';
-    if (!apiKey) {
-      this.logger.warn('RESEND_API_KEY eksik — mock moda düşülüyor');
-      return { ok: true, provider: 'mock' };
-    }
-
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from,
-          to: [to],
-          subject,
-          html,
-          text,
-        }),
-      });
-      if (!res.ok) {
-        const raw = await res.text().catch(() => res.statusText);
-        this.logger.warn(`Resend failed ${res.status}: ${raw}`);
-        return { ok: false, provider: 'resend', error: raw.slice(0, 200) };
-      }
-      return { ok: true, provider: 'resend' };
-    } catch (err) {
-      const msg = (err as Error).message;
-      this.logger.warn(`Resend error: ${msg}`);
-      return { ok: false, provider: 'resend', error: msg };
-    }
-  }
-
   async sendTransactional(opts: {
     to: string;
     subject: string;
@@ -170,23 +130,12 @@ export class EmailService {
     text: string;
     tenantId?: string;
   }): Promise<SendResult> {
-    const provider = this.provider();
-    if (provider === 'mock') {
-      this.logger.log(
-        `[mock email] to=${opts.to} subject=${opts.subject}`,
-      );
-      return { ok: true, provider: 'mock' };
-    }
-    if (provider === 'resend') {
-      return this.sendViaResend(
-        opts.to,
-        opts.subject,
-        opts.html,
-        opts.text,
-      );
-    }
-    this.logger.warn(`Email provider ${provider} desteklenmiyor — mock`);
-    return { ok: true, provider: 'mock' };
+    return this.mail.send({
+      to: opts.to,
+      subject: opts.subject,
+      html: opts.html,
+      text: opts.text,
+    });
   }
 
   async listMergeTags() {

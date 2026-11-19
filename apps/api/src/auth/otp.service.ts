@@ -10,6 +10,23 @@ import * as bcrypt from 'bcrypt';
 import { createHmac, randomInt, timingSafeEqual } from 'crypto';
 import { OtpPurpose } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
+
+/** Kullanıcı hesabı gerektiren amaçlar (kayıt dışında). */
+const EXISTING_USER_PURPOSES: OtpPurpose[] = [
+  OtpPurpose.RESET_PASSWORD,
+  OtpPurpose.PASSWORD_CHANGE,
+  OtpPurpose.ACCOUNT_CANCEL,
+  OtpPurpose.ACCOUNT_DELETE,
+];
+
+const PURPOSE_COPY: Record<OtpPurpose, { subject: string; action: string }> = {
+  [OtpPurpose.REGISTER]: { subject: 'Doğrulama kodunuz', action: 'Hesabınızı doğrulamak için kodunuz' },
+  [OtpPurpose.RESET_PASSWORD]: { subject: 'Şifre sıfırlama kodunuz', action: 'Şifrenizi sıfırlamak için kodunuz' },
+  [OtpPurpose.PASSWORD_CHANGE]: { subject: 'Şifre değişikliği onay kodunuz', action: 'Şifrenizi değiştirmek için onay kodunuz' },
+  [OtpPurpose.ACCOUNT_CANCEL]: { subject: 'Abonelik iptali onay kodunuz', action: 'Aboneliğinizi iptal etmek için onay kodunuz' },
+  [OtpPurpose.ACCOUNT_DELETE]: { subject: 'Hesap silme onay kodunuz', action: 'Hesabınızı silme talebini onaylamak için kodunuz' },
+};
 
 const CODE_TTL_MS = 10 * 60_000;
 const RESEND_COOLDOWN_MS = 60_000;
@@ -27,6 +44,7 @@ export class OtpService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly mail: MailService,
   ) {}
 
   private isProduction(): boolean {
@@ -50,7 +68,7 @@ export class OtpService {
   ): Promise<{ ok: true; devCode?: string }> {
     const email = rawEmail.toLowerCase().trim();
 
-    if (purpose === OtpPurpose.RESET_PASSWORD) {
+    if (EXISTING_USER_PURPOSES.includes(purpose)) {
       const user = await this.prisma.user.findUnique({ where: { email } });
       if (!user || !user.isActive) return { ok: true };
     } else {
@@ -178,38 +196,30 @@ export class OtpService {
     return { email: payload.sub, purpose };
   }
 
+  /** Oturumdaki kullanıcının e-postası için sensitive işlem kanıtını doğrular. */
+  async assertProofForUser(token: string, purpose: OtpPurpose, userId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    if (!user) throw new BadRequestException('Hesap bulunamadı');
+    await this.assertProof(token, purpose, user.email);
+  }
+
+  /** Sensitive işlem kanıtı: e-posta ve amaç eşleşmeli. */
+  async assertProof(token: string, purpose: OtpPurpose, email: string): Promise<void> {
+    const proof = await this.readProof(token, purpose);
+    if (proof.email !== email.toLowerCase().trim()) {
+      throw new BadRequestException('Doğrulama e-postası eşleşmiyor');
+    }
+  }
+
   private async sendCode(email: string, purpose: OtpPurpose, code: string) {
-    const subject =
-      purpose === OtpPurpose.REGISTER
-        ? 'StampWell doğrulama kodu'
-        : 'StampWell şifre sıfırlama kodu';
-    const text = `Doğrulama kodunuz: ${code}\nKod 10 dakika geçerlidir. Bu isteği siz yapmadıysanız bu e-postayı yok sayın.`;
+    const copy = PURPOSE_COPY[purpose];
+    const text = `${copy.action}: ${code}\nKod 10 dakika geçerlidir. Bu isteği siz yapmadıysanız bu e-postayı yok sayın.`;
+    const html = `<p>${copy.action}: <strong style="font-size:20px;letter-spacing:2px">${code}</strong></p><p>Kod 10 dakika geçerlidir. Bu isteği siz yapmadıysanız bu e-postayı yok sayın.</p>`;
 
-    const provider = (this.config.get<string>('EMAIL_PROVIDER') ?? 'mock')
-      .toLowerCase()
-      .trim();
-    const apiKey = this.config.get<string>('RESEND_API_KEY')?.trim();
-
-    if (provider === 'resend' && apiKey) {
-      const from =
-        this.config.get<string>('EMAIL_FROM')?.trim() ??
-        'StampWell <onboarding@resend.dev>';
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from,
-          to: [email],
-          subject,
-          text,
-          html: `<p>${text.replace(code, `<strong>${code}</strong>`).replace(/\n/g, '<br>')}</p>`,
-        }),
-      });
-      if (!res.ok) {
-        this.logger.warn(`OTP e-postası gönderilemedi (${res.status})`);
+    if (this.mail.isLive()) {
+      const result = await this.mail.send({ to: email, subject: copy.subject, text, html });
+      if (!result.ok) {
+        this.logger.warn(`OTP e-postası gönderilemedi (${result.provider})`);
         throw new ServiceUnavailableException(
           'Doğrulama kodu gönderilemedi. Lütfen tekrar deneyin.',
         );

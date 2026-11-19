@@ -145,6 +145,8 @@ function TrialNotice({ snap }: { snap: SubscriptionSnapshot }) {
   const days = snap.daysRemaining ?? 0;
   const urgent = days <= 3 || snap.trialExpired;
 
+  const endsOn = snap.trialEndsAt ? new Date(snap.trialEndsAt).toLocaleDateString("tr-TR") : "";
+
   return (
     <div
       role="status"
@@ -156,14 +158,14 @@ function TrialNotice({ snap }: { snap: SubscriptionSnapshot }) {
     >
       <p>
         {snap.trialExpired
-          ? "Deneme süreniz sona erdi. Devam etmek için paketinizi etkinleştirin."
-          : `Ücretsiz deneme: ${days} gün kaldı.`}
+          ? "Deneme süreniz sona erdi. Devam etmek için paketinizi satın alın."
+          : `Denemeniz ${days} gün sonra bitecek${endsOn ? ` (${endsOn})` : ""}. Kesintisiz devam etmek için paket satın alın.`}
       </p>
       <Link
         href="/settings/billing"
-        className="inline-flex h-9 items-center justify-center rounded-lg bg-[var(--accent)] px-4 text-xs font-semibold text-white"
+        className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] px-4 text-xs font-semibold text-white"
       >
-        Paketi seç
+        Paket satın al
       </Link>
     </div>
   );

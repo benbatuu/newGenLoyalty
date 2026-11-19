@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, FormEvent, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, FormEvent, useEffect, useState } from "react";
 import { AuthShell, authButtonClass, authFieldClass } from "../../components/auth-shell";
 import { OtpInput } from "../../components/otp-input";
 import {
@@ -10,18 +9,10 @@ import {
   type OtpRequestResponse,
   type OtpVerifyResponse,
 } from "../../lib/auth-request";
-import { getApiUrl } from "../../lib/public-urls";
 
-type PlanOption = { code: string; labelTr?: string; priceTry?: number };
-
-/** Web fiyatlandırma sayfasındaki paket adları (kaynak: apps/web messages). */
-const PLAN_NAMES: Record<string, string> = {
-  starter: "Starter",
-  growth: "Growth",
-  pro: "Pro",
-  business: "Business",
-};
-const FALLBACK_PLANS: PlanOption[] = Object.keys(PLAN_NAMES).map((code) => ({ code }));
+/** Kayıtta paket seçimi yok: her yeni işletme Starter ile 14 gün denemeye başlar. */
+const SIGNUP_PLAN_CODE = "starter";
+const TRIAL_DAYS = 14;
 
 type Step = "details" | "code" | "done";
 
@@ -34,13 +25,8 @@ export default function RegisterPage() {
 }
 
 function RegisterFlow() {
-  const search = useSearchParams();
-  const planFromUrl = search.get("plan")?.trim() ?? "";
-  const billing = search.get("billing") === "yearly" ? "yearly" : "monthly";
-
-  const [plans, setPlans] = useState<PlanOption[]>(FALLBACK_PLANS);
   const [step, setStep] = useState<Step>("details");
-  const [planCode, setPlanCode] = useState(planFromUrl);
+  const [trialEndsOn, setTrialEndsOn] = useState<string | null>(null);
   const [cafeName, setCafeName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
@@ -52,32 +38,10 @@ function RegisterFlow() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    fetch(`${getApiUrl()}/public/plans`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: unknown) => {
-        if (!cancelled && Array.isArray(data) && data.length > 0) {
-          setPlans(data as PlanOption[]);
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (planFromUrl) setPlanCode(planFromUrl);
-  }, [planFromUrl]);
-
-  useEffect(() => {
     if (cooldown <= 0) return;
     const id = setTimeout(() => setCooldown((c) => c - 1), 1000);
     return () => clearTimeout(id);
   }, [cooldown]);
-
-  const selected = useMemo(() => plans.find((p) => p.code === planCode) ?? null, [plans, planCode]);
-  const planUnknown = planCode !== "" && !selected;
 
   async function sendCode() {
     setError(null);
@@ -98,10 +62,6 @@ function RegisterFlow() {
 
   async function onDetails(e: FormEvent) {
     e.preventDefault();
-    if (!planCode || planUnknown) {
-      setError("Lütfen bir paket seçin.");
-      return;
-    }
     if (await sendCode()) {
       setCode("");
       setStep("code");
@@ -127,7 +87,7 @@ function RegisterFlow() {
       ownerName: ownerName.trim(),
       ownerEmail: ownerEmail.trim(),
       ownerPassword,
-      planCode,
+      planCode: SIGNUP_PLAN_CODE,
       verificationToken: verified.data.verificationToken,
     });
     setLoading(false);
@@ -135,6 +95,9 @@ function RegisterFlow() {
       setError(signup.message);
       return;
     }
+    setTrialEndsOn(
+      new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toLocaleDateString("tr-TR"),
+    );
     setStep("done");
   }
 
@@ -142,7 +105,7 @@ function RegisterFlow() {
     details: {
       eyebrow: "14 gün ücretsiz deneme",
       title: "İşletmenizi oluşturun",
-      subtitle: "Kredi kartı gerekmez. Deneme bitince paketinizi seçip etkinleştirirsiniz.",
+      subtitle: "Starter paketiyle başlarsınız. Kredi kartı gerekmez; deneme bitince paketinizi seçip etkinleştirirsiniz.",
     },
     code: {
       eyebrow: "E-posta doğrulama",
@@ -152,7 +115,7 @@ function RegisterFlow() {
     done: {
       eyebrow: "Hesabınız hazır",
       title: "14 gün başladı",
-      subtitle: `${ownerEmail.trim()} ile giriş yapıp kurulumu tamamlayabilirsiniz.`,
+      subtitle: `${ownerEmail.trim()} ile giriş yapıp kurulumu tamamlayabilirsiniz. Deneme ${trialEndsOn ?? ""} tarihinde sona erecek; bitmeden önce size haber vereceğiz ve paketinizi seçebileceksiniz.`,
     },
   };
 
@@ -173,25 +136,6 @@ function RegisterFlow() {
 
       {step === "details" ? (
         <form onSubmit={onDetails} className="space-y-4">
-          <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3.5">
-            <label className="block space-y-1.5">
-              <span className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">Seçilen paket</span>
-              <select className={authFieldClass} value={planCode} onChange={(e) => setPlanCode(e.target.value)} required>
-                <option value="" disabled>Paket seçin</option>
-                {plans.map((p) => (
-                  <option key={p.code} value={p.code}>{PLAN_NAMES[p.code] ?? p.labelTr ?? p.code}</option>
-                ))}
-              </select>
-            </label>
-            {selected && typeof selected.priceTry === "number" ? (
-              <p className="mt-2 text-xs text-[var(--muted)]">
-                {selected.priceTry.toLocaleString("tr-TR")} ₺ / {billing === "yearly" ? "yıl" : "ay"} sonrası
-              </p>
-            ) : null}
-            {planUnknown ? (
-              <p className="mt-2 text-xs text-[var(--accent)]">Bu paket artık geçerli değil. Lütfen listeden seçin.</p>
-            ) : null}
-          </div>
 
           <label className="block space-y-1.5">
             <span className="text-sm font-medium text-[var(--ink)]">İşletme adı</span>
@@ -210,7 +154,7 @@ function RegisterFlow() {
             <input className={authFieldClass} type="password" value={ownerPassword} onChange={(e) => setOwnerPassword(e.target.value)} minLength={8} maxLength={100} autoComplete="new-password" placeholder="En az 8 karakter" required />
           </label>
 
-          <button type="submit" disabled={loading || planUnknown || !planCode} className={authButtonClass}>
+          <button type="submit" disabled={loading} className={authButtonClass}>
             {loading ? "Kod gönderiliyor…" : "Doğrulama kodu gönder"}
           </button>
           <p className="text-center text-xs text-[var(--muted)]">

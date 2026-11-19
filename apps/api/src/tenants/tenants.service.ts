@@ -10,6 +10,7 @@ import { sanitizeInviteLayout } from '../wallet/invite-page';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
+import { MailService } from '../mail/mail.service';
 import { BranchPolicyService } from '../branches/branch-policy.service';
 import { SubscriptionLifecycleService } from './subscription-lifecycle.service';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
@@ -68,6 +69,7 @@ export class TenantsService {
     private readonly loyaltyEngine: LoyaltyEngineService,
     private readonly branchPolicy: BranchPolicyService,
     private readonly subscriptionLifecycle: SubscriptionLifecycleService,
+    private readonly mail: MailService,
     private readonly crm: CrmService,
   ) {}
 
@@ -909,7 +911,7 @@ export class TenantsService {
     );
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    return this.prisma.user.create({
+    const created = await this.prisma.user.create({
       data: {
         email,
         name: dto.name,
@@ -929,6 +931,18 @@ export class TenantsService {
         branch: { select: { id: true, name: true } },
       },
     });
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
+    const loginUrl = this.mail.adminUrl() ? `${this.mail.adminUrl()}/login` : undefined;
+    const body = this.mail.render(
+      `${tenant?.name ?? 'İşletme'} ekibine eklendiniz`,
+      [
+        `Hesabınız oluşturuldu. Giriş e-postanız: ${email}`,
+        'Şifrenizi işletme yöneticiniz size iletecek. İlk girişten sonra şifrenizi değiştirmenizi öneririz.',
+      ],
+      loginUrl ? { label: 'Panele giriş yap', url: loginUrl } : undefined,
+    );
+    await this.mail.send({ to: email, subject: 'Ekibe davet edildiniz', ...body });
+    return created;
   }
 
   async createStaffResetLink(tenantId: string, userId: string) {
@@ -942,6 +956,15 @@ export class TenantsService {
     });
     if (!user) throw new NotFoundException('Personel bulunamadı');
     const reset = await this.auth.createPasswordReset(user.id);
+    const body = this.mail.render(
+      'Şifre sıfırlama bağlantınız',
+      [
+        'İşletme yöneticiniz şifrenizi sıfırlamanız için bir bağlantı oluşturdu.',
+        'Bağlantı 2 saat geçerlidir. Bu isteği siz beklemiyorsanız bu e-postayı yok sayın.',
+      ],
+      { label: 'Şifremi sıfırla', url: reset.resetUrl },
+    );
+    await this.mail.send({ to: user.email, subject: 'Şifre sıfırlama bağlantınız', ...body });
     return {
       userId: user.id,
       email: user.email,

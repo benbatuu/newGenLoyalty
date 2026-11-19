@@ -1,6 +1,7 @@
+import { OtpPurpose } from '@prisma/client';
 import { OtpService } from './otp.service';
-import { OtpRequestDto, OtpVerifyDto, ResetPasswordOtpDto } from './dto/otp.dto';
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { OtpRequestDto, OtpVerifyDto, ResetPasswordOtpDto, SensitiveOtpRequestDto } from './dto/otp.dto';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
@@ -61,6 +62,27 @@ export class AuthController {
     return this.otp.request(dto.email, dto.purpose);
   }
 
+  /** Oturumlu kullanıcıya sensitive işlem kodu gönderir (şifre değişikliği, iptal, silme). */
+  @UseGuards(JwtAuthGuard)
+  @Post('sensitive/otp/request')
+  @HttpCode(200)
+  async sensitiveOtpRequest(
+    @Req() req: Request,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: SensitiveOtpRequestDto,
+  ) {
+    await assertHttpRateLimit(req, 'auth-sensitive-otp', 5, 60_000);
+    if (
+      dto.purpose !== OtpPurpose.PASSWORD_CHANGE &&
+      dto.purpose !== OtpPurpose.ACCOUNT_CANCEL &&
+      dto.purpose !== OtpPurpose.ACCOUNT_DELETE
+    ) {
+      throw new BadRequestException('Geçersiz işlem');
+    }
+    const me = await this.authService.me(user.id);
+    return this.otp.request(me.email, dto.purpose);
+  }
+
   @Post('otp/verify')
   @HttpCode(200)
   async otpVerify(@Req() req: Request, @Body() dto: OtpVerifyDto) {
@@ -102,6 +124,7 @@ export class AuthController {
     @Body() dto: ChangePasswordDto,
   ) {
     await assertHttpRateLimit(req, 'auth-change-pw', 5, 60_000);
+    await this.otp.assertProofForUser(dto.verificationToken, OtpPurpose.PASSWORD_CHANGE, user.id);
     return this.authService.changePassword(
       user.id,
       dto.currentPassword,
