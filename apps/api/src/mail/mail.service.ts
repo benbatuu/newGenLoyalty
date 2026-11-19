@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 export type MailMessage = {
@@ -16,10 +16,20 @@ export type MailResult = { ok: boolean; provider: string; error?: string };
  * varsa brevo, yoksa mock (loglar, göndermez).
  */
 @Injectable()
-export class MailService {
+export class MailService implements OnModuleInit {
   private readonly logger = new Logger(MailService.name);
 
   constructor(private readonly config: ConfigService) {}
+
+  onModuleInit() {
+    const p = this.provider();
+    this.logger.log(
+      `Mail sağlayıcısı: ${p} (gönderici tanımlı: ${this.env('BREVO_SENDER') || this.env('EMAIL_FROM') ? 'evet' : 'hayır'})`,
+    );
+    if (p === 'mock') {
+      this.logger.warn('Mail gönderilmiyor (mock). BREVO_API_KEY tanımlı ve API yeniden başlatılmış olmalı.');
+    }
+  }
 
   private env(key: string): string | undefined {
     return (
@@ -76,12 +86,9 @@ export class MailService {
     return { email: raw.trim() };
   }
 
-  private fromAddress(): string {
-    return (
-      this.env('BREVO_SENDER') ??
-      this.env('EMAIL_FROM') ??
-      'Dokun & Kazan <onboarding@resend.dev>'
-    );
+  /** Gönderici tanımlı değilse null: sessizce varsayılan adresle denemiyoruz. */
+  private fromAddress(): string | null {
+    return this.env('BREVO_SENDER') ?? this.env('EMAIL_FROM') ?? null;
   }
 
   private async sendViaBrevo(msg: MailMessage): Promise<MailResult> {
@@ -89,6 +96,11 @@ export class MailService {
     if (!apiKey) {
       this.logger.warn('BREVO_API_KEY eksik — mail gönderilmedi');
       return { ok: false, provider: 'brevo', error: 'BREVO_API_KEY eksik' };
+    }
+    const from = this.fromAddress();
+    if (!from) {
+      this.logger.warn('BREVO_SENDER tanımlı değil — mail gönderilmedi');
+      return { ok: false, provider: 'brevo', error: 'BREVO_SENDER tanımlı değil' };
     }
     try {
       const res = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -99,7 +111,7 @@ export class MailService {
           Accept: 'application/json',
         },
         body: JSON.stringify({
-          sender: this.parseSender(this.fromAddress()),
+          sender: this.parseSender(from),
           to: [{ email: msg.to }],
           subject: msg.subject,
           htmlContent: msg.html,
@@ -121,6 +133,7 @@ export class MailService {
 
   private async sendViaResend(msg: MailMessage): Promise<MailResult> {
     const apiKey = this.env('RESEND_API_KEY');
+    const from = this.fromAddress() ?? 'Dokun & Kazan <onboarding@resend.dev>';
     if (!apiKey) {
       this.logger.warn('RESEND_API_KEY eksik — mail gönderilmedi');
       return { ok: false, provider: 'resend', error: 'RESEND_API_KEY eksik' };
@@ -133,7 +146,7 @@ export class MailService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: this.fromAddress(),
+          from,
           to: [msg.to],
           subject: msg.subject,
           html: msg.html,
