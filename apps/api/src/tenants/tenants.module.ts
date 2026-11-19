@@ -1,3 +1,4 @@
+import { TrialReminderJob } from './trial-reminder.job';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { BranchesModule } from '../branches/branches.module';
@@ -24,7 +25,8 @@ import { RewardEditorService } from './reward-editor.service';
     CrmModule,
   ],
   controllers: [TenantsController],
-  providers: [TenantsService, AssetsService, RewardEditorService],
+  providers: [
+    TrialReminderJob,TenantsService, AssetsService, RewardEditorService],
   exports: [TenantsService, AssetsService, SubscriptionModule],
 })
 export class TenantsModule {}

@@ -3,7 +3,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "../i18n/navigation";
 import { BrandLogo } from "@/components/marketing/BrandLogo";
-import { getAdminLoginUrl, getAdminRegisterUrl } from "@/lib/public-urls";
+import { getAdminLoginUrl } from "@/lib/public-urls";
 import { DemoButton } from "@/components/marketing/DemoModal";
 import {
   Accordion,
@@ -125,7 +125,7 @@ export function SiteFooter() {
   const resourceLinks: FooterLink[] = [
     { href: "/contact", label: nav("contact") },
     ...(getAdminLoginUrl() ? [{ href: getAdminLoginUrl() as FooterHref, label: t("admin") }] : []),
-    { href: (getAdminRegisterUrl() || "/pricing") as FooterHref, label: nav("signup") },
+    { href: "/pricing", label: nav("signup") },
   ];
 
   const legalLinks: FooterLink[] = [
@@ -171,12 +171,12 @@ export function SiteFooter() {
             >
               {isTr ? "Demo iste" : "Request demo"}
             </DemoButton>
-            <a
-              href={getAdminRegisterUrl() || "/pricing"}
+            <Link
+              href="/pricing"
               className="inline-flex h-11 items-center justify-center rounded-full bg-[#D91E33] px-5 text-sm font-semibold text-white shadow-[0_10px_28px_-12px_rgba(239,35,60,0.9)] transition-transform duration-200 hover:-translate-y-px"
             >
               {nav("signup")}
-            </a>
+            </Link>
           </div>
         </div>
 

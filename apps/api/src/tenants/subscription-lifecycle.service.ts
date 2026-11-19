@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Role, SubscriptionStatus, Tenant, Prisma } from '@prisma/client';
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const MS_DAY = 24 * 60 * 60 * 1000;
@@ -38,7 +39,60 @@ export type SubscriptionSnapshot = {
 export class SubscriptionLifecycleService {
   private readonly logger = new Logger(SubscriptionLifecycleService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mail: MailService,
+  ) {}
+
+  /**
+   * Deneme bitişi hatırlatması: 3 gün, 1 gün ve bitiş günü kala owner'a e-posta.
+   * Her eşik yalnızca bir kez gönderilir (trialReminderDay ile izlenir).
+   */
+  async sendTrialReminders(): Promise<number> {
+    const now = new Date();
+    const tenants = await this.prisma.tenant.findMany({
+      where: { subscriptionStatus: SubscriptionStatus.TRIAL },
+      select: { id: true, name: true, createdAt: true, trialReminderDay: true },
+    });
+    let sent = 0;
+    for (const t of tenants) {
+      const endsAt = new Date(t.createdAt.getTime() + TRIAL_DAYS * MS_DAY);
+      const days = this.daysRemainingUntil(endsAt, now);
+      const threshold = days === 0 ? 0 : days <= 1 ? 1 : days <= 3 ? 3 : null;
+      if (threshold === null) continue;
+      if (t.trialReminderDay !== null && t.trialReminderDay <= threshold) continue;
+
+      const owner = await this.prisma.user.findFirst({
+        where: { tenantId: t.id, role: Role.STORE_OWNER, isActive: true },
+        select: { email: true },
+      });
+      if (!owner) continue;
+
+      const headline =
+        threshold === 0
+          ? 'Deneme süreniz bugün sona eriyor'
+          : threshold === 1
+            ? 'Deneme süreniz yarın sona eriyor'
+            : `Deneme süreniz ${threshold} gün sonra sona erecek`;
+      const adminUrl = this.mail.adminUrl();
+      const body = this.mail.render(
+        headline,
+        [
+          `${t.name} için ücretsiz deneme süreniz ${threshold === 0 ? 'bugün' : `${threshold} gün sonra`} bitiyor.`,
+          'Kesintisiz devam etmek için bir paket seçip satın alın.',
+        ],
+        adminUrl ? { label: 'Paket satın al', url: `${adminUrl}/settings/billing` } : undefined,
+      );
+      const result = await this.mail.send({ to: owner.email, subject: headline, ...body });
+      if (!result.ok) continue;
+      await this.prisma.tenant.update({
+        where: { id: t.id },
+        data: { trialReminderDay: threshold },
+      });
+      sent += 1;
+    }
+    return sent;
+  }
 
   /** Gün farkı — yukarı yuvarla, minimum 0 */
   daysRemainingUntil(end: Date, from = new Date()): number {

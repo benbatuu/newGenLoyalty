@@ -127,7 +127,8 @@ export class PublicService {
       ownerEmail: dto.ownerEmail,
       ownerName: dto.ownerName,
       ownerPassword: dto.ownerPassword,
-      planCode: dto.planCode?.trim() || undefined,
+      // Self-serve kayıt her zaman Starter ile 14 gün deneme başlatır
+      planCode: 'starter',
     });
 
     await this.prisma.contactLead.create({

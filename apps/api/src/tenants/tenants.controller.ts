@@ -15,7 +15,9 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Role } from '@prisma/client';
+import { OtpPurpose, Role } from '@prisma/client';
+import { OtpService } from '../auth/otp.service';
+import { VerificationTokenDto } from '../auth/dto/otp.dto';
 import { memoryStorage } from 'multer';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
@@ -66,6 +68,7 @@ export class TenantsController {
     private readonly rewardEditor: RewardEditorService,
     private readonly assets: AssetsService,
     private readonly prisma: PrismaService,
+    private readonly otp: OtpService,
   ) {}
 
   private tenantIdOf(user: AuthUser): string {
@@ -343,7 +346,11 @@ export class TenantsController {
   @SkipSubscriptionCheck()
   @Roles(Role.STORE_OWNER)
   @RequirePermissions('tenant:update')
-  cancelSubscription(@CurrentUser() user: AuthUser) {
+  async cancelSubscription(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: VerificationTokenDto,
+  ) {
+    await this.otp.assertProofForUser(dto.verificationToken, OtpPurpose.ACCOUNT_CANCEL, user.id);
     return this.subscription.cancelSubscription(this.tenantIdOf(user));
   }
 
@@ -367,10 +374,11 @@ export class TenantsController {
   @SkipSubscriptionCheck()
   @Roles(Role.STORE_OWNER)
   @RequirePermissions('tenant:update')
-  requestDeletion(
+  async requestDeletion(
     @CurrentUser() user: AuthUser,
-    @Body() dto: { reason: string; note?: string },
+    @Body() dto: { reason: string; note?: string; verificationToken: string },
   ) {
+    await this.otp.assertProofForUser(dto.verificationToken, OtpPurpose.ACCOUNT_DELETE, user.id);
     return this.tenantsService.requestDeletion(this.tenantIdOf(user), dto.reason, dto.note);
   }
 

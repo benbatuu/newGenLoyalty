@@ -220,6 +220,8 @@ model Tenant {
   /// Hesap silme talebi: 14 gün sonra kalıcı silinir, bu sürede iptal edilebilir
   deletionRequestedAt      DateTime?
   deletionScheduledAt      DateTime?
+  /// Deneme bitişi hatırlatmasında son gönderilen eşik (3, 1, 0 gün kala)
+  trialReminderDay         Int?
   deletionReason           String?
   deletionNote             String?
   /// Hesap askıya alındı
@@ -670,6 +672,9 @@ model RefreshToken {
 enum OtpPurpose {
   REGISTER
   RESET_PASSWORD
+  PASSWORD_CHANGE
+  ACCOUNT_CANCEL
+  ACCOUNT_DELETE
 }
 
 /// E-posta ile tek kullanımlık 6 haneli kod (kayıt doğrulama, şifre sıfırlama)

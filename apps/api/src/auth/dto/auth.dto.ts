@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
   @IsEmail()
@@ -48,6 +48,11 @@ export class ChangePasswordDto {
   @IsOptional()
   @IsString()
   refreshToken?: string;
+
+  /** Şifre değişikliği e-posta kodu kanıtı (PASSWORD_CHANGE) */
+  @IsString()
+  @IsNotEmpty()
+  verificationToken!: string;
 }
 
 export class RevokeOthersDto {

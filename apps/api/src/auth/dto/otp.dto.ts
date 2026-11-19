@@ -2,6 +2,7 @@ import { OtpPurpose } from '@prisma/client';
 import {
   IsEmail,
   IsEnum,
+  IsNotEmpty,
   IsString,
   Length,
   MaxLength,
@@ -37,4 +38,15 @@ export class ResetPasswordOtpDto {
   @MinLength(8)
   @MaxLength(100)
   password!: string;
+}
+
+export class SensitiveOtpRequestDto {
+  @IsEnum(OtpPurpose)
+  purpose!: OtpPurpose;
+}
+
+export class VerificationTokenDto {
+  @IsString()
+  @IsNotEmpty()
+  verificationToken!: string;
 }

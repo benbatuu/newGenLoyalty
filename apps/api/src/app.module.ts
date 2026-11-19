@@ -28,6 +28,7 @@ import { ReferralsModule } from './referrals/referrals.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { TableTentModule } from './table-tent/table-tent.module';
 import { EmailModule } from './email/email.module';
+import { MailModule } from './mail/mail.module';
 import { SocialModule } from './social/social.module';
 import { TenantApiModule } from './tenant-api/tenant-api.module';
 import { GiftCreditModule } from './gift-credit/gift-credit.module';
@@ -69,6 +70,7 @@ import { MarketplaceBridgeModule } from './marketplace-bridge/marketplace-bridge
     ReferralsModule,
     AnalyticsModule,
     TableTentModule,
+    MailModule,
     EmailModule,
     SocialModule,
     TenantApiModule,

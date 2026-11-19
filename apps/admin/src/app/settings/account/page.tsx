@@ -17,6 +17,7 @@ import { Dialog } from "../../../components/dialog";
 import { ApiError, api, getStoredTokens } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { refreshSessionData, useSessionData } from "../../../lib/session-data";
+import { SensitiveCodeDialog } from "../../../components/sensitive-code-dialog";
 import { resolveAdminAssetUrl } from "../../../lib/public-urls";
 import { useApiQuery } from "../../../lib/use-api-query";
 
@@ -163,6 +164,9 @@ export default function AccountSettingsPage() {
   const status = tenant?.subscriptionStatus ?? "ACTIVE";
   const [confirmAction, setConfirmAction] = useState<"cancel" | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [pwCodeOpen, setPwCodeOpen] = useState(false);
+  const [deleteCodeOpen, setDeleteCodeOpen] = useState(false);
+  const [cancelCodeOpen, setCancelCodeOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState("");
   const [deleteNote, setDeleteNote] = useState("");
   const [deleteAck, setDeleteAck] = useState(false);
@@ -219,12 +223,17 @@ export default function AccountSettingsPage() {
     }, "İşletme bilgileri kaydedilemedi");
   }
 
-  async function changePassword(e: FormEvent) {
+  function changePassword(e: FormEvent) {
     e.preventDefault();
     if (newPw !== newPw2) {
       setError("Yeni şifreler eşleşmiyor");
       return;
     }
+    setPwCodeOpen(true);
+  }
+
+  async function submitPasswordChange(verificationToken: string) {
+    setPwCodeOpen(false);
     await run(async () => {
       await api("/auth/change-password", {
         method: "POST",
@@ -232,6 +241,7 @@ export default function AccountSettingsPage() {
           currentPassword: curPw,
           newPassword: newPw,
           refreshToken: getStoredTokens()?.refreshToken,
+          verificationToken,
         }),
       });
       setCurPw("");
@@ -275,9 +285,9 @@ export default function AccountSettingsPage() {
     }, "Paket değiştirilemedi");
   }
 
-  async function subscriptionAction(path: string, _confirmText: string, done: string) {
+  async function subscriptionAction(path: string, body: string, done: string) {
     await run(async () => {
-      await api(path, { method: "POST" });
+      await api(path, { method: "POST", ...(body ? { body } : {}) });
       refreshSessionData("tenant");
       flash(done);
     }, "İşlem tamamlanamadı");
@@ -562,15 +572,7 @@ export default function AccountSettingsPage() {
           onSubmit={(e) => {
             e.preventDefault();
             if (!deleteReason || !deleteAck) return;
-            void run(async () => {
-              await api("/tenants/me/deletion", { method: "POST", body: JSON.stringify({ reason: deleteReason, note: deleteNote }) });
-              refreshSessionData("tenant");
-              setDeleteOpen(false);
-              setDeleteReason("");
-              setDeleteNote("");
-              setDeleteAck(false);
-              flash("Silme talebi alındı. 14 gün içinde iptal edebilirsiniz.");
-            }, "Talep oluşturulamadı");
+            setDeleteCodeOpen(true);
           }}
         >
           <fieldset className="space-y-2">
@@ -605,6 +607,44 @@ export default function AccountSettingsPage() {
         </form>
       </Dialog>
 
+      <SensitiveCodeDialog
+        open={pwCodeOpen}
+        purpose="PASSWORD_CHANGE"
+        onClose={() => setPwCodeOpen(false)}
+        onVerified={(token) => void submitPasswordChange(token)}
+      />
+
+      <SensitiveCodeDialog
+        open={deleteCodeOpen}
+        purpose="ACCOUNT_DELETE"
+        onClose={() => setDeleteCodeOpen(false)}
+        onVerified={(token) => {
+          setDeleteCodeOpen(false);
+          void run(async () => {
+            await api("/tenants/me/deletion", {
+              method: "POST",
+              body: JSON.stringify({ reason: deleteReason, note: deleteNote, verificationToken: token }),
+            });
+            refreshSessionData("tenant");
+            setDeleteOpen(false);
+            setDeleteReason("");
+            setDeleteNote("");
+            setDeleteAck(false);
+            flash("Silme talebi alındı. 14 gün içinde iptal edebilirsiniz.");
+          }, "Talep oluşturulamadı");
+        }}
+      />
+
+      <SensitiveCodeDialog
+        open={cancelCodeOpen}
+        purpose="ACCOUNT_CANCEL"
+        onClose={() => setCancelCodeOpen(false)}
+        onVerified={(token) => {
+          setCancelCodeOpen(false);
+          void subscriptionAction("/tenants/me/subscription/cancel", JSON.stringify({ verificationToken: token }), "Abonelik iptal edildi");
+        }}
+      />
+
       <ConfirmDialog
         open={confirmAction === "cancel"}
         title="Abonelik iptal edilsin mi?"
@@ -614,7 +654,7 @@ export default function AccountSettingsPage() {
         busy={busy}
         onConfirm={() => {
           setConfirmAction(null);
-          void subscriptionAction("/tenants/me/subscription/cancel", "", "Abonelik iptal edildi");
+          setCancelCodeOpen(true);
         }}
         onCancel={() => setConfirmAction(null)}
       >
