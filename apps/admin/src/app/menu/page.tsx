@@ -1,5 +1,6 @@
 "use client";
 
+import { resolveAdminAssetUrl } from "../../lib/public-urls";
 import {
   FormEvent,
   ReactNode,
@@ -24,10 +25,12 @@ import {
   inputClassName,
 } from "../../components/ui";
 import { ApiError, api, apiUpload } from "../../lib/api";
+import { useSessionData } from "../../lib/session-data";
 import { getPublicMenuUrl } from "../../lib/public-urls";
 import { useApiQuery } from "../../lib/use-api-query";
 import { ThemeTab } from "./theme-tab";
 import { TagManager, TagPicker, useTagCatalog } from "./tag-picker";
+import { CatalogManager, catalogEnName, useCatalog, type CatalogKind } from "./catalog-manager";
 import { FeedbackTab } from "./feedback-tab";
 import {
   ContentLocaleFields,
@@ -388,9 +391,28 @@ function SearchIcon() {
 
 function ItemThumb({ src, alt, size = 44 }: { src: string | null; alt: string; size?: number }) {
   const cls = `shrink-0 rounded-xl border border-[var(--line)] object-cover`;
+  // Fotoğraf yoksa işletme logosu gösterilir
+  const { data: brandTenant } = useSessionData<{ logoUrl?: string | null }>("tenant");
+  const brandLogo = resolveAdminAssetUrl(brandTenant?.logoUrl) || null;
   if (src) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={src} alt={alt} width={size} height={size} className={cls} style={{ width: size, height: size }} />;
+  }
+  if (brandLogo) {
+    return (
+      <div
+        className="flex shrink-0 items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)]"
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={brandLogo}
+          alt=""
+          className="h-full w-full object-contain p-[14%]"
+        />
+      </div>
+    );
   }
   return (
     <div
@@ -581,6 +603,7 @@ function MenuTab({
 
   const totalItems = categories?.reduce((sum, c) => sum + c._count.items, 0) ?? 0;
   const [tagsOpen, setTagsOpen] = useState(false);
+  const [catalogKind, setCatalogKind] = useState<CatalogKind | null>(null);
   const catLimitReached = ctx != null && !ctx.canAddCategory;
 
   return (
@@ -608,10 +631,35 @@ function MenuTab({
         ) : (
           <span />
         )}
-        <Btn variant="secondary" className="h-9" onClick={() => setTagsOpen(true)}>
-          Etiketleri yönet
-        </Btn>
+        <div className="flex flex-wrap items-center gap-2">
+          <Btn variant="secondary" className="h-9" onClick={() => setCatalogKind("ALLERGEN")}>
+            Alerjenleri yönet
+          </Btn>
+          <Btn variant="secondary" className="h-9" onClick={() => setCatalogKind("EXTRA")}>
+            Ekstraları yönet
+          </Btn>
+          <Btn variant="secondary" className="h-9" onClick={() => setTagsOpen(true)}>
+            Etiketleri yönet
+          </Btn>
+        </div>
       </div>
+
+      {catalogKind && (
+        <Modal
+          title={catalogKind === "ALLERGEN" ? "Alerjen kataloğu" : "Ekstra kataloğu"}
+          description={
+            catalogKind === "ALLERGEN"
+              ? "Ürünlerde seçilen alerjenler. Türkçe ve İngilizce adı bir kez girilir; ürünlerde her iki dilde görünür."
+              : "Ürünlere tek tıkla eklenen ekstralar. Türkçe ve İngilizce adı ile varsayılan ücreti burada tutulur."
+          }
+          onClose={() => setCatalogKind(null)}
+          maxWidth="max-w-3xl"
+        >
+          <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+            <CatalogManager kind={catalogKind} onChanged={onQuotaChange} />
+          </div>
+        </Modal>
+      )}
 
       {tagsOpen && (
         <Modal title="Etiket kataloğu" description="Ürünlerde kullanılan etiketler. Türkçe ve İngilizce adlarını buradan düzenleyin." onClose={() => setTagsOpen(false)} maxWidth="max-w-2xl">
@@ -664,7 +712,7 @@ function MenuTab({
                           : "hover:bg-[var(--surface)]"
                       }`}
                     >
-                      <ItemThumb src={cat.imageUrl} alt="" size={36} />
+                      <ItemThumb src={resolveAdminAssetUrl(cat.imageUrl) || null} alt="" size={36} />
                       <div className="min-w-0 flex-1">
                         <p className={`truncate text-[0.8125rem] font-medium ${active ? "text-white" : "text-[var(--ink)]"}`}>
                           {cat.name}
@@ -1061,7 +1109,7 @@ function ItemsPanel({
                     onClick={() => setDetailId(item.id)}
                     className="flex min-w-0 flex-1 items-center gap-4 text-left"
                   >
-                    <ItemThumb src={item.imageUrl} alt={item.name} size={48} />
+                    <ItemThumb src={resolveAdminAssetUrl(item.imageUrl) || null} alt={item.name} size={48} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[0.875rem] font-medium text-[var(--ink)]">{item.name}</p>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -1179,7 +1227,7 @@ function ItemDetailDrawer({
         <div className="relative h-52 shrink-0 bg-[var(--surface)]">
           {item.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+            <img src={resolveAdminAssetUrl(item.imageUrl)} alt={item.name} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full items-center justify-center text-[var(--muted)]/50">
               <ItemThumb src={null} alt="" size={64} />
@@ -1361,8 +1409,31 @@ function ItemFormModal({
   const [error, setError] = useState<string | null>(null);
   const [newAllergen, setNewAllergen] = useState("");
   const tagCatalog = useTagCatalog();
+  const allergenCatalog = useCatalog("ALLERGEN");
+  const extraCatalog = useCatalog("EXTRA");
+  const allergenRows = allergenCatalog.data ?? [];
+  const extraRows = extraCatalog.data ?? [];
 
-  const previewUrl = useObjectUrl(imageFile) ?? editing?.imageUrl ?? null;
+  /** Yeni alerjeni kataloğa ekler (varsa mevcut olanı) ve ürüne seçer */
+  async function addAllergen(v: string) {
+    const existing = allergenRows.find((r) => r.label.toLowerCase() === v.toLowerCase());
+    let label = existing?.label ?? v;
+    if (!existing) {
+      try {
+        const created = await api<{ label: string }>("/menu/catalog", {
+          method: "POST",
+          body: JSON.stringify({ kind: "ALLERGEN", label: v }),
+        });
+        label = created.label;
+        await allergenCatalog.reload(true);
+      } catch {
+        // Kayıt eklenemese de ürün alerjeni olarak seçilebilir
+      }
+    }
+    setAllergens(toggleArrayItem(allergens, label));
+  }
+
+  const previewUrl = useObjectUrl(imageFile) ?? (editing?.imageUrl ? resolveAdminAssetUrl(editing.imageUrl) : null);
 
   // Ana dil dışındaki diller için varyasyon çevirisi alanları
   const otherLangs = langs.slice(1);
@@ -1583,6 +1654,34 @@ function ItemFormModal({
               </Btn>
             </div>
 
+            {extraRows.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-medium text-[var(--muted)]">Kataloktan ekle</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {extraRows.map((row) => {
+                    const en = catalogEnName(row);
+                    return (
+                      <button
+                        key={row.id}
+                        type="button"
+                        onClick={() =>
+                          setVariants([
+                            ...variants,
+                            { name: row.label, price: row.defaultPrice ?? 0, kind: "extra", translations: row.translations },
+                          ])
+                        }
+                        className="rounded-full border border-[var(--line)] bg-[var(--panel)] px-2.5 py-1 text-xs text-[var(--ink)] transition hover:border-[var(--ink)]/30"
+                      >
+                        + {row.label}
+                        {en !== row.label ? <span className="ml-1 text-[var(--muted)]">· {en}</span> : null}
+                        {row.defaultPrice != null ? <span className="ml-1 tabular-nums text-[var(--muted)]">+{formatTry(row.defaultPrice)}</span> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {extrasPreview.length > 0 && (
               <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-xs text-[var(--muted)]">
                 <span>Örnek: ürün {formatTry(Number(price) || 0)} + tüm ekstralar</span>
@@ -1597,17 +1696,22 @@ function ItemFormModal({
           <section>
             <h4 className="mb-2 text-sm font-semibold text-[var(--ink)]">Alerjenler</h4>
             <div className="flex flex-wrap gap-1.5">
-              {Array.from(new Set([...ALLERGEN_OPTIONS, ...allergens])).map((a) => (
-                <Chip key={a} on={allergens.includes(a)} tone="warn" onClick={() => setAllergens(toggleArrayItem(allergens, a))}>
-                  {a}
-                </Chip>
-              ))}
+              {Array.from(new Set([...allergenRows.map((r) => r.label), ...allergens])).map((a) => {
+                const row = allergenRows.find((r) => r.label === a);
+                const en = row ? catalogEnName(row) : "";
+                return (
+                  <Chip key={a} on={allergens.includes(a)} tone="warn" onClick={() => setAllergens(toggleArrayItem(allergens, a))}>
+                    {a}
+                    {en && en !== a ? <span className="ml-1 opacity-60">· {en}</span> : null}
+                  </Chip>
+                );
+              })}
             </div>
             <CustomChipInput
-              placeholder="Yeni alerjen ekle"
+              placeholder="Yeni alerjen ekle (kataloğa da eklenir)"
               value={newAllergen}
               onChange={setNewAllergen}
-              onAdd={(v) => setAllergens(toggleArrayItem(allergens, v))}
+              onAdd={(v) => void addAllergen(v)}
             />
           </section>
 

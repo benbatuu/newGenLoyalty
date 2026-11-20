@@ -13,6 +13,10 @@ import {
   type StampTheme,
 } from "../../../../components/stamp-glyph";
 import { IconUploadField } from "./shared-fields";
+import { StampsSection } from "../../../reward/_panels/passkit-sections";
+import type { ProgramWalletDraft } from "../../../reward/_panels/wallet-types";
+
+
 import { INSETS, type StampInset } from "./types";
 
 type StampTabProps = {
@@ -29,6 +33,8 @@ type StampTabProps = {
   setStampsRequired: (v: number) => void;
   rewardLabel: string;
   setRewardLabel: (v: string) => void;
+  draft: ProgramWalletDraft;
+  onDraftChange: (d: ProgramWalletDraft) => void;
   uploadBusy: string | null;
   setUploadBusy: (v: string | null) => void;
   setError: (msg: string | null) => void;
@@ -48,10 +54,19 @@ export function StampTab({
   setStampsRequired,
   rewardLabel,
   setRewardLabel,
+  draft,
+  onDraftChange,
   uploadBusy,
   setUploadBusy,
   setError,
 }: StampTabProps) {
+  void rewardLabel;
+  void setRewardLabel;
+  void setStampTheme;
+  void setStampIconFilledUrl;
+  void setStampIconEmptyUrl;
+  void setStampInset;
+  void setStampsRequired;
   return (
     <Panel>
       <PanelHeader
@@ -152,32 +167,13 @@ export function StampTab({
           </div>
         </Field>
 
-        <SoftBox>
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-            Ödül kuralı
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Gerekli damga sayısı">
-              <input
-                className={inputClassName()}
-                type="number"
-                min={1}
-                max={16}
-                value={stampsRequired}
-                onChange={(e) => setStampsRequired(Number(e.target.value))}
-                required
-              />
-            </Field>
-            <Field label="Ödül metni (ön yüz)">
-              <input
-                className={inputClassName()}
-                value={rewardLabel}
-                onChange={(e) => setRewardLabel(e.target.value)}
-                required
-              />
-            </Field>
-          </div>
-        </SoftBox>
+        <StampsSection
+          draft={draft}
+          onChange={onDraftChange}
+          stampsRequired={stampsRequired}
+          filledUrl={stampIconFilledUrl || null}
+          emptyUrl={stampIconEmptyUrl || null}
+        />
       </div>
     </Panel>
   );

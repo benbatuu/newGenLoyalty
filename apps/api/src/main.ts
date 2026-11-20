@@ -60,9 +60,9 @@ async function bootstrap() {
   const swaggerEnabled = process.env.SWAGGER_ENABLED !== 'false';
   if (swaggerEnabled) {
     const config = new DocumentBuilder()
-      .setTitle('newGenLoyalty API')
+      .setTitle('Stampwell API')
       .setDescription(
-        'newGenLoyalty sadakat platformu REST API. ' +
+        'Stampwell sadakat platformu REST API. ' +
           'JWT: `Authorization: Bearer <token>` (auth/login ile alınır). ' +
           'Enterprise API: `x-api-key` header. ' +
           'PassKit endpoint\'leri kendi ApplePass auth şemasını kullanır.',

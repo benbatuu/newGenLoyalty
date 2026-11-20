@@ -62,6 +62,8 @@ export type ProgramWalletTemplate = {
   showStampField?: boolean;
   showRewardField?: boolean;
   showStatusField?: boolean;
+  /** true/boş: Alanlar ve Kilit ekranı marka varsayılanını kullanır; false: kartın kendi değerleri */
+  inheritBrandFields?: boolean | null;
 };
 
 export type TenantBrandingSource = {

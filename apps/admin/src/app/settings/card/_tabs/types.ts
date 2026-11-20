@@ -1,11 +1,13 @@
 import type { StampTheme } from "../../../../components/stamp-glyph";
 
 export const SETTINGS_TABS = [
-  { id: "stamp", label: "Damgalar", hint: "Simge ve ödül" },
-  { id: "brand", label: "Logo ve renk", hint: "Marka görünümü" },
-  { id: "front", label: "Kartın önü", hint: "Hangi bilgiler görünsün" },
-  { id: "back", label: "Kartın arkası", hint: "Bilgi satırları" },
-  { id: "notify", label: "Bildirim", hint: "Mesajlar ve barkod" },
+  { id: "stamp", label: "Damgalar", hint: "Simge, şerit, dizilim" },
+  { id: "look", label: "Görünüm", hint: "Renk, logo, üst yazı" },
+  { id: "fields", label: "Alanlar", hint: "Başlıklar, header, ek alan" },
+  { id: "back", label: "Arka yüz", hint: "İletişim, koşullar" },
+  { id: "barcode", label: "Barkod", hint: "Biçim, paylaşım" },
+  { id: "relevance", label: "Kilit ekranı", hint: "Konum, tarih" },
+  { id: "notify", label: "Bildirimler", hint: "Kilit ekranı mesajları" },
 ] as const;
 
 export type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
@@ -61,6 +63,7 @@ export type Tenant = {
   statusChangeMessage: string | null;
   headerChangeMessage: string | null;
   barcodeFormat: string | null;
+  walletDefaults?: Record<string, unknown> | null;
   stampTheme: string | null;
   stampIconFilledUrl: string | null;
   stampIconEmptyUrl: string | null;

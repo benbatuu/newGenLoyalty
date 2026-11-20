@@ -233,6 +233,7 @@ export function MenuBottomNav({
   barBg,
   muted,
   contained,
+  variant = "bottom",
 }: {
   items: MenuBottomNavItem[];
   lang: MenuLang;
@@ -243,9 +244,48 @@ export function MenuBottomNav({
   barBg: string;
   muted: string;
   contained?: boolean;
+  /** bottom: telefonda alt sekme çubuğu · top: tablet/masaüstünde başlıkta yatay menü */
+  variant?: "bottom" | "top";
 }) {
   const enabled = items.filter((i) => i.enabled);
   if (!enabled.length) return null;
+  const labelOf = (item: MenuBottomNavItem) =>
+    pickMenuLocale(
+      typeof item.label === "string" ? { tr: item.label } : item.label,
+      lang,
+      t(lang, item.id, uiLabels),
+    );
+
+  if (variant === "top") {
+    return (
+      <nav aria-label="Menü" className="flex min-w-0 items-center gap-1 overflow-x-auto lg:gap-2">
+        {enabled.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onOpen(item.id)}
+            className="group relative inline-flex h-10 shrink-0 items-center gap-2 px-3 text-[14px] font-medium tracking-[-0.01em] opacity-80 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 [touch-action:manipulation]"
+            style={{ color: muted }}
+          >
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-x-3 bottom-1 h-px origin-left scale-x-0 transition-transform duration-200 group-hover:scale-x-100"
+              style={{ background: accent }}
+            />
+            <span className="whitespace-nowrap">{labelOf(item)}</span>
+            {item.id === "cart" && cartCount > 0 ? (
+              <span
+                className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-semibold"
+                style={{ background: accent, color: barBg }}
+              >
+                {cartCount}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </nav>
+    );
+  }
 
   return (
     <nav
@@ -263,7 +303,7 @@ export function MenuBottomNav({
           : "max(8px, env(safe-area-inset-bottom))",
       }}
     >
-      <div className="flex items-stretch justify-around px-1 pt-1.5">
+      <div className="mx-auto flex w-full max-w-[640px] items-stretch justify-around px-1 pt-1.5">
         {enabled.map((item) => (
           <button
             key={item.id}
@@ -365,6 +405,8 @@ export function MenuSheet({
   variant = "drawer",
   showTitle = true,
   closeLabel = "Kapat",
+  dialogTall,
+  dialogWidth,
 }: {
   open: boolean;
   onClose: () => void;
@@ -374,21 +416,97 @@ export function MenuSheet({
   panel: string;
   muted: string;
   contained?: boolean;
-  variant?: "sheet" | "drawer";
+  /** drawer: telefonda alttan çekmece · dialog: tablet/masaüstünde ortada pencere */
+  variant?: "sheet" | "drawer" | "dialog";
   showTitle?: boolean;
   closeLabel?: string;
+  /** dialog: içerik kendi içinde kayıyorsa sabit yükseklik ver (ör. görsel + bilgi) */
+  dialogTall?: boolean;
+  /** dialog: pencere genişliği (px), cihaza göre ayarlanır */
+  dialogWidth?: number;
 }) {
-  const drawer = variant !== "sheet";
+  const dialog = variant === "dialog";
+  const drawer = variant === "drawer";
   const { mounted, entered, reduced } = useSheetPresence(open);
   const held = useRef(children);
   if (open) held.current = children;
-  const drag = useSheetDrag(Boolean(drawer), onClose);
+  const drag = useSheetDrag(drawer, onClose);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!mounted) return null;
 
   const ease = "cubic-bezier(0.22, 1, 0.36, 1)";
   const motion = reduced ? "none" : `transform ${SHEET_MS}ms ${ease}`;
   const fade = reduced ? "none" : `opacity ${SHEET_MS}ms ${ease}`;
   const body = held.current;
+
+  if (dialog) {
+    return (
+      <div
+        className="z-[60] flex items-center justify-center p-6 [touch-action:manipulation]"
+        style={{
+          position: contained ? "absolute" : "fixed",
+          inset: 0,
+          pointerEvents: entered ? "auto" : "none",
+        }}
+      >
+        <button
+          type="button"
+          aria-label={closeLabel}
+          className="absolute inset-0 cursor-default"
+          onClick={onClose}
+          style={{
+            background: "rgba(0,0,0,0.55)",
+            backdropFilter: "blur(2px)",
+            opacity: entered ? 1 : 0,
+            transition: fade,
+          }}
+        />
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={title || undefined}
+          className="relative z-[61] flex w-full flex-col overflow-hidden rounded-[28px] shadow-[0_40px_100px_-30px_rgba(0,0,0,0.6)]"
+          style={{
+            background: panel,
+            color: ink,
+            maxWidth: dialogWidth ?? (dialogTall ? 960 : 560),
+            height: dialogTall ? "min(640px, 100%)" : undefined,
+            maxHeight: "100%",
+            opacity: entered ? 1 : 0,
+            transform: entered ? "none" : "translate3d(0,12px,0) scale(0.97)",
+            transition: reduced ? "none" : `${motion}, ${fade}`,
+            willChange: reduced ? undefined : "transform, opacity",
+          }}
+        >
+          <button
+            type="button"
+            aria-label={closeLabel}
+            onClick={onClose}
+            className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full shadow-md transition hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2"
+            style={{ background: panel, color: ink, boxShadow: `0 0 0 1px ${ink}14, 0 6px 18px -8px rgba(0,0,0,0.35)` }}
+          >
+            <CloseGlyph />
+          </button>
+          {title && !showTitle ? <h3 className="sr-only">{title}</h3> : null}
+          {showTitle && title ? (
+            <h3 className="px-8 pb-2 pr-16 pt-7 text-lg font-semibold">{title}</h3>
+          ) : null}
+          <div className={dialogTall ? "min-h-0 flex-1" : "min-h-0 flex-1 overflow-y-auto px-8 pb-8 pt-10"}>
+            {body}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

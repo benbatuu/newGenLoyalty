@@ -144,6 +144,8 @@ export type MenuBlockStyleBase = {
   fontWeight?: number;
   borderRadius?: number;
   gap?: number;
+  /** Bu ekranda bloğu gizle (byDevice ile cihaz bazlı) */
+  hidden?: boolean;
 };
 
 export const MENU_DEVICES = ['mobile', 'tablet', 'desktop'] as const;
@@ -157,6 +159,8 @@ export type MenuDeviceFrame = {
   /** İçerik max genişliği */
   maxWidth: number;
   pagePadding: number;
+  /** true: içerik açıldığı ekranın tamamına yayılır (maxWidth uygulanmaz) */
+  fullWidth?: boolean;
 };
 
 export type MenuBlockStyle = MenuBlockStyleBase & {
@@ -178,7 +182,36 @@ export type MenuDocTheme = {
   maxWidth: number;
   /** Mobil / tablet / masaüstü çerçeve ve boşluk */
   devices: Record<MenuDeviceId, MenuDeviceFrame>;
+  /** Ürün detayı ve başlık menüleri: alttan çekmece veya ortada pencere (cihaza göre) */
+  overlays?: Partial<Record<MenuDeviceId, MenuOverlayStyle>>;
 };
+
+export type MenuOverlayStyle = 'drawer' | 'dialog';
+
+export const DEFAULT_MENU_OVERLAYS: Record<MenuDeviceId, MenuOverlayStyle> = {
+  mobile: 'drawer',
+  tablet: 'dialog',
+  desktop: 'dialog',
+};
+
+/** Cihaz için açılır pencere tipini döndürür (ayar yoksa varsayılan) */
+export function resolveMenuOverlay(
+  theme: { overlays?: Partial<Record<MenuDeviceId, MenuOverlayStyle>> },
+  device: MenuDeviceId,
+): MenuOverlayStyle {
+  return theme.overlays?.[device] ?? DEFAULT_MENU_OVERLAYS[device];
+}
+
+function normalizeOverlays(
+  raw: unknown,
+): Partial<Record<MenuDeviceId, MenuOverlayStyle>> {
+  const src = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const out: Partial<Record<MenuDeviceId, MenuOverlayStyle>> = {};
+  (['mobile', 'tablet', 'desktop'] as MenuDeviceId[]).forEach((d) => {
+    if (src[d] === 'drawer' || src[d] === 'dialog') out[d] = src[d] as MenuOverlayStyle;
+  });
+  return out;
+}
 
 type Styled = { style?: MenuBlockStyle };
 
@@ -199,6 +232,9 @@ export type MenuHeaderBlock = {
   logoWidth: number;
   /** Logo kutusu yüksekliği (px) */
   logoHeight: number;
+  /** Tablet / masaüstü için logo boyutu (boşsa logoWidth/logoHeight) */
+  logoWidthByDevice?: Partial<Record<MenuDeviceId, number>>;
+  logoHeightByDevice?: Partial<Record<MenuDeviceId, number>>;
   showName: boolean;
   showTable: boolean;
   sticky: boolean;
@@ -298,7 +334,24 @@ export type MenuProductDetail = {
   showExtras: boolean;
   showAddToCart: boolean;
   addToCartLabel: string;
+  /** Tablet/masaüstü pencerede görselin tarafı */
+  dialogImageSide: 'left' | 'right';
+  /** Tablet/masaüstü pencerede görselin yüzdesi (30–70) */
+  dialogImageShare: number;
+  /** Tablet/masaüstü pencere genişliği (cihaza özel, px) */
+  dialogWidthByDevice?: Partial<Record<MenuDeviceId, number>>;
 };
+
+export const DEFAULT_DIALOG_WIDTH: Record<MenuDeviceId, number> = {
+  mobile: 560,
+  tablet: 760,
+  desktop: 960,
+};
+
+/** Ürün penceresinin genişliğini cihaza göre döndürür */
+export function resolveDetailDialogWidth(detail: MenuProductDetail, device: MenuDeviceId): number {
+  return detail.dialogWidthByDevice?.[device] ?? DEFAULT_DIALOG_WIDTH[device];
+}
 
 export function defaultProductDetail(): MenuProductDetail {
   return {
@@ -317,6 +370,8 @@ export function defaultProductDetail(): MenuProductDetail {
     showExtras: true,
     showAddToCart: true,
     addToCartLabel: '',
+    dialogImageSide: 'left',
+    dialogImageShare: 50,
   };
 }
 
@@ -770,6 +825,9 @@ function normalizeProductDetail(raw: unknown): MenuProductDetail {
     showExtras: bool(raw.showExtras, d.showExtras),
     showAddToCart: bool(raw.showAddToCart, d.showAddToCart),
     addToCartLabel: str(raw.addToCartLabel, d.addToCartLabel).slice(0, 40),
+    dialogImageSide: raw.dialogImageSide === 'right' ? 'right' : 'left',
+    dialogImageShare: num(raw.dialogImageShare, d.dialogImageShare, 30, 70),
+    dialogWidthByDevice: normalizeDeviceNumberMap(raw.dialogWidthByDevice, 480, 1400),
   };
 }
 
@@ -1097,6 +1155,21 @@ function normalizeDeviceNumberMap(
   return Object.keys(out).length ? out : undefined;
 }
 
+/** Sütun düzeni (Mobil=base, Tablet=md, Masaüstü=xl …); geçersiz değerler atılır */
+function normalizeGridCols(raw: unknown): MenuGridCols | undefined {
+  if (!isRec(raw)) return undefined;
+  const clamp = (v: unknown) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.max(1, Math.min(6, Math.round(v))) : undefined;
+  const base = clamp(raw.base);
+  if (base == null) return undefined;
+  const out: MenuGridCols = { base };
+  for (const k of ['sm', 'md', 'lg', 'xl', '2xl'] as const) {
+    const v = clamp(raw[k]);
+    if (v != null) out[k] = v;
+  }
+  return out;
+}
+
 function normalizeStyleBase(raw: Record<string, unknown>): MenuBlockStyleBase {
   const style: MenuBlockStyleBase = {};
   if (raw.paddingTop != null) style.paddingTop = num(raw.paddingTop, 0, 0, 120);
@@ -1111,6 +1184,7 @@ function normalizeStyleBase(raw: Record<string, unknown>): MenuBlockStyleBase {
   if (raw.fontWeight != null) style.fontWeight = num(raw.fontWeight, 400, 300, 800);
   if (raw.borderRadius != null) style.borderRadius = num(raw.borderRadius, 0, 0, 48);
   if (raw.gap != null) style.gap = num(raw.gap, 8, 0, 48);
+  if (typeof raw.hidden === 'boolean') style.hidden = raw.hidden;
   return style;
 }
 
@@ -1144,6 +1218,7 @@ function normalizeDeviceFrames(
       height: num(src.height, defaults[d].height, 400, 1400),
       maxWidth: num(src.maxWidth, defaults[d].maxWidth, 280, 1400),
       pagePadding: num(src.pagePadding, defaults[d].pagePadding, 0, 64),
+      ...(src.fullWidth === true ? { fullWidth: true } : {}),
     };
   }
   return out;
@@ -1180,6 +1255,8 @@ function normalizeBlock(raw: unknown): MenuBlock | null {
         logoWideRatio,
         logoWidth: num(raw.logoWidth, legacyW, 24, 280),
         logoHeight: num(raw.logoHeight, logoSize, 24, 160),
+        logoWidthByDevice: normalizeDeviceNumberMap(raw.logoWidthByDevice, 24, 280),
+        logoHeightByDevice: normalizeDeviceNumberMap(raw.logoHeightByDevice, 24, 160),
         showName: bool(raw.showName, merged.showName),
         showTable: bool(raw.showTable, merged.showTable),
         sticky: bool(raw.sticky, merged.sticky),
@@ -1245,6 +1322,7 @@ function normalizeBlock(raw: unknown): MenuBlock | null {
             ? raw.imageAspect
             : 'wide',
         openOnClick: bool(raw.openOnClick, merged.openOnClick),
+        ...(normalizeGridCols(raw.gridCols) ? { gridCols: normalizeGridCols(raw.gridCols) } : {}),
       };
     }
     case 'items':
@@ -1281,6 +1359,8 @@ function normalizeBlock(raw: unknown): MenuBlock | null {
             : 'detail',
         allowAddToCart: bool(raw.allowAddToCart, merged.allowAddToCart),
         detail: normalizeProductDetail(raw.detail ?? merged.detail),
+        ...(typeof raw.showVariants === 'boolean' ? { showVariants: raw.showVariants } : {}),
+        ...(normalizeGridCols(raw.gridCols) ? { gridCols: normalizeGridCols(raw.gridCols) } : {}),
       };
     case 'text':
       return {
@@ -1448,6 +1528,7 @@ export function normalizeMenuDocument(
       pagePadding,
       maxWidth,
       devices: normalizeDeviceFrames(themeSrc.devices, maxWidth, pagePadding),
+      overlays: normalizeOverlays(themeSrc.overlays),
     },
     blocks: blocks.length ? blocks : createDefaultMenuDocument(preset, brandColor).blocks,
   };

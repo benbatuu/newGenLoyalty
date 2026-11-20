@@ -155,6 +155,7 @@ type TenantReward = {
   } | null;
   rewardReadyText: string | null;
   barcodeFormat?: string | null;
+  walletDefaults?: Record<string, unknown> | null;
   stampsRemainingTemplate: string | null;
   stampChangeMessage: string | null;
   rewardChangeMessage: string | null;
@@ -196,6 +197,7 @@ function tenantWalletDefaults(data: TenantReward | null | undefined): TenantWall
     rewardFieldLabel: data?.rewardFieldLabel ?? null,
     statusFieldLabel: data?.statusFieldLabel ?? null,
     rewardReadyText: data?.rewardReadyText ?? null,
+    walletDefaults: data?.walletDefaults ?? null,
   };
 }
 
@@ -320,6 +322,10 @@ function RewardContent() {
   const [rewardLabel, setRewardLabel] = useState("1 bedava kahve");
   const [rewardReadyText, setRewardReadyText] = useState("Ödül hazır!");
   const [barcodeFormat, setBarcodeFormat] = useState<BarcodeFormat>("QR");
+  // Barkod türü tek kaynak: taslak her zaman seçili türle aynı (kaydedilen şablon da bunu taşır)
+  useEffect(() => {
+    setWalletDraft((d) => (d.barcodeFormat === barcodeFormat ? d : { ...d, barcodeFormat }));
+  }, [barcodeFormat]);
   const [remainingTpl, setRemainingTpl] = useState("{remaining} damga kaldı");
   const [stampChangeMessage, setStampChangeMessage] = useState(
     "Damga güncellendi: %@",
@@ -1055,21 +1061,49 @@ function RewardContent() {
                           </Link>
                         </div>
                       ) : null}
+                      {tab === "stamps" ? (
+                        <BrandInheritToggle
+                          checked={walletDraft.inheritBrandFields}
+                          onChange={(v) => setWalletDraft((d) => (v ? brandRefresh(d, data, selectedProgram.name) : { ...d, inheritBrandFields: false }))}
+                        />
+                      ) : null}
                       {error}
                       {form}
                       {tab === "fields" ? (
-                        <FieldsSection draft={walletDraft} onChange={setWalletDraft} tenantHasHeader={Boolean(data?.headerFieldLabel?.trim())} />
+                        <>
+                          <BrandInheritToggle
+                            checked={walletDraft.inheritBrandFields}
+                            onChange={(v) => setWalletDraft((d) => (v ? brandRefresh(d, data, selectedProgram.name) : { ...d, inheritBrandFields: false }))}
+                          />
+                          <FieldsSection
+                            draft={walletDraft}
+                            onChange={(d) => setWalletDraft({ ...d, inheritBrandFields: false })}
+                            tenantHasHeader={Boolean(data?.headerFieldLabel?.trim())}
+                          />
+                        </>
                       ) : null}
                     </div>
                     ) : null}
                     {tab === "barcode" && walletEligible ? (
                       <>
-                        <BarcodeTypePicker value={barcodeFormat} onChange={setBarcodeFormat} />
+                        <BarcodeTypePicker
+                          value={barcodeFormat}
+                          onChange={(f) => {
+                            setBarcodeFormat(f);
+                            setWalletDraft((d) => ({ ...d, barcodeFormat: f }));
+                          }}
+                        />
                         <BarcodeSection draft={walletDraft} onChange={setWalletDraft} />
                       </>
                     ) : null}
                     {tab === "relevance" && walletEligible ? (
-                      <RelevanceSection draft={walletDraft} onChange={setWalletDraft} />
+                      <>
+                        <BrandInheritToggle
+                          checked={walletDraft.inheritBrandFields}
+                          onChange={(v) => setWalletDraft((d) => (v ? brandRefresh(d, data, selectedProgram.name) : { ...d, inheritBrandFields: false }))}
+                        />
+                        <RelevanceSection draft={walletDraft} onChange={(d) => setWalletDraft({ ...d, inheritBrandFields: false })} />
+                      </>
                     ) : null}
 
                     {tab === "notify" && isPrimaryStamp ? (
@@ -1134,6 +1168,7 @@ function RewardContent() {
                         <ApplePreviewPane
                           draft={walletDraft}
                           tenant={tenantWalletDefaults(data)}
+                          barcodeFormat={barcodeFormat}
                           isStamp={isStampCard || isMultiStamp}
                           stampsRequired={previewStamps}
                           rewardLabel={previewReward}
@@ -1177,7 +1212,7 @@ function RewardContent() {
                       onBarcodeFormatChange={setBarcodeFormat}
                       formSection={tab === "stamps" ? "stamps" : tab === "fields" ? "fields" : tab === "back" ? "back" : "brand"}
                       draft={walletDraft}
-                      onChange={setWalletDraft}
+                      onChange={(d) => setWalletDraft({ ...d, inheritBrandFields: false })}
                       multiStamp={isMultiStamp ? multiStamp : null}
                       onMultiStampChange={isMultiStamp ? setMultiStamp : undefined}
                     renderLayout={({ form, preview, error }) => studio(preview, form, error)}
@@ -1272,5 +1307,46 @@ function RewardSkeleton() {
         </div>
       </div>
     </div>
+  );
+}
+
+
+/** Marka varsayılanını devral: Alanlar, Kilit ekranı ve damga dizilimini tenant'tan yeniden al */
+function brandRefresh(d: ProgramWalletDraft, data: TenantReward | null | undefined, programName: string): ProgramWalletDraft {
+  const fresh = draftFromProgramWallet({ walletTemplate: { inheritBrandFields: true } }, tenantWalletDefaults(data), programName);
+  return {
+    ...d,
+    inheritBrandFields: true,
+    headerFields: fresh.headerFields,
+    locations: fresh.locations,
+    relevantDate: fresh.relevantDate,
+    expirationDate: fresh.expirationDate,
+    suppressStripShine: fresh.suppressStripShine,
+    sharingProhibited: fresh.sharingProhibited,
+    stampRows: fresh.stampRows,
+    stampLayout: fresh.stampLayout,
+    stampGapX: fresh.stampGapX,
+    stampGapY: fresh.stampGapY,
+    stampIconScale: fresh.stampIconScale,
+    stampStaggerRatio: fresh.stampStaggerRatio,
+    stampOffsetX: fresh.stampOffsetX,
+    stampOffsetY: fresh.stampOffsetY,
+    stampPositions: fresh.stampPositions,
+    stampRowAdjust: fresh.stampRowAdjust,
+    stripImageUrl: fresh.stripImageUrl,
+  };
+}
+
+function BrandInheritToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--line)] p-3.5 hover:bg-[var(--surface)]">
+      <input type="checkbox" className="mt-1 h-4 w-4" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-[var(--ink)]">Marka varsayılanını kullan</span>
+        <span className="block text-xs text-[var(--muted)]">
+          Açıkken bu kart, Kart ayarları içindeki Alanlar ve Kilit ekranı değerlerini kullanır. Aşağıdaki alanları değiştirirseniz bu kart kendi değerini alır.
+        </span>
+      </span>
+    </label>
   );
 }

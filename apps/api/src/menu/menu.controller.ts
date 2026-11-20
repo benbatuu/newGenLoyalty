@@ -23,7 +23,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
-import { MenuService } from './menu.service';
+import { MenuService, type CatalogInput } from './menu.service';
 import {
   BulkCreateTablesDto,
   CreateCategoryDto,
@@ -318,6 +318,42 @@ export class MenuController {
   @RequirePermissions('tenant:update')
   deleteTag(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.menu.deleteTag(this.tenantIdOf(user), id);
+  }
+
+  @Get('catalog/:kind')
+  @RequirePermissions('tenant:update')
+  listCatalog(@CurrentUser() user: AuthUser, @Param('kind') kind: string) {
+    return this.menu.listCatalog(this.tenantIdOf(user), kind === 'EXTRA' ? 'EXTRA' : 'ALLERGEN');
+  }
+
+  @Post('catalog/ALLERGEN/seed-defaults')
+  @RequirePermissions('tenant:update')
+  seedAllergens(@CurrentUser() user: AuthUser) {
+    return this.menu.seedDefaultAllergens(this.tenantIdOf(user));
+  }
+
+  @Post('catalog/reset-defaults')
+  @RequirePermissions('tenant:update')
+  resetCatalog(@CurrentUser() user: AuthUser) {
+    return this.menu.resetDefaultCatalog(this.tenantIdOf(user));
+  }
+
+  @Post('catalog')
+  @RequirePermissions('tenant:update')
+  createCatalog(@CurrentUser() user: AuthUser, @Body() dto: CatalogInput) {
+    return this.menu.createCatalogEntry(this.tenantIdOf(user), dto);
+  }
+
+  @Patch('catalog/:id')
+  @RequirePermissions('tenant:update')
+  updateCatalog(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: Partial<CatalogInput>) {
+    return this.menu.updateCatalogEntry(this.tenantIdOf(user), id, dto);
+  }
+
+  @Delete('catalog/:id')
+  @RequirePermissions('tenant:update')
+  deleteCatalog(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.menu.deleteCatalogEntry(this.tenantIdOf(user), id);
   }
 
   @Get('feedback')

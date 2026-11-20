@@ -24,6 +24,17 @@ import {
 } from '../loyalty/wallet-template';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import {
+  MAX_WALLET_STAMP_SLOTS,
+  WALLET_STRIP_H,
+  WALLET_STRIP_W,
+  computeStampGrid,
+  computeWalletStampPositions,
+  resolveWalletStampGrid,
+  type WalletStampInset,
+  type WalletStampLayoutOptions,
+} from '@ngl/shared';
+import { applyBrandFields } from './wallet-defaults';
 import { SmsService } from '../sms/sms.service';
 import { AppleApnsService } from './apple-apns.service';
 import { ApplePassService } from './apple-pass.service';
@@ -1299,15 +1310,24 @@ export class WalletService {
 
     const single = cards.length === 1 ? cards[0]! : null;
 
-    const stampArt = await this.inviteStampArt(tenant, programIds[0]).catch(
+    const stampArt = await this.inviteStampArt(tenant, programIds[0], rule?.stampsRequired ?? 10).catch(
       (err: Error) => {
         this.logger.warn(`Davet damga görünümü: ${err.message}`);
         return { stampTheme: 'COFFEE', stampIconFilledUrl: null, stampIconEmptyUrl: null };
       },
     );
+    const passFront = await this.buildInvitePassFront(
+      tenant as never,
+      programIds[0],
+      customer.stampCount,
+      rule?.stampsRequired ?? 10,
+      rule?.rewardLabel ?? 'Ödül',
+      customer.rewardReady,
+    );
     return {
       token,
       tenantName: tenant.name,
+      passFront,
       logoText: tenant.logoText?.trim() || null,
       logoUrl: this.resolvePublicAssetUrl(tenant.logoUrl),
       primaryColor: tenant.primaryColor ?? '#1B4332',
@@ -1391,10 +1411,19 @@ export class WalletService {
     const stampsRequired = rule?.stampsRequired ?? 10;
     const rewardLabel = rule?.rewardLabel ?? 'Ödül';
 
-    const stampArt = await this.inviteStampArt(tenant);
+    const stampArt = await this.inviteStampArt(tenant, undefined, stampsRequired);
+    const passFront = await this.buildInvitePassFront(
+      tenant as never,
+      undefined,
+      3,
+      stampsRequired,
+      rewardLabel,
+      false,
+    );
     return {
       token: 'preview',
       tenantName: tenant.name,
+      passFront,
       logoText: tenant.logoText?.trim() || null,
       logoUrl: this.resolvePublicAssetUrl(tenant.logoUrl),
       primaryColor: tenant.primaryColor ?? '#1B4332',
@@ -1434,6 +1463,47 @@ export class WalletService {
     };
   }
 
+  /** Davet kartı: Wallet ön yüzündeki header ve DAMGA / ÖDÜL / DURUM alanları (pass ile aynı kural) */
+  private async buildInvitePassFront(
+    tenant: { id: string } & Record<string, unknown>,
+    programId: string | undefined,
+    stampCount: number,
+    stampsRequired: number,
+    rewardLabel: string,
+    rewardReady: boolean,
+  ) {
+    const program = await this.prisma.loyaltyProgram.findFirst({
+      where: programId
+        ? { id: programId, tenantId: tenant.id }
+        : { tenantId: tenant.id, isPrimary: true, isActive: true },
+      select: { config: true },
+    });
+    const wt = applyBrandFields(parseWalletTemplate(program?.config), tenant.walletDefaults);
+    const str = (k: string) => (typeof tenant[k] === 'string' ? (tenant[k] as string).trim() : '');
+    const header: { label: string; value: string }[] = [];
+    const headerLabel = str('headerFieldLabel');
+    if (headerLabel) {
+      header.push({ label: headerLabel.toUpperCase().slice(0, 20), value: `${stampCount}/${stampsRequired}` });
+    }
+    for (const f of wt.headerFields ?? []) {
+      if (f?.label?.trim() && f?.value?.trim()) {
+        header.push({ label: f.label.trim().toUpperCase().slice(0, 20), value: f.value.trim().slice(0, 30) });
+      }
+    }
+    const remaining = Math.max(stampsRequired - stampCount, 0);
+    const status = rewardReady
+      ? str('rewardReadyText') || 'Ödül hazır!'
+      : (str('stampsRemainingTemplate') || '{remaining} damga kaldı').replace(/\{remaining\}/gi, String(remaining));
+    return {
+      header: header.slice(0, 2),
+      primary: [
+        { label: str('stampFieldLabel') || 'DAMGA', value: `${stampCount}/${stampsRequired}` },
+        { label: str('rewardFieldLabel') || 'ÖDÜL', value: rewardLabel },
+        { label: str('statusFieldLabel') || 'DURUM', value: status },
+      ],
+    };
+  }
+
   /** Davet sayfasında damga görünümü: birincil programın cüzdan tasarımı, yoksa marka ayarları */
   private async inviteStampArt(
     tenant: {
@@ -1446,6 +1516,7 @@ export class WalletService {
     logoUrl?: string | null;
   } & Record<string, unknown>,
     programId?: string,
+    stampsRequired = 10,
   ) {
     // Müşterinin kartındaki program; yoksa birincil program
     const program = await this.prisma.loyaltyProgram.findFirst({
@@ -1454,14 +1525,44 @@ export class WalletService {
         : { tenantId: tenant.id, isPrimary: true, isActive: true },
       select: { config: true },
     });
-    const branding = resolvePassBranding(
-      tenant as never,
-      parseWalletTemplate(program?.config),
+    const wt = parseWalletTemplate(program?.config);
+    const branding = resolvePassBranding(tenant as never, wt);
+    // Kart tasarımıyla aynı damga şeridi: dizilim, boyut ve arka plan (pass ile aynı hesap)
+    const layoutTpl = applyBrandFields(wt, tenant.walletDefaults);
+    const total = Math.max(1, Math.min(stampsRequired, MAX_WALLET_STAMP_SLOTS));
+    const insetRaw = String(layoutTpl.stampInset ?? tenant.stampInset ?? 'NORMAL').toUpperCase();
+    const grid = resolveWalletStampGrid(total, computeStampGrid(total), layoutTpl.stampRows || undefined);
+    const positions = computeWalletStampPositions(
+      total,
+      grid.cols,
+      grid.rows,
+      (['TIGHT', 'NORMAL', 'WIDE'].includes(insetRaw) ? insetRaw : 'NORMAL') as WalletStampInset,
+      undefined,
+      undefined,
+      {
+        layout: layoutTpl.stampLayout === 'STAGGERED' ? 'STAGGERED' : 'GRID',
+        gapX: layoutTpl.stampGapX ?? null,
+        gapY: layoutTpl.stampGapY ?? null,
+        iconScale: layoutTpl.stampIconScale ?? null,
+        staggerRatio: layoutTpl.stampStaggerRatio ?? null,
+        offsetX: layoutTpl.stampOffsetX ?? null,
+        offsetY: layoutTpl.stampOffsetY ?? null,
+        manual: (layoutTpl.stampPositions ?? null) as WalletStampLayoutOptions['manual'],
+        rowAdjust: (layoutTpl.stampRowAdjust ?? null) as WalletStampLayoutOptions['rowAdjust'],
+      },
     );
     return {
       stampTheme: branding.stampTheme || 'COFFEE',
       stampIconFilledUrl: this.resolvePublicAssetUrl(branding.stampIconFilledUrl),
       stampIconEmptyUrl: this.resolvePublicAssetUrl(branding.stampIconEmptyUrl),
+      stampStrip: {
+        items: positions.map((p) => ({
+          x: p.x / WALLET_STRIP_W,
+          y: p.y / WALLET_STRIP_H,
+          s: p.iconSize / WALLET_STRIP_W,
+        })),
+        stripImageUrl: layoutTpl.stripImageUrl ? this.resolvePublicAssetUrl(layoutTpl.stripImageUrl) : null,
+      },
     };
   }
 
@@ -1779,7 +1880,10 @@ export class WalletService {
         where: { id: programId, tenantId },
         select: { config: true, type: true },
       });
-      walletTemplate = parseWalletTemplate(program?.config);
+      walletTemplate = applyBrandFields(
+        parseWalletTemplate(program?.config),
+        tenant.walletDefaults,
+      );
       programType = program?.type ?? null;
     }
     const branding = resolvePassBranding(tenant, walletTemplate);

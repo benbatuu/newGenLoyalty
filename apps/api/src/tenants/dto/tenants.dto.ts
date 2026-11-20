@@ -16,6 +16,7 @@ import {
   ValidateIf,
   ValidateNested,
   ArrayMaxSize,
+  IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { SubscriptionStatus } from '@prisma/client';
@@ -78,6 +79,11 @@ export class UpdateTenantAdminDto {
 }
 
 export class UpdateTenantProfileDto {
+  /** Marka düzeyi kart varsayılanları (sanitize edilir) */
+  @IsOptional()
+  @IsObject()
+  walletDefaults?: Record<string, unknown>;
+
   @IsOptional()
   @IsString()
   @MinLength(2)

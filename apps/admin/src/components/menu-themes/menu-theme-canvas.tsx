@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
   createDefaultMenuDocument,
   defaultExplorePage,
   defaultProductDetail,
+  resolveMenuOverlay,
+  resolveDetailDialogWidth,
   getMenuLangMeta,
   normalizeMenuDocument,
   pickContentDescription,
@@ -108,12 +110,15 @@ function FitImage({
   radius,
   aspect,
   className,
+  logo,
 }: {
   src: string;
   alt?: string;
   radius?: string | number;
   aspect: string;
   className?: string;
+  /** Görsel yerine işletme logosu: kırpmadan, ortada ve yumuşak zeminde */
+  logo?: boolean;
 }) {
   // "4 / 3" | "1 / 1" | "16 / 10" → padding-% for reliable grid sizing
   const parts = aspect.split("/").map((p) => Number(p.trim()));
@@ -130,7 +135,7 @@ function FitImage({
         paddingTop: pad,
         overflow: "hidden",
         borderRadius: radius,
-        background: "rgba(128,128,128,0.2)",
+        background: logo ? "rgba(128,128,128,0.1)" : "rgba(128,128,128,0.2)",
         flexShrink: 0,
       }}
     >
@@ -140,7 +145,7 @@ function FitImage({
         alt={alt}
         loading="lazy"
         decoding="async"
-        style={{
+        style={logo ? logoFillStyle : {
           position: "absolute",
           inset: 0,
           width: "100%",
@@ -154,9 +159,29 @@ function FitImage({
   );
 }
 
-function logoBox(block: MenuHeaderBlock): { width: number; height: number; radius: string } {
-  const height = Math.max(24, Math.min(160, block.logoHeight || block.logoSize || 40));
-  const width = Math.max(24, Math.min(280, block.logoWidth || (() => {
+/** Görüntülenen ekran (mobil / tablet / masaüstü); iç bileşenler cihaz bazlı değerler için okur */
+const MenuDeviceCtx = createContext<MenuDeviceId>("mobile");
+
+/** Görseli olmayan kategori/ürünlerde gösterilecek işletme logosu */
+const MenuFallbackLogoCtx = createContext<string | null>(null);
+
+const logoFillStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  objectPosition: "center",
+  padding: "18%",
+  boxSizing: "border-box",
+  display: "block",
+};
+
+function logoBox(block: MenuHeaderBlock, device: MenuDeviceId = "mobile"): { width: number; height: number; radius: string } {
+  const baseH = block.logoHeight || block.logoSize || 40;
+  const baseW = block.logoWidth || 0;
+  const height = Math.max(24, Math.min(160, resolveDeviceNumber(baseH, block.logoHeightByDevice, device)));
+  const width = Math.max(24, Math.min(280, resolveDeviceNumber(baseW, block.logoWidthByDevice, device) || (() => {
     const shape: MenuLogoShape = block.logoShape || "round";
     if (shape === "wide") {
       const ratio = Math.max(1.6, Math.min(4, block.logoWideRatio || 2.4));
@@ -177,7 +202,8 @@ function BrandLogo({
   src: string;
   block: MenuHeaderBlock;
 }) {
-  const box = logoBox(block);
+  const device = useContext(MenuDeviceCtx);
+  const box = logoBox(block, device);
   return (
     <div
       style={{
@@ -300,6 +326,7 @@ function ProductDetailView({
   onBack,
   onAddToCart,
   hideBack,
+  split,
 }: {
   item: MenuItemData;
   theme: MenuDocument["theme"];
@@ -311,6 +338,8 @@ function ProductDetailView({
   onBack: () => void;
   onAddToCart?: () => void;
   hideBack?: boolean;
+  /** Tablet/masaüstü diyaloğu: solda görsel, sağda bilgiler */
+  split?: boolean;
 }) {
   const name = localizedName(lang, item.name, item.nameTr, item.nameEn, item.translations);
   const description = pickContentDescription(lang, item.description, item.translations);
@@ -325,47 +354,29 @@ function ProductDetailView({
   if (detail.showPrepTime && item.prepTimeMin != null) tiles.push({ label: t(lang, "minutes"), value: String(item.prepTimeMin) });
   if (detail.showAllergens && item.allergens?.length) tiles.push({ label: t(lang, "allergens"), value: String(item.allergens.length) });
 
-  return (
-    <div className="flex min-h-full flex-col">
-      {hideBack ? null : (
-        <button
-          type="button"
-          onClick={onBack}
-          className="mb-3 inline-flex min-h-10 items-center gap-1.5 self-start rounded-full px-3 text-[11px] font-medium uppercase tracking-[0.14em]"
-          style={{ color: muted, background: `${theme.textColor}08` }}
-        >
-          ← {t(lang, "back", uiLabels)}
-        </button>
-      )}
+  const fallbackLogo = useContext(MenuFallbackLogoCtx);
+  const isLogo = !item.imageUrl && Boolean(fallbackLogo);
+  const imageSrc = item.imageUrl || fallbackLogo || "";
+  const hasImage = Boolean(detail.showImage && imageSrc);
+  const imageRight = detail.dialogImageSide === "right";
+  const imageShare = Math.min(70, Math.max(30, detail.dialogImageShare ?? 50));
+  const priceOnImage = detail.showPrice && hasImage && !split;
+  const padX = split ? 36 : 16;
 
-      {detail.showImage && item.imageUrl ? (
-        <div
-          className="relative -mx-1 mb-4 overflow-hidden"
-          style={{
-            margin: detail.imageBleed ? `0 -${pagePadding}px 20px` : "0 0 20px",
-            borderRadius: detail.imageBleed ? 0 : detail.imageRadius + 6,
-          }}
-        >
-          <FitImage src={item.imageUrl} alt={name} aspect={productAspectCss(detail.imageAspect)} radius={0} />
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3"
-            style={{ background: "linear-gradient(to top, rgba(0,0,0,0.35), transparent)" }}
-          />
-          {detail.showPrice ? (
-            <div
-              className="absolute bottom-3 right-3 flex items-baseline gap-1 rounded-2xl px-4 py-2 shadow-lg"
-              style={{ background: theme.accentColor, color: theme.backgroundColor }}
-            >
-              <span className="text-[22px] font-bold leading-none tabular-nums">₺{Number(item.price).toFixed(0)}</span>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+  const priceBadge = (
+    <div
+      className="absolute bottom-3 right-3 flex items-baseline gap-1 rounded-2xl px-4 py-2 shadow-lg"
+      style={{ background: theme.accentColor, color: theme.backgroundColor }}
+    >
+      <span className="text-[22px] font-bold leading-none tabular-nums">₺{Number(item.price).toFixed(0)}</span>
+    </div>
+  );
 
+  const info = (
+    <>
       {detail.showName ? (
         <h1
-          className="text-[30px] leading-[1.08] tracking-[-0.02em]"
+          className={`${split ? "text-[34px]" : "text-[30px]"} leading-[1.08] tracking-[-0.02em]`}
           style={{ fontFamily: fonts.display, fontWeight: 600, color: theme.textColor }}
         >
           {name}
@@ -374,7 +385,7 @@ function ProductDetailView({
         <p className="mb-1 text-sm font-medium" style={{ color: muted }}>{name}</p>
       )}
 
-      {(!detail.showPrice || !detail.showImage || !item.imageUrl) && detail.showPrice ? (
+      {detail.showPrice && !priceOnImage ? (
         <div className="mt-2 flex items-baseline gap-2">
           <span className="text-2xl font-bold tabular-nums" style={{ color: theme.accentColor }}>
             ₺{Number(item.price).toFixed(0)}
@@ -438,8 +449,15 @@ function ProductDetailView({
 
       {detail.showAddToCart && onAddToCart ? (
         <div
-          className="sticky bottom-0 -mx-4 mt-auto flex items-center gap-3 px-4 pb-1 pt-3"
-          style={{ background: `linear-gradient(to top, ${theme.surfaceColor} 70%, ${theme.surfaceColor}00)` }}
+          className="sticky bottom-0 mt-auto flex items-center gap-3 pt-3"
+          style={{
+            marginLeft: -padX,
+            marginRight: -padX,
+            paddingLeft: padX,
+            paddingRight: padX,
+            paddingBottom: split ? 28 : 4,
+            background: `linear-gradient(to top, ${theme.surfaceColor} 70%, ${theme.surfaceColor}00)`,
+          }}
         >
           <div className="min-w-0">
             <p className="text-[10px] uppercase tracking-[0.14em]" style={{ color: muted }}>Toplam</p>
@@ -457,6 +475,89 @@ function ProductDetailView({
           </button>
         </div>
       ) : null}
+    </>
+  );
+
+  if (split) {
+    // Diyalog: görsel sol yarıyı doldurur, bilgiler sağda kendi içinde kayar
+    return (
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: hasImage
+            ? imageRight
+              ? `minmax(0, 1fr) ${imageShare}%`
+              : `${imageShare}% minmax(0, 1fr)`
+            : "minmax(0, 1fr)",
+          height: "100%",
+          minHeight: 0,
+        }}
+      >
+        {hasImage ? (
+          <div
+            className="relative min-h-0 overflow-hidden"
+            style={{ background: `${theme.textColor}0d`, gridColumn: imageRight ? 2 : 1, gridRow: 1 }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={resolveAdminAssetUrl(imageSrc)}
+              alt={name}
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover"
+              style={isLogo ? logoFillStyle : undefined}
+            />
+          </div>
+        ) : null}
+        <div
+          className="flex min-h-0 flex-col overflow-y-auto"
+          style={{
+            paddingLeft: padX,
+            paddingRight: padX,
+            paddingTop: 40,
+            overscrollBehavior: "contain",
+            gridColumn: hasImage && imageRight ? 1 : 2,
+            gridRow: 1,
+          }}
+        >
+          {info}
+          {detail.showAddToCart && onAddToCart ? null : <div className="h-9 shrink-0" />}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-full flex-col">
+      {hideBack ? null : (
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-3 inline-flex min-h-10 items-center gap-1.5 self-start rounded-full px-3 text-[11px] font-medium uppercase tracking-[0.14em]"
+          style={{ color: muted, background: `${theme.textColor}08` }}
+        >
+          ← {t(lang, "back", uiLabels)}
+        </button>
+      )}
+
+      {hasImage ? (
+        <div
+          className="relative -mx-1 mb-4 overflow-hidden"
+          style={{
+            margin: detail.imageBleed ? `0 -${pagePadding}px 20px` : "0 0 20px",
+            borderRadius: detail.imageBleed ? 0 : detail.imageRadius + 6,
+          }}
+        >
+          <FitImage src={imageSrc} alt={name} aspect={productAspectCss(detail.imageAspect)} radius={0} logo={isLogo} />
+          {isLogo ? null : <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3"
+            style={{ background: "linear-gradient(to top, rgba(0,0,0,0.35), transparent)" }}
+          />}
+          {priceOnImage ? priceBadge : null}
+        </div>
+      ) : null}
+
+      {info}
     </div>
   );
 }
@@ -539,18 +640,8 @@ function MenuThemeCanvasInner({
   }, [previewDevice]);
 
   const device: MenuDeviceId = previewDevice ?? autoDevice;
-  // Public menüde tek tasarım dili; cihaz çerçeveleri yalnızca builder önizlemesi için
-  const theme = previewDevice
-    ? resolveThemeForDevice(document.theme, previewDevice)
-    : {
-        ...document.theme,
-        frame: document.theme.devices?.[device] ?? {
-          width: typeof window !== "undefined" ? window.innerWidth : 390,
-          height: 800,
-          maxWidth: document.theme.maxWidth,
-          pagePadding: document.theme.pagePadding,
-        },
-      };
+  // Her ekran kendi çerçevesini kullanır: kenar boşluğu ve içerik genişliği cihaza göre
+  const theme = resolveThemeForDevice(document.theme, device);
 
   const headerBlock = document.blocks.find((b): b is MenuHeaderBlock => b.type === "header");
   const itemsBlock = document.blocks.find((b): b is MenuItemsBlock => b.type === "items");
@@ -590,7 +681,7 @@ function MenuThemeCanvasInner({
   const hasBottomNav = Boolean(bottomNavBlock?.items.some((i) => i.enabled));
   const stickyHeader = Boolean(headerBlock?.sticky);
   const headerBarH = headerBlock
-    ? Math.max(56, logoBox(headerBlock).height + 24)
+    ? Math.max(device === "mobile" ? 56 : 72, logoBox(headerBlock, device).height + 24)
     : 64;
 
   const filteredCategories = useMemo(() => {
@@ -637,8 +728,39 @@ function MenuThemeCanvasInner({
     setOpenProduct(item);
   }
 
-  const padBottom = hasBottomNav ? 72 : theme.pagePadding;
-  const frameWidth = previewWidth ?? (contained ? theme.frame.width : undefined);
+  // Telefonda alt sekme çubuğu; tablet ve masaüstünde aynı menü başlıkta yatay görünür
+  const navOnTop = hasBottomNav && device !== "mobile";
+  const padBottom = hasBottomNav && !navOnTop ? 72 : theme.pagePadding;
+  const topNav =
+    navOnTop && bottomNavBlock ? (
+      <div
+        role="presentation"
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelectBlock?.(bottomNavBlock.id);
+        }}
+        style={{
+          minWidth: 0,
+          borderRadius: 999,
+          outline: selectedBlockId === bottomNavBlock.id ? `2px solid ${theme.accentColor}` : undefined,
+          outlineOffset: 2,
+        }}
+      >
+        <MenuBottomNav
+          variant="top"
+          items={bottomNavBlock.items}
+          lang={lang}
+          uiLabels={uiLabels}
+          cartCount={interactions.cartCount}
+          onOpen={interactions.openNav}
+          accent={theme.accentColor}
+          barBg={theme.backgroundColor}
+          muted={theme.textColor}
+        />
+      </div>
+    ) : null;
+  // Cihaz zorlanmadıysa (ör. iframe önizleme, halka açık menü) görünüm alanının genişliği kullanılır
+  const frameWidth = previewWidth ?? (contained && previewDevice ? theme.frame.width : undefined);
 
   useEffect(() => {
     const href = FONT_HREF[theme.fontPair];
@@ -655,7 +777,15 @@ function MenuThemeCanvasInner({
     if (link.getAttribute("href") !== href) link.setAttribute("href", href);
   }, [theme.fontPair]);
 
+  // Ürün detayı: telefonda alttan çekmece, tablet/masaüstünde ortada iki sütunlu pencere
+  const overlayStyle = resolveMenuOverlay(document.theme, device);
+  const productDialog = overlayStyle === "dialog";
+  const fallbackLogo = headerBlock?.logoUrl || menu.tenant.logoUrl || null;
+  const productDetail: MenuProductDetail = { ...defaultProductDetail(), ...itemsBlock?.detail };
+
   return (
+    <MenuDeviceCtx.Provider value={device}>
+    <MenuFallbackLogoCtx.Provider value={fallbackLogo}>
     <div
       className="menu-doc"
       style={{
@@ -672,7 +802,7 @@ function MenuThemeCanvasInner({
       }}
       onClick={() => onSelectBlock?.(null)}
     >
-      {stickyHeader && headerBlock ? (
+      {stickyHeader && headerBlock && !(resolveBlockStyle(headerBlock.style, device).hidden && !onSelectBlock) ? (
         <StickyHeader
           block={headerBlock}
           tenant={menu.tenant}
@@ -684,6 +814,10 @@ function MenuThemeCanvasInner({
           contained={contained}
           selected={selectedBlockId === headerBlock.id}
           onSelect={() => onSelectBlock?.(headerBlock.id)}
+          nav={topNav}
+          wide={device !== "mobile"}
+          innerMaxWidth={device === "mobile" || theme.frame.fullWidth ? undefined : theme.maxWidth}
+          padX={theme.pagePadding}
         />
       ) : null}
 
@@ -691,9 +825,10 @@ function MenuThemeCanvasInner({
         style={{
           containerType: "inline-size",
           // Önizleme genişliği verildiyse içerik tüm çerçeveyi kullanır; kapsayıcı sorguları buna göre çalışır
-          maxWidth: previewWidth ? previewWidth : previewDevice ? theme.maxWidth : Math.min(theme.maxWidth, 920),
+          maxWidth: previewWidth ? previewWidth : device === "mobile" || theme.frame.fullWidth ? "100%" : theme.maxWidth,
           margin: "0 auto",
-          padding: `${theme.pagePadding}px`,
+          paddingLeft: theme.pagePadding,
+          paddingRight: theme.pagePadding,
           paddingTop:
             stickyHeader && contained
               ? theme.pagePadding + headerBarH
@@ -705,6 +840,9 @@ function MenuThemeCanvasInner({
           width: "100%",
         }}
       >
+        {topNav && !(stickyHeader && headerBlock) ? (
+          <div className="mb-4 flex justify-end">{topNav}</div>
+        ) : null}
         {drilldown && selectedCat ? (
           <CategoryDetail
             category={selectedCat}
@@ -732,6 +870,8 @@ function MenuThemeCanvasInner({
             if (block.type === "items" && !showItemsHome) return null;
             if (block.type === "branchPicker" && hideBranchSelect) return null;
             const selected = selectedBlockId === block.id;
+            const hiddenHere = Boolean(resolveBlockStyle(block.style, device).hidden);
+            if (hiddenHere && !onSelectBlock) return null;
             return (
               <div
                 key={block.id}
@@ -741,11 +881,35 @@ function MenuThemeCanvasInner({
                   onSelectBlock?.(block.id);
                 }}
                 style={{
-                  outline: selected ? `2px solid ${theme.accentColor}` : undefined,
+                  position: "relative",
+                  outline: selected
+                    ? `2px solid ${theme.accentColor}`
+                    : hiddenHere
+                      ? `1px dashed ${theme.mutedColor}`
+                      : undefined,
                   outlineOffset: 2,
                   borderRadius: 8,
+                  opacity: hiddenHere ? 0.35 : undefined,
                 }}
               >
+                {hiddenHere ? (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 4,
+                      right: 4,
+                      zIndex: 2,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      padding: "2px 6px",
+                      borderRadius: 999,
+                      background: theme.textColor,
+                      color: theme.backgroundColor,
+                    }}
+                  >
+                    Bu ekranda gizli
+                  </span>
+                ) : null}
                 <RenderBlock
                   block={block}
                   document={document}
@@ -778,7 +942,7 @@ function MenuThemeCanvasInner({
         )}
       </div>
 
-      {bottomNavBlock ? (
+      {bottomNavBlock && !navOnTop ? (
         <div
           role="presentation"
           onClick={(e) => {
@@ -807,6 +971,7 @@ function MenuThemeCanvasInner({
       ) : null}
 
       <Sheets
+        overlay={overlayStyle}
         interactions={interactions}
         theme={theme}
         fonts={fonts}
@@ -825,7 +990,9 @@ function MenuThemeCanvasInner({
             ? localizedName(lang, openProduct.name, openProduct.nameTr, openProduct.nameEn, openProduct.translations)
             : ""
         }
-        variant="drawer"
+        variant={productDialog ? "dialog" : "drawer"}
+        dialogTall={productDialog && productDetail.showImage && Boolean(openProduct?.imageUrl || fallbackLogo)}
+        dialogWidth={productDialog ? resolveDetailDialogWidth(productDetail, device) : undefined}
         showTitle={false}
         ink={theme.textColor}
         panel={theme.surfaceColor}
@@ -842,10 +1009,8 @@ function MenuThemeCanvasInner({
             lang={lang}
             uiLabels={uiLabels}
             pagePadding={16}
-            detail={{
-              ...defaultProductDetail(),
-              ...itemsBlock?.detail,
-            }}
+            detail={productDetail}
+            split={productDialog}
             hideBack
             onBack={() => setOpenProduct(null)}
             onAddToCart={() => {
@@ -876,6 +1041,8 @@ function MenuThemeCanvasInner({
         </div>
       ) : null}
     </div>
+    </MenuFallbackLogoCtx.Provider>
+    </MenuDeviceCtx.Provider>
   );
 }
 
@@ -1007,6 +1174,10 @@ function StickyHeader({
   contained,
   selected,
   onSelect,
+  nav,
+  wide = false,
+  innerMaxWidth,
+  padX = 16,
 }: {
   block: MenuHeaderBlock;
   tenant: MenuThemeCanvasProps["menu"]["tenant"];
@@ -1018,6 +1189,13 @@ function StickyHeader({
   contained: boolean;
   selected: boolean;
   onSelect: () => void;
+  /** Tablet / masaüstünde başlıkta gösterilen menü */
+  nav?: ReactNode;
+  /** Tablet / masaüstü: web sitesi başlığı düzeni */
+  wide?: boolean;
+  /** İçerikle hizalı iç genişlik (boşsa tam genişlik) */
+  innerMaxWidth?: number;
+  padX?: number;
 }) {
   return (
     <header
@@ -1037,7 +1215,21 @@ function StickyHeader({
         outline: selected ? `2px solid ${theme.accentColor}` : undefined,
       }}
     >
-      <div className="flex items-center justify-between gap-2 px-4 py-3">
+      <div
+        className={`flex items-center justify-between ${wide ? "gap-6" : "gap-2 px-4 py-3"}`}
+        style={
+          wide
+            ? {
+                // Web sitesi başlığı: içerikle aynı hizada, sabit yükseklik
+                maxWidth: innerMaxWidth ?? "100%",
+                margin: "0 auto",
+                minHeight: 72,
+                paddingLeft: padX,
+                paddingRight: padX,
+              }
+            : undefined
+        }
+      >
         <div className="flex min-w-0 items-center gap-2.5">
           {block.showLogo && (block.logoUrl || tenant.logoUrl) ? (
             <BrandLogo
@@ -1064,6 +1256,11 @@ function StickyHeader({
             ) : null}
           </div>
         </div>
+        <div className={`ml-auto flex min-w-0 items-center ${wide ? "gap-4" : "gap-2"}`}>
+        {nav}
+        {nav && block.showLanguages && block.languages.length > 0 ? (
+          <span aria-hidden className="h-5 w-px shrink-0" style={{ background: `${theme.textColor}22` }} />
+        ) : null}
         {block.showLanguages && block.languages.length > 0 ? (
           <LanguageSwitcher
             languages={block.languages}
@@ -1074,12 +1271,14 @@ function StickyHeader({
             bg={theme.backgroundColor}
           />
         ) : null}
+        </div>
       </div>
     </header>
   );
 }
 
 function Sheets({
+  overlay,
   interactions,
   theme,
   fonts,
@@ -1099,6 +1298,7 @@ function Sheets({
   bottomNavBlock?: MenuBottomNavBlock;
   table?: { id: string; label: string };
   contained: boolean;
+  overlay: "drawer" | "dialog";
 }) {
   const sheet = interactions.sheet;
   const tt = (key: Parameters<typeof t>[1]) => t(lang, key, uiLabels);
@@ -1113,7 +1313,7 @@ function Sheets({
     muted: theme.mutedColor,
     contained,
     onClose: () => interactions.setSheet({ type: "none" }),
-    variant: "drawer" as const,
+    variant: overlay,
     closeLabel: tt("close"),
   };
 
@@ -1360,6 +1560,7 @@ function RenderBlock({
   onOpenCategory: (id: string) => void;
   onProductClick?: (item: MenuItemData) => void;
 }) {
+  const fallbackLogo = useContext(MenuFallbackLogoCtx);
   const previewWidthValue = usePreviewWidthValue();
   const radius = radiusCss(theme.radius);
   const st = styleToCss(resolveBlockStyle(block.style, device));
@@ -1548,6 +1749,9 @@ function RenderBlock({
                             objectPosition: "center",
                           }}
                         />
+                      ) : fallbackLogo ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={resolveAdminAssetUrl(fallbackLogo)} alt="" loading="lazy" style={{ ...logoFillStyle, padding: "14%" }} />
                       ) : null}
                     </div>
                   ) : null}
@@ -1564,7 +1768,7 @@ function RenderBlock({
             </div>
           ) : (
             <>
-              <style>{gridColsCss(gridId, previewWidthValue ? colsForWidth(resolvedCols, previewWidthValue) : resolvedCols, "0.75rem")}</style>
+              <style>{gridColsCss(gridId, colsForDevice(resolvedCols, device), "0.75rem")}</style>
               <div className={gridId}>
                 {categories.map((c) => (
                   <button
@@ -1584,6 +1788,8 @@ function RenderBlock({
                     {block.showImages ? (
                       c.imageUrl ? (
                         <FitImage src={c.imageUrl} aspect={aspect} />
+                      ) : fallbackLogo ? (
+                        <FitImage src={fallbackLogo} aspect={aspect} logo />
                       ) : (
                         <div
                           style={{
@@ -1696,7 +1902,7 @@ function RenderBlock({
           }}
         >
           {block.text ? <p>{block.text}</p> : null}
-          {block.showBranding ? <p className="mt-1">newGenLoyalty</p> : null}
+          {block.showBranding ? <p className="mt-1">Stampwell</p> : null}
         </footer>
       );
     case "branchPicker":
@@ -1750,6 +1956,23 @@ export function colsForWidth(
   return { base: Math.max(1, Math.min(6, Math.round(value))) };
 }
 
+/**
+ * Sütun sayısını ekran tipine göre seçer (editördeki Mobil / Tablet / Masaüstü satırları).
+ * İçerik kutusu genişliğine bakılmaz: kenar boşluğu ve içerik sınırı eşikleri hiç geçirmiyordu.
+ */
+export function colsForDevice(
+  cols: { base: number; sm?: number; md?: number; lg?: number; xl?: number; '2xl'?: number },
+  device: MenuDeviceId,
+): { base: number } {
+  const pick =
+    device === 'desktop'
+      ? (cols.xl ?? cols.lg ?? cols.md ?? cols.sm ?? cols.base)
+      : device === 'tablet'
+        ? (cols.md ?? cols.sm ?? cols.base)
+        : cols.base;
+  return { base: Math.max(1, Math.min(6, Math.round(pick))) };
+}
+
 export function gridColsCss(
   gridId: string,
   cols: { base: number; sm?: number; md?: number; lg?: number; xl?: number; '2xl'?: number },
@@ -1801,6 +2024,7 @@ function ItemsList({
   previewLocked: boolean;
   device: MenuDeviceId;
 }) {
+  const fallbackLogo = useContext(MenuFallbackLogoCtx);
   const previewWidthValue = usePreviewWidthValue();
   const radius = radiusCss(theme.radius);
   if (!items.length) {
@@ -1812,7 +2036,7 @@ function ItemsList({
 
   return (
     <>
-      <style>{gridColsCss(gridId, previewWidthValue ? colsForWidth(block.gridCols ?? legacyGridCols(block.columns || 1, block.columnsByDevice?.tablet, block.columnsByDevice?.desktop, 4), previewWidthValue) : (block.gridCols ?? legacyGridCols(block.columns || 1, block.columnsByDevice?.tablet, block.columnsByDevice?.desktop, 4)), "0.7rem")}</style>
+      <style>{gridColsCss(gridId, colsForDevice(block.gridCols ?? legacyGridCols(block.columns || 1, block.columnsByDevice?.tablet, block.columnsByDevice?.desktop, 4), device), "0.7rem")}</style>
       <div className={gridId}>
       {items.map((item) => (
         <article
@@ -1841,8 +2065,12 @@ function ItemsList({
             height: "100%",
           }}
         >
-          {block.showImages && item.imageUrl && stacked ? (
-            <FitImage src={item.imageUrl} aspect={block.layout === "card" ? "1 / 1" : "16 / 10"} />
+          {block.showImages && (item.imageUrl || fallbackLogo) && stacked ? (
+            <FitImage
+              src={item.imageUrl || fallbackLogo || ""}
+              logo={!item.imageUrl}
+              aspect={block.layout === "card" ? "1 / 1" : "16 / 10"}
+            />
           ) : null}
           <div
             style={{
@@ -1912,7 +2140,7 @@ function ItemsList({
               </div>
             ) : null}
           </div>
-          {block.showImages && item.imageUrl && !stacked ? (
+          {block.showImages && (item.imageUrl || fallbackLogo) && !stacked ? (
             <div
               style={{
                 width: thumb,
@@ -1926,18 +2154,18 @@ function ItemsList({
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={resolveAdminAssetUrl(item.imageUrl)}
+                src={resolveAdminAssetUrl(item.imageUrl || fallbackLogo || "")}
                 alt=""
                 loading="lazy"
                 decoding="async"
-                style={{
+                style={item.imageUrl ? {
                   position: "absolute",
                   inset: 0,
                   width: "100%",
                   height: "100%",
                   objectFit: "cover",
                   objectPosition: "center",
-                }}
+                } : { ...logoFillStyle, padding: "14%" }}
               />
             </div>
           ) : null}

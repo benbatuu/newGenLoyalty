@@ -222,6 +222,8 @@ model Tenant {
   deletionScheduledAt      DateTime?
   /// Deneme bitişi hatırlatmasında son gönderilen eşik (3, 1, 0 gün kala)
   trialReminderDay         Int?
+  /// Marka düzeyi kart varsayılanları: Alanlar (header) ve Kilit ekranı (konum, tarih, bayraklar)
+  walletDefaults           Json?
   deletionReason           String?
   deletionNote             String?
   /// Hesap askıya alındı
@@ -267,6 +269,7 @@ model Tenant {
   menuThemes     MenuTheme[]
   menuFeedback   MenuFeedback[]
   menuTags       MenuTag[]
+  menuCatalogEntries MenuCatalogEntry[]
 
   @@index([isActive])
   @@index([subscriptionStatus])
@@ -1177,6 +1180,24 @@ model MenuTag {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, label])
+  @@index([tenantId])
+}
+
+/// Alerjen ve ekstra kataloğu (tenant bazlı, çok dilli). kind: "ALLERGEN" | "EXTRA".
+/// `label` ana (Türkçe) ad; `translations` dil kodu → { name }. Ekstralarda `defaultPrice` ürüne kopyalanan varsayılan ücret.
+model MenuCatalogEntry {
+  id           String   @id @default(cuid())
+  tenantId     String
+  kind         String
+  label        String
+  translations Json?
+  defaultPrice Decimal? @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, kind, label])
   @@index([tenantId])
 }
 

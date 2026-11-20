@@ -45,6 +45,8 @@ export const BACK_FIELD_PRESETS: { key: BackFieldKey; label: string; placeholder
 ];
 
 export type ProgramWalletDraft = {
+  /** true: Alanlar ve Kilit ekranı marka varsayılanından gelir */
+  inheritBrandFields: boolean;
   primaryColor: string;
   foregroundColor: string;
   labelColor: string;
@@ -124,6 +126,8 @@ export type TenantWalletDefaults = {
   rewardFieldLabel: string | null;
   statusFieldLabel: string | null;
   rewardReadyText: string | null;
+  /** Marka düzeyi kart varsayılanları (Alanlar + Kilit ekranı) */
+  walletDefaults?: Record<string, unknown> | null;
 };
 
 export const INSETS: { id: StampInset; label: string; hint: string }[] = [

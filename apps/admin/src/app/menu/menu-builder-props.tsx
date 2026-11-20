@@ -10,6 +10,7 @@ import {
   getMenuLangMeta,
   MENU_FEEDBACK_FIELD_TYPES,
   MENU_LANG_CATALOG,
+  resolveBlockStyle,
   type MenuBlock,
   type MenuBlockStyleBase,
   type MenuDeviceId,
@@ -27,15 +28,8 @@ import {
 } from "@ngl/shared";
 import { MENU_UI_LABEL_KEYS } from "../../components/menu-themes/menu-i18n";
 import { BREAKPOINT_PREVIEW_WIDTH, usePreviewWidth } from "../../lib/preview-width";
+import { QUICK_PALETTES, type QuickPalette } from "./palettes";
 
-const QUICK_PALETTES = [
-  { name: "Krem", backgroundColor: "#f4efe6", surfaceColor: "#ffffff", textColor: "#1a1916", mutedColor: "#6f6a62", accentColor: "#2f5d50" },
-  { name: "Kahve", backgroundColor: "#f7f1ea", surfaceColor: "#fffdf9", textColor: "#2b1d14", mutedColor: "#8a6f5c", accentColor: "#c45c26" },
-  { name: "Gece", backgroundColor: "#1c1714", surfaceColor: "#2a2320", textColor: "#f5f0ea", mutedColor: "#a89b90", accentColor: "#c9a0a8" },
-  { name: "Okyanus", backgroundColor: "#eef6f8", surfaceColor: "#ffffff", textColor: "#0f2a33", mutedColor: "#5b7b86", accentColor: "#0f6e8c" },
-  { name: "Zeytin", backgroundColor: "#f2f3ec", surfaceColor: "#ffffff", textColor: "#23261a", mutedColor: "#6b7055", accentColor: "#6b7a2e" },
-  { name: "Gül", backgroundColor: "#fdf3f4", surfaceColor: "#ffffff", textColor: "#3a1d24", mutedColor: "#9a6b75", accentColor: "#b5476a" },
-];
 
 function langLabel(code: string): string {
   const m = getMenuLangMeta(code);
@@ -291,6 +285,123 @@ function Toggle({
   );
 }
 
+const DEVICE_NAME: Record<MenuDeviceId, string> = {
+  mobile: "Mobil",
+  tablet: "Tablet",
+  desktop: "Masaüstü",
+};
+
+/** Ekrana özel değer işareti + temel değere dön düğmesi */
+function OverrideBadge({ device, onReset }: { device: MenuDeviceId; onReset: () => void }) {
+  return (
+    <span className="ml-auto inline-flex items-center gap-1.5">
+      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-1.5 py-px text-[10px] font-semibold text-[var(--accent)]">
+        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+        {DEVICE_NAME[device]}
+      </span>
+      <button
+        type="button"
+        onClick={onReset}
+        className="text-[10px] font-medium text-[var(--muted)] underline-offset-2 hover:text-[var(--ink)] hover:underline"
+        title="Bu ekrandaki özel değeri kaldır, mobil (temel) değeri kullan"
+      >
+        Sıfırla
+      </button>
+    </span>
+  );
+}
+
+/** Seçili ekrana göre sayı alanı: mobil = temel değer, tablet/masaüstü = yalnızca o ekran */
+function DeviceRangeField({
+  label,
+  device,
+  base,
+  map,
+  min,
+  max,
+  step = 1,
+  unit = "px",
+  onBase,
+  onMap,
+}: {
+  label: string;
+  device: MenuDeviceId;
+  base: number;
+  map: Partial<Record<MenuDeviceId, number>> | undefined;
+  min: number;
+  max: number;
+  step?: number;
+  unit?: string;
+  onBase: (v: number) => void;
+  onMap: (m: Partial<Record<MenuDeviceId, number>> | undefined) => void;
+}) {
+  const own = device === "mobile" ? undefined : map?.[device];
+  const value = own ?? base;
+  const overridden = own != null;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2 text-[12px] font-medium text-[var(--ink)]">
+        <span>
+          {label} <span className="tabular-nums text-[var(--muted)]">{value}{unit}</span>
+        </span>
+        {overridden ? (
+          <OverrideBadge
+            device={device}
+            onReset={() => {
+              const next = { ...(map ?? {}) };
+              delete next[device];
+              onMap(Object.keys(next).length ? next : undefined);
+            }}
+          />
+        ) : null}
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        aria-label={`${label} (${DEVICE_NAME[device]})`}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          if (device === "mobile") onBase(v);
+          else onMap({ ...(map ?? {}), [device]: v });
+        }}
+        className="w-full accent-[var(--accent)]"
+      />
+    </div>
+  );
+}
+
+/** Panelin üstünde: hangi ekranı düzenlediğinizi tek satırda söyler */
+function DeviceScopeNote({ device, overrides }: { device: MenuDeviceId; overrides: number }) {
+  if (device === "mobile") {
+    return (
+      <p className="mt-2 text-[11px] text-[var(--muted)]">
+        Mobil temel tasarım. Tablet ve masaüstü bunu devralır.
+      </p>
+    );
+  }
+  return (
+    <p className="mt-2 rounded-lg bg-[var(--accent-soft)] px-2.5 py-1.5 text-[11px] text-[var(--ink)]">
+      <strong>{DEVICE_NAME[device]}</strong>: boyut ve boşluk değişiklikleri yalnızca bu ekranda.
+      {overrides > 0 ? ` Bu blokta ${overrides} özel ayar.` : ""}
+    </p>
+  );
+}
+
+/** Blok için bu ekranda kaç özel ayar var (stil + boyut haritaları) */
+function countOverrides(block: MenuBlock | null, device: MenuDeviceId): number {
+  if (!block || device === "mobile") return 0;
+  let n = Object.keys(block.style?.byDevice?.[device] ?? {}).length;
+  const maps = block as unknown as Record<string, unknown>;
+  for (const k of ["heightByDevice", "sizeByDevice", "logoWidthByDevice", "logoHeightByDevice"]) {
+    const m = maps[k] as Partial<Record<MenuDeviceId, number>> | undefined;
+    if (m?.[device] != null) n += 1;
+  }
+  return n;
+}
+
 function nid() {
   return `mb_${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -324,7 +435,7 @@ function emptyExploreSection(): MenuExploreSection {
 export function MenuBuilderProps({
   document,
   block,
-  device: _device,
+  device,
   onDocumentChange,
   onPatchHeader,
   onBlockChange,
@@ -334,6 +445,7 @@ export function MenuBuilderProps({
   uploading = false,
   onPreviewProductDetail,
   onPreviewExplore,
+  onDeselect,
   width,
 }: {
   document: MenuDocument;
@@ -352,10 +464,23 @@ export function MenuBuilderProps({
   uploading?: boolean;
   onPreviewProductDetail?: (open: boolean) => void;
   onPreviewExplore?: (open: boolean) => void;
+  /** Blok seçimini kaldırıp sayfa ayarlarına dön */
+  onDeselect?: () => void;
   width?: number;
 }) {
-  void _device;
   const t = document.theme;
+  const frame = t.devices?.[device] ?? { width: 390, height: 780, maxWidth: t.maxWidth, pagePadding: t.pagePadding };
+  function patchFrame(patch: Partial<typeof frame>) {
+    const devices = { ...t.devices, [device]: { ...frame, ...patch } };
+    onDocumentChange({
+      theme: {
+        ...t,
+        devices,
+        // Geriye uyum: mobil değerleri temel alanlara da yazılır
+        ...(device === "mobile" && patch.pagePadding != null ? { pagePadding: patch.pagePadding } : {}),
+      },
+    });
+  }
   const [itemsPanel, setItemsPanel] = useState<"list" | "detail">("list");
   const [navPanel, setNavPanel] = useState<"buttons" | "explore" | "forms">("buttons");
   const [formKind, setFormKind] = useState<"suggest" | "complaint">("suggest");
@@ -425,45 +550,65 @@ export function MenuBuilderProps({
             ? "Seçili bloğu düzenleyin. Dil alanları üstteki sekmelerden yönetilir."
             : "Renk, yazı ve akışı ayarlayın — veya ortadaki bir bloğa tıklayın."}
         </p>
+        <DeviceScopeNote device={device} overrides={countOverrides(block, device)} />
       </div>
 
       <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-4">
+        {!block ? (
         <section className="space-y-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
             Sayfa
           </p>
-          <div className="space-y-2">
-            <p className="text-[11px] font-medium text-[var(--muted)]">Hazır paletler</p>
-            <div className="grid grid-cols-3 gap-2">
-              {QUICK_PALETTES.map((pal) => (
-                <button
-                  key={pal.name}
-                  type="button"
-                  title={pal.name}
-                  onClick={() =>
-                    onDocumentChange({
-                      theme: {
-                        ...t,
-                        backgroundColor: pal.backgroundColor,
-                        surfaceColor: pal.surfaceColor,
-                        textColor: pal.textColor,
-                        mutedColor: pal.mutedColor,
-                        accentColor: pal.accentColor,
-                        headingColor: pal.textColor,
-                      },
-                    })
-                  }
-                  className="group overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--panel)] text-left transition hover:border-[var(--ink)]/30"
-                >
-                  <span className="flex h-9" style={{ background: pal.backgroundColor }}>
-                    <span className="m-1.5 flex-1 rounded-md" style={{ background: pal.surfaceColor }} />
-                    <span className="my-1.5 mr-1.5 w-5 rounded-md" style={{ background: pal.accentColor }} />
-                  </span>
-                  <span className="block px-2 py-1.5 text-[11px] font-medium text-[var(--ink)]">{pal.name}</span>
-                </button>
-              ))}
+          {(["Açık", "Koyu"] as const).map((group) => (
+            <div key={group} className="space-y-2">
+              <p className="text-[11px] font-medium text-[var(--muted)]">{group} paletler</p>
+              <div className="grid grid-cols-3 gap-2">
+                {QUICK_PALETTES.filter((pal) => Boolean(pal.dark) === (group === "Koyu")).map((pal) => {
+                  const active =
+                    t.backgroundColor.toLowerCase() === pal.backgroundColor &&
+                    t.accentColor.toLowerCase() === pal.accentColor;
+                  return (
+                    <button
+                      key={pal.name}
+                      type="button"
+                      aria-pressed={active}
+                      title={pal.name}
+                      onClick={() =>
+                        onDocumentChange({
+                          theme: {
+                            ...t,
+                            backgroundColor: pal.backgroundColor,
+                            surfaceColor: pal.surfaceColor,
+                            textColor: pal.textColor,
+                            mutedColor: pal.mutedColor,
+                            accentColor: pal.accentColor,
+                            headingColor: pal.textColor,
+                          },
+                        })
+                      }
+                      className={`overflow-hidden rounded-xl border text-left transition ${
+                        active
+                          ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30"
+                          : "border-[var(--line)] hover:border-[var(--ink)]/30"
+                      }`}
+                    >
+                      <span className="flex h-11 items-end gap-1 p-1.5" style={{ background: pal.backgroundColor }}>
+                        <span className="h-6 flex-1 rounded-md" style={{ background: pal.surfaceColor }}>
+                          <span className="m-1 block h-1 w-2/3 rounded-full" style={{ background: pal.textColor }} />
+                          <span className="mx-1 block h-1 w-1/3 rounded-full" style={{ background: pal.mutedColor }} />
+                        </span>
+                        <span className="h-6 w-4 rounded-md" style={{ background: pal.accentColor }} />
+                      </span>
+                      <span className="flex items-center justify-between px-2 py-1.5 text-[11px] font-medium text-[var(--ink)]">
+                        {pal.name}
+                        {active ? <span aria-hidden className="text-[var(--accent)]">✓</span> : null}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          ))}
           <Field label="Menü akışı">
             <select
               className={inputClassName()}
@@ -478,7 +623,12 @@ export function MenuBuilderProps({
               <option value="scroll">Tek sayfada kaydır</option>
             </select>
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <details className="group rounded-xl border border-[var(--line)]">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-[12px] font-medium text-[var(--ink)]">
+              Renkleri özelleştir
+              <span aria-hidden className="text-[var(--muted)] transition group-open:rotate-90">›</span>
+            </summary>
+          <div className="grid grid-cols-2 gap-3 px-3 pb-3">
             {(
               [
                 ["Zemin", "backgroundColor"],
@@ -502,6 +652,7 @@ export function MenuBuilderProps({
               </Field>
             ))}
           </div>
+          </details>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Yazı stili">
               <select
@@ -543,44 +694,112 @@ export function MenuBuilderProps({
               </select>
             </Field>
           </div>
-          <Field label={`Kenar boşluğu · ${t.pagePadding}px`}>
-            <input
-              type="range"
-              min={12}
-              max={32}
-              value={t.pagePadding}
-              onChange={(e) => {
-                const pagePadding = Number(e.target.value);
-                onDocumentChange({
-                  theme: {
-                    ...t,
-                    pagePadding,
-                    devices: t.devices
-                      ? {
-                          mobile: { ...t.devices.mobile, pagePadding },
-                          tablet: {
-                            ...t.devices.tablet,
-                            pagePadding: Math.max(pagePadding, 20),
-                          },
-                          desktop: {
-                            ...t.devices.desktop,
-                            pagePadding: Math.max(pagePadding, 24),
-                          },
-                        }
-                      : t.devices,
-                  },
-                });
-              }}
-              className="w-full accent-[#0f6e56]"
-            />
-          </Field>
-        </section>
-
-        <section className="space-y-3 border-t border-[var(--line)] pt-5">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-              Seçili blok
+          <div className="space-y-3 rounded-xl border border-[var(--line)] p-3">
+            <p className="text-[11px] font-semibold text-[var(--ink)]">
+              {DEVICE_NAME[device]} yerleşimi
             </p>
+            <Field label={`Sayfa kenar boşluğu · ${frame.pagePadding}px`}>
+              <input
+                type="range"
+                min={0}
+                max={64}
+                value={frame.pagePadding}
+                onChange={(e) => patchFrame({ pagePadding: Number(e.target.value) })}
+                className="w-full accent-[var(--accent)]"
+              />
+            </Field>
+            {device === "mobile" ? (
+              <p className="text-[11px] text-[var(--muted)]">Mobilde içerik ekranın tamamını kullanır.</p>
+            ) : (
+              <>
+                <label className="flex items-center justify-between gap-3 text-[12px] font-medium text-[var(--ink)]">
+                  <span>
+                    Ekrana yay
+                    <span className="block text-[11px] font-normal text-[var(--muted)]">
+                      İçerik açıldığı ekranın tamamını kullanır.
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={Boolean(frame.fullWidth)}
+                    onChange={(e) => patchFrame({ fullWidth: e.target.checked || undefined })}
+                    className="h-5 w-9 shrink-0 cursor-pointer accent-[var(--accent)]"
+                  />
+                </label>
+                {frame.fullWidth ? null : (
+              <Field label={`İçerik genişliği · ${frame.maxWidth}px`}>
+                <input
+                  type="range"
+                  min={device === "tablet" ? 480 : 640}
+                  max={device === "tablet" ? 1000 : 1400}
+                  step={10}
+                  value={frame.maxWidth}
+                  onChange={(e) => patchFrame({ maxWidth: Number(e.target.value) })}
+                  className="w-full accent-[var(--accent)]"
+                />
+              </Field>
+                )}
+              </>
+            )}
+          </div>
+          <div className="space-y-2 rounded-xl border border-[var(--line)] p-3">
+            <p className="text-[11px] font-semibold text-[var(--ink)]">
+              Açılan ekranlar · {DEVICE_NAME[device]}
+            </p>
+            <p className="text-[11px] text-[var(--muted)]">
+              Ürün detayı, Sepet, Öneri, Wi-Fi gibi ekranların açılış şekli.
+            </p>
+            <div role="radiogroup" className="grid grid-cols-2 gap-1 rounded-lg bg-[var(--surface)] p-1">
+              {(
+                [
+                  { value: "drawer", label: "Alttan çekmece" },
+                  { value: "dialog", label: "Ortada pencere" },
+                ] as const
+              ).map((opt) => {
+                const current = t.overlays?.[device] ?? (device === "mobile" ? "drawer" : "dialog");
+                const active = current === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() =>
+                      onDocumentChange({
+                        theme: { ...t, overlays: { ...t.overlays, [device]: opt.value } },
+                      })
+                    }
+                    className={`rounded-md px-2 py-1.5 text-[12px] font-medium transition ${
+                      active
+                        ? "bg-[var(--panel)] text-[var(--ink)] shadow-sm"
+                        : "text-[var(--muted)] hover:text-[var(--ink)]"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+        ) : null}
+
+        <section className={`space-y-3 ${block ? "" : "border-t border-[var(--line)] pt-5"}`}>
+          <div className="flex items-center justify-between gap-2">
+            {block && onDeselect ? (
+              <button
+                type="button"
+                onClick={onDeselect}
+                className="text-[11px] font-medium text-[var(--muted)] hover:text-[var(--ink)]"
+              >
+                ← Sayfa ayarları
+              </button>
+            ) : (
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                Seçili blok
+              </p>
+            )}
             {block ? (
               <div className="flex gap-1">
                 <button
@@ -618,6 +837,7 @@ export function MenuBuilderProps({
             <div className="space-y-4">
               <BlockFields
                 block={block}
+                device={device}
                 onChange={onBlockChange}
                 onDocumentChange={onDocumentChange}
                 onUploadImage={onUploadImage}
@@ -643,7 +863,7 @@ export function MenuBuilderProps({
                   });
                 }}
               />
-              <StyleFields block={block} onChange={onBlockChange} />
+              <StyleFields block={block} device={device} onChange={onBlockChange} />
             </div>
           )}
         </section>
@@ -654,54 +874,203 @@ export function MenuBuilderProps({
 
 function StyleFields({
   block,
+  device,
   onChange,
 }: {
   block: MenuBlock;
+  device: MenuDeviceId;
   onChange: (patch: Partial<MenuBlock>) => void;
 }) {
-  const s = block.style ?? {};
-  function patchStyle(partial: Partial<MenuBlockStyleBase>) {
-    onChange({ style: { ...s, ...partial } });
+  const style = block.style ?? {};
+  const isBase = device === "mobile";
+  const own: MenuBlockStyleBase = isBase ? style : (style.byDevice?.[device] ?? {});
+  const resolved = resolveBlockStyle(style, device);
+
+  function set<K extends keyof MenuBlockStyleBase>(key: K, value: MenuBlockStyleBase[K] | undefined) {
+    if (isBase) {
+      const next = { ...style, [key]: value };
+      if (value === undefined) delete next[key];
+      onChange({ style: next });
+      return;
+    }
+    const dev: MenuBlockStyleBase = { ...(style.byDevice?.[device] ?? {}), [key]: value };
+    if (value === undefined) delete dev[key];
+    const byDevice = { ...(style.byDevice ?? {}), [device]: dev };
+    if (!Object.keys(dev).length) delete byDevice[device];
+    onChange({ style: { ...style, byDevice: Object.keys(byDevice).length ? byDevice : undefined } });
   }
+  const isOverridden = (key: keyof MenuBlockStyleBase) => !isBase && own[key] !== undefined;
+  const badge = (key: keyof MenuBlockStyleBase) =>
+    isOverridden(key) ? <OverrideBadge device={device} onReset={() => set(key, undefined)} /> : null;
+
+  const showText = block.type === "text" || block.type === "welcome" || block.type === "footer";
+  const hiddenHere = Boolean(resolved.hidden);
+
+  function setHidden(h: boolean) {
+    if (isBase) set("hidden", h || undefined);
+    else set("hidden", h === Boolean(style.hidden) ? undefined : h);
+  }
+
+  function rangeRow(key: "paddingTop" | "paddingBottom" | "paddingX" | "borderRadius" | "fontSize", label: string, min: number, max: number, fallback: number) {
+    const value = resolved[key] ?? fallback;
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2 text-[12px] font-medium text-[var(--ink)]">
+          <span>
+            {label}{" "}
+            <span className="tabular-nums text-[var(--muted)]">
+              {resolved[key] == null ? "varsayılan" : `${value}px`}
+            </span>
+          </span>
+          {badge(key)}
+        </div>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          value={value}
+          aria-label={`${label} (${DEVICE_NAME[device]})`}
+          onChange={(e) => set(key, Number(e.target.value))}
+          className="w-full accent-[var(--accent)]"
+        />
+      </div>
+    );
+  }
+
+  function colorRow(key: "background" | "color", label: string) {
+    const value = resolved[key];
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2 text-[12px] font-medium text-[var(--ink)]">
+          <span>{label}</span>
+          {badge(key)}
+        </div>
+        <div className="flex items-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-2 py-1.5">
+          <input
+            type="color"
+            className="h-7 w-9 cursor-pointer rounded border-0 bg-transparent p-0"
+            value={value && /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#ffffff"}
+            aria-label={`${label} (${DEVICE_NAME[device]})`}
+            onChange={(e) => set(key, e.target.value)}
+          />
+          <span className="flex-1 font-mono text-[11px] text-[var(--muted)]">{value ?? "tema rengi"}</span>
+          {value ? (
+            <button
+              type="button"
+              className="text-[11px] text-[var(--muted)] hover:text-[var(--ink)]"
+              onClick={() => set(key, isBase ? undefined : "")}
+              title="Rengi kaldır"
+            >
+              Temizle
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-2 border-t border-[var(--line)] pt-3">
-      <p className="text-[11px] font-semibold uppercase text-[var(--muted)]">Blok boşlukları</p>
-      <Field label={`Üst (${s.paddingTop ?? 0}px)`}>
+    <div className="space-y-4 border-t border-[var(--line)] pt-4">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+          Yerleşim · {DEVICE_NAME[device]}
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--line)] px-3 py-2.5">
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 text-[13px] font-medium text-[var(--ink)]">
+            {DEVICE_NAME[device]} ekranında göster {badge("hidden")}
+          </p>
+          <p className="text-[11px] text-[var(--muted)]">
+            {hiddenHere ? "Bu blok bu ekranda müşterilere görünmez." : "Kapatırsanız yalnızca bu ekranda gizlenir."}
+          </p>
+        </div>
         <input
-          type="range"
-          min={0}
-          max={64}
-          value={s.paddingTop ?? 0}
-          onChange={(e) => patchStyle({ paddingTop: Number(e.target.value) })}
-          className="w-full"
+          type="checkbox"
+          role="switch"
+          checked={!hiddenHere}
+          aria-label={`${DEVICE_NAME[device]} ekranında göster`}
+          onChange={(e) => setHidden(!e.target.checked)}
+          className="h-5 w-9 shrink-0 cursor-pointer accent-[var(--accent)]"
         />
-      </Field>
-      <Field label={`Alt (${s.paddingBottom ?? 0}px)`}>
-        <input
-          type="range"
-          min={0}
-          max={64}
-          value={s.paddingBottom ?? 0}
-          onChange={(e) => patchStyle({ paddingBottom: Number(e.target.value) })}
-          className="w-full"
-        />
-      </Field>
-      <Field label="Hizalama">
-        <select
-          className={inputClassName()}
-          value={s.textAlign ?? ""}
-          onChange={(e) =>
-            patchStyle({
-              textAlign: (e.target.value || undefined) as "left" | "center" | "right" | undefined,
-            })
-          }
-        >
-          <option value="">Varsayılan</option>
-          <option value="left">Sol</option>
-          <option value="center">Orta</option>
-          <option value="right">Sağ</option>
-        </select>
-      </Field>
+      </div>
+
+      <div className="space-y-3">
+        {rangeRow("paddingTop", "Üst boşluk", 0, 120, 0)}
+        {rangeRow("paddingBottom", "Alt boşluk", 0, 120, 0)}
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2 text-[12px] font-medium text-[var(--ink)]">
+          <span>Hizalama</span>
+          {badge("textAlign")}
+        </div>
+        <div className="grid grid-cols-4 gap-1 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-0.5" role="radiogroup" aria-label="Hizalama">
+          {(
+            [
+              ["", "Varsayılan"],
+              ["left", "Sol"],
+              ["center", "Orta"],
+              ["right", "Sağ"],
+            ] as const
+          ).map(([v, l]) => {
+            const active = (resolved.textAlign ?? "") === v;
+            return (
+              <button
+                key={l}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => set("textAlign", (v || undefined) as MenuBlockStyleBase["textAlign"])}
+                className={`h-8 rounded-md text-[11px] font-medium transition ${
+                  active ? "bg-[var(--panel)] text-[var(--ink)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]"
+                }`}
+              >
+                {l}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <details className="group rounded-xl border border-[var(--line)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-[12px] font-medium text-[var(--ink)]">
+          Daha fazla stil
+          <span aria-hidden className="text-[var(--muted)] transition group-open:rotate-90">›</span>
+        </summary>
+        <div className="space-y-3 px-3 pb-3">
+          {rangeRow("paddingX", "Yan boşluk", 0, 80, 0)}
+      {showText ? (
+            <div className="space-y-3">
+              {rangeRow("fontSize", "Yazı boyutu", 10, 48, 16)}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-[12px] font-medium text-[var(--ink)]">
+                  <span>Yazı kalınlığı</span>
+                  {badge("fontWeight")}
+                </div>
+                <select
+                  className={inputClassName()}
+                  value={resolved.fontWeight ?? ""}
+                  onChange={(e) => set("fontWeight", e.target.value ? Number(e.target.value) : undefined)}
+                >
+                  <option value="">Varsayılan</option>
+                  <option value={300}>İnce</option>
+                  <option value={400}>Normal</option>
+                  <option value={600}>Kalın</option>
+                  <option value={800}>Çok kalın</option>
+                </select>
+              </div>
+            </div>
+          ) : null}
+    
+          <div className="grid grid-cols-1 gap-3">
+            {colorRow("background", "Arka plan")}
+            {colorRow("color", "Yazı rengi")}
+            {rangeRow("borderRadius", "Köşe yuvarlaklığı", 0, 48, 0)}
+          </div>
+        </div>
+      </details>
     </div>
   );
 }
@@ -994,6 +1363,7 @@ function LocalizedTextField({
 
 function BlockFields({
   block,
+  device,
   onChange,
   onDocumentChange,
   onUploadImage,
@@ -1010,6 +1380,7 @@ function BlockFields({
   onHeaderChange,
 }: {
   block: MenuBlock;
+  device: MenuDeviceId;
   onChange: (patch: Partial<MenuBlock>) => void;
   onDocumentChange: (patch: Partial<MenuDocument>) => void;
   onUploadImage?: (file: File) => Promise<string>;
@@ -1065,38 +1436,26 @@ function BlockFields({
                   <option value="wide">Köşesiz / yatay</option>
                 </select>
               </Field>
-              <Field label={`Genişlik (${block.logoWidth ?? block.logoSize ?? 40}px)`}>
-                <input
-                  type="range"
-                  min={24}
-                  max={200}
-                  value={block.logoWidth ?? block.logoSize ?? 40}
-                  onChange={(e) => {
-                    const logoWidth = Number(e.target.value);
-                    onChange({
-                      logoWidth,
-                      logoSize: block.logoHeight ?? block.logoSize ?? 40,
-                    });
-                  }}
-                  className="w-full accent-[#0f6e56]"
-                />
-              </Field>
-              <Field label={`Yükseklik (${block.logoHeight ?? block.logoSize ?? 40}px)`}>
-                <input
-                  type="range"
-                  min={24}
-                  max={120}
-                  value={block.logoHeight ?? block.logoSize ?? 40}
-                  onChange={(e) => {
-                    const logoHeight = Number(e.target.value);
-                    onChange({
-                      logoHeight,
-                      logoSize: logoHeight,
-                    });
-                  }}
-                  className="w-full accent-[#0f6e56]"
-                />
-              </Field>
+              <DeviceRangeField
+                label="Logo genişliği"
+                device={device}
+                base={block.logoWidth ?? block.logoSize ?? 40}
+                map={block.logoWidthByDevice}
+                min={24}
+                max={280}
+                onBase={(logoWidth) => onChange({ logoWidth, logoSize: block.logoHeight ?? block.logoSize ?? 40 })}
+                onMap={(logoWidthByDevice) => onChange({ logoWidthByDevice })}
+              />
+              <DeviceRangeField
+                label="Logo yüksekliği"
+                device={device}
+                base={block.logoHeight ?? block.logoSize ?? 40}
+                map={block.logoHeightByDevice}
+                min={24}
+                max={160}
+                onBase={(logoHeight) => onChange({ logoHeight, logoSize: logoHeight })}
+                onMap={(logoHeightByDevice) => onChange({ logoHeightByDevice })}
+              />
               <p className="text-[11px] text-[var(--muted)]">
                 Genişlik ve yüksekliği ayrı ayarlayın. Logo kırpılmaz; kutuya sığdırılır,
                 arka plan eklenmez.
@@ -1265,16 +1624,16 @@ function BlockFields({
     case "cover":
       return (
         <>
-          <Field label={`Kapak yüksekliği (${block.height}px)`}>
-            <input
-              type="range"
-              min={120}
-              max={320}
-              value={block.height}
-              onChange={(e) => onChange({ height: Number(e.target.value) })}
-              className="w-full"
-            />
-          </Field>
+          <DeviceRangeField
+            label="Kapak yüksekliği"
+            device={device}
+            base={block.height}
+            map={block.heightByDevice}
+            min={80}
+            max={420}
+            onBase={(height) => onChange({ height })}
+            onMap={(heightByDevice) => onChange({ heightByDevice })}
+          />
           <Field label={`Karartma (${block.overlay}%)`}>
             <input
               type="range"
@@ -1631,6 +1990,59 @@ function BlockFields({
               ) : null}
             </>
           )}
+          <div className="space-y-3 rounded-xl border border-[var(--line)] p-3">
+            <p className="text-[11px] font-semibold text-[var(--ink)]">Tablet ve masaüstü penceresi</p>
+            <p className="text-[11px] leading-relaxed text-[var(--muted)]">
+              {device === "mobile"
+                ? "Telefonda ürün alttan çekmece olarak açılır. Bu ayarlar tablet ve masaüstü penceresi içindir."
+                : `${DEVICE_NAME[device]} ekranında ürün ortada pencere olarak açılır.`}
+            </p>
+            <Field label="Görsel tarafı">
+              <select
+                className={inputClassName()}
+                value={detail.dialogImageSide}
+                onChange={(e) => patchDetail({ dialogImageSide: e.target.value as "left" | "right" })}
+              >
+                <option value="left">Solda görsel, sağda bilgi</option>
+                <option value="right">Sağda görsel, solda bilgi</option>
+              </select>
+            </Field>
+            <Field label={`Görsel genişliği · %${detail.dialogImageShare}`}>
+              <input
+                type="range"
+                min={30}
+                max={70}
+                step={1}
+                value={detail.dialogImageShare}
+                onChange={(e) => patchDetail({ dialogImageShare: Number(e.target.value) })}
+                className="w-full accent-[var(--accent)]"
+              />
+            </Field>
+            {device !== "mobile" ? (
+              <Field
+                label={`Pencere genişliği · ${
+                  detail.dialogWidthByDevice?.[device] ?? (device === "tablet" ? 760 : 960)
+                }px`}
+              >
+                <input
+                  type="range"
+                  min={480}
+                  max={1200}
+                  step={10}
+                  value={detail.dialogWidthByDevice?.[device] ?? (device === "tablet" ? 760 : 960)}
+                  onChange={(e) =>
+                    patchDetail({
+                      dialogWidthByDevice: {
+                        ...detail.dialogWidthByDevice,
+                        [device]: Number(e.target.value),
+                      },
+                    })
+                  }
+                  className="w-full accent-[var(--accent)]"
+                />
+              </Field>
+            ) : null}
+          </div>
         </>
       );
     }
@@ -1702,16 +2114,16 @@ function BlockFields({
       );
     case "spacer":
       return (
-        <Field label={`Boşluk (${block.size}px)`}>
-          <input
-            type="range"
-            min={8}
-            max={120}
-            value={block.size}
-            onChange={(e) => onChange({ size: Number(e.target.value) })}
-            className="w-full"
-          />
-        </Field>
+        <DeviceRangeField
+          label="Boşluk"
+          device={device}
+          base={block.size}
+          map={block.sizeByDevice}
+          min={4}
+          max={160}
+          onBase={(size) => onChange({ size })}
+          onMap={(sizeByDevice) => onChange({ sizeByDevice })}
+        />
       );
     case "footer":
       return (

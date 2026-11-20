@@ -52,6 +52,8 @@ export type PublicMenuPayload = {
   branches: BranchData[];
   /** Etiket adı → { dil: çeviri } */
   tagLabels?: Record<string, Record<string, string>>;
+  /** Alerjen adı → { dil: çeviri } (alerjen kataloğu) */
+  allergenLabels?: Record<string, Record<string, string>>;
   table?: { id: string; label: string };
   /** Aktif tema kaydı — önbelleği geçersiz kılmak için */
   revision?: string | null;

@@ -16,13 +16,35 @@ export function tagKey(raw: string): string {
   return normalizeTagLabel(raw).toLocaleLowerCase('tr-TR');
 }
 
-/** Hazır etiketler (ilk kurulumda katalogda yoksa eklenir). */
+/** Hazır etiketler (katalog sıfırlandığında veya ilk kurulumda eklenir). tr = ana ad, en = İngilizce. */
 export const DEFAULT_MENU_TAGS: { tr: string; en: string }[] = [
+  { tr: 'Yeni', en: 'New' },
+  { tr: 'Popüler', en: 'Popular' },
+  { tr: 'Şef önerisi', en: "Chef's pick" },
   { tr: 'Vegan', en: 'Vegan' },
   { tr: 'Vejetaryen', en: 'Vegetarian' },
-  { tr: 'Glutensiz', en: 'Gluten-Free' },
+  { tr: 'Glutensiz', en: 'Gluten-free' },
+  { tr: 'Laktozsuz', en: 'Lactose-free' },
   { tr: 'Acılı', en: 'Spicy' },
-  { tr: 'Popüler', en: 'Popular' },
-  { tr: 'Yeni', en: 'New' },
-  { tr: 'Şef Önerisi', en: "Chef's Pick" },
+  { tr: 'Sağlıklı', en: 'Healthy' },
+  { tr: 'Yüksek protein', en: 'High protein' },
+  { tr: 'Sezon ürünü', en: 'Seasonal' },
+];
+
+/** Hazır alerjenler: AB'nin 14 zorunlu alerjeni (tr = ana ad, en = İngilizce). */
+export const DEFAULT_MENU_ALLERGENS: { tr: string; en: string }[] = [
+  { tr: 'Gluten', en: 'Gluten' },
+  { tr: 'Kabuklu deniz ürünleri', en: 'Crustaceans' },
+  { tr: 'Yumurta', en: 'Eggs' },
+  { tr: 'Balık', en: 'Fish' },
+  { tr: 'Yer fıstığı', en: 'Peanuts' },
+  { tr: 'Soya', en: 'Soybeans' },
+  { tr: 'Süt', en: 'Milk' },
+  { tr: 'Sert kabuklu yemişler', en: 'Tree nuts' },
+  { tr: 'Kereviz', en: 'Celery' },
+  { tr: 'Hardal', en: 'Mustard' },
+  { tr: 'Susam', en: 'Sesame seeds' },
+  { tr: 'Kükürt dioksit ve sülfitler', en: 'Sulphur dioxide and sulphites' },
+  { tr: 'Acı bakla', en: 'Lupin' },
+  { tr: 'Yumuşakçalar', en: 'Molluscs' },
 ];
