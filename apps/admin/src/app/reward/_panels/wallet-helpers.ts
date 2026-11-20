@@ -44,7 +44,16 @@ export function draftFromProgramWallet(
       ? (config.walletTemplate as Record<string, unknown>)
       : {};
 
+  // Şablonu hiç olmayan yeni kart marka varsayılanını devralır; mevcut kartlar bayrak açıkça true olmadıkça kendi değerlerini korur
+  const inherit = config?.walletTemplate ? wt.inheritBrandFields === true : true;
+  const brand = ((inherit && tenant.walletDefaults) || {}) as Record<string, unknown>;
+  const brandHeader = Array.isArray(brand.headerFields) ? (brand.headerFields as PassKitField[]) : [];
+  const brandLocations = Array.isArray(brand.locations) ? (brand.locations as PassKitLocation[]) : [];
+  // Damga şeridi/dizilim: devralınıyorsa marka varsayılanı, değilse kartın kendi değeri
+  const S = (k: string): unknown => (inherit && brand[k] !== undefined ? brand[k] : (wt as Record<string, unknown>)[k]);
+
   return {
+    inheritBrandFields: inherit,
     primaryColor:
       (wt.primaryColor as string) || tenant.primaryColor || "#1B4332",
     foregroundColor:
@@ -58,42 +67,53 @@ export function draftFromProgramWallet(
       ((wt.stampInset as StampInset) ||
         (tenant.stampInset as StampInset) ||
         "NORMAL") as StampInset,
-    stampRows: Number(wt.stampRows) || 0,
-    stampLayout: wt.stampLayout === "STAGGERED" ? "STAGGERED" : "GRID",
-    stampGapX: typeof wt.stampGapX === "number" ? wt.stampGapX : null,
-    stampGapY: typeof wt.stampGapY === "number" ? wt.stampGapY : null,
-    stampIconScale: typeof wt.stampIconScale === "number" ? wt.stampIconScale : 1,
-    stampStaggerRatio: typeof wt.stampStaggerRatio === "number" ? wt.stampStaggerRatio : 0.5,
-    stampOffsetX: typeof wt.stampOffsetX === "number" ? wt.stampOffsetX : 0,
-    stampOffsetY: typeof wt.stampOffsetY === "number" ? wt.stampOffsetY : 0,
-    stampPositions: Array.isArray(wt.stampPositions)
-      ? (wt.stampPositions as ProgramWalletDraft["stampPositions"])
+    stampRows: Number(S("stampRows")) || 0,
+    stampLayout: S("stampLayout") === "STAGGERED" ? "STAGGERED" : "GRID",
+    stampGapX: typeof S("stampGapX") === "number" ? (S("stampGapX") as number) : null,
+    stampGapY: typeof S("stampGapY") === "number" ? (S("stampGapY") as number) : null,
+    stampIconScale: typeof S("stampIconScale") === "number" ? (S("stampIconScale") as number) : 1,
+    stampStaggerRatio: typeof S("stampStaggerRatio") === "number" ? (S("stampStaggerRatio") as number) : 0.5,
+    stampOffsetX: typeof S("stampOffsetX") === "number" ? (S("stampOffsetX") as number) : 0,
+    stampOffsetY: typeof S("stampOffsetY") === "number" ? (S("stampOffsetY") as number) : 0,
+    stampPositions: Array.isArray(S("stampPositions"))
+      ? (S("stampPositions") as ProgramWalletDraft["stampPositions"])
       : [],
-    stampRowAdjust: Array.isArray(wt.stampRowAdjust)
-      ? (wt.stampRowAdjust as (Partial<StampRowAdjust> | null)[]).map((r) => ({
+    stampRowAdjust: Array.isArray(S("stampRowAdjust"))
+      ? (S("stampRowAdjust") as (Partial<StampRowAdjust> | null)[]).map((r) => ({
           offsetX: r?.offsetX ?? 0,
           offsetY: r?.offsetY ?? 0,
           scale: r?.scale ?? 1,
         }))
       : [],
-    headerFields: Array.isArray(wt.headerFields) ? (wt.headerFields as PassKitField[]) : [],
+    headerFields: inherit
+      ? brandHeader
+      : Array.isArray(wt.headerFields)
+        ? (wt.headerFields as PassKitField[])
+        : [],
     auxFields: Array.isArray(wt.auxFields) ? (wt.auxFields as PassKitField[]) : [],
     showBarcode: wt.showBarcode !== false,
     barcodeFormat: (wt.barcodeFormat as BarcodeFormat | undefined) ?? "",
     barcodeAltMode:
       wt.barcodeAltMode === "NONE" || wt.barcodeAltMode === "CUSTOM" ? wt.barcodeAltMode : "CODE",
     barcodeAltText: (wt.barcodeAltText as string) || "",
-    locations: Array.isArray(wt.locations)
-      ? (wt.locations as PassKitLocation[]).map((l) => ({
-          latitude: Number(l.latitude),
-          longitude: Number(l.longitude),
-          relevantText: l.relevantText ?? "",
-        }))
-      : [],
-    relevantDate: isoToLocalInput(wt.relevantDate as string | undefined),
-    expirationDate: isoToLocalInput(wt.expirationDate as string | undefined),
-    suppressStripShine: wt.suppressStripShine === true,
-    sharingProhibited: wt.sharingProhibited === true,
+    locations: (inherit
+      ? brandLocations
+      : Array.isArray(wt.locations)
+        ? (wt.locations as PassKitLocation[])
+        : []
+    ).map((l) => ({
+      latitude: Number(l.latitude),
+      longitude: Number(l.longitude),
+      relevantText: l.relevantText ?? "",
+    })),
+    relevantDate: isoToLocalInput(
+      (inherit ? brand.relevantDate : wt.relevantDate) as string | undefined,
+    ),
+    expirationDate: isoToLocalInput(
+      (inherit ? brand.expirationDate : wt.expirationDate) as string | undefined,
+    ),
+    suppressStripShine: inherit ? brand.suppressStripShine === true : wt.suppressStripShine === true,
+    sharingProhibited: inherit ? brand.sharingProhibited === true : wt.sharingProhibited === true,
     // Kullanıcı alanı bilerek boşalttıysa (kayıtlı ""), tenant adını geri doldurma
     logoText:
       typeof wt.logoText === "string"
@@ -112,7 +132,7 @@ export function draftFromProgramWallet(
     stampIconFilledUrl: (wt.stampIconFilledUrl as string) || "",
     stampIconEmptyUrl: (wt.stampIconEmptyUrl as string) || "",
     logoUrl: (wt.logoUrl as string) || tenant.logoUrl || "",
-    stripImageUrl: (wt.stripImageUrl as string) || "",
+    stripImageUrl: (S("stripImageUrl") as string) || "",
     backgroundImageUrl: (wt.backgroundImageUrl as string) || "",
     backFields: Array.isArray(wt.backFields)
       ? (wt.backFields as WalletBackField[])
@@ -122,6 +142,7 @@ export function draftFromProgramWallet(
 
 export function walletTemplatePayload(draft: ProgramWalletDraft) {
   return {
+    inheritBrandFields: draft.inheritBrandFields,
     primaryColor: draft.primaryColor,
     foregroundColor: draft.foregroundColor,
     labelColor: draft.labelColor,

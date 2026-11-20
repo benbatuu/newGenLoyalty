@@ -12,6 +12,7 @@ import type { ProgramWalletDraft, TenantWalletDefaults, BarcodeFormat } from "./
 export function PassKitPreview({
   draft,
   tenant,
+  barcodeFormat,
   side,
   isStamp,
   stampsRequired,
@@ -22,6 +23,7 @@ export function PassKitPreview({
 }: {
   draft: ProgramWalletDraft;
   tenant: TenantWalletDefaults;
+  barcodeFormat?: BarcodeFormat;
   side: "front" | "back";
   isStamp: boolean;
   stampsRequired: number;
@@ -80,7 +82,7 @@ export function PassKitPreview({
   // Yardımcı (aux) alanlar gösterilmiyor; wallet ile aynı
   const aux: { key: string; label: string; value: string }[] = [];
 
-  const format = (draft.barcodeFormat || tenant.barcodeFormat || "QR") as BarcodeFormat;
+  const format = (barcodeFormat || draft.barcodeFormat || tenant.barcodeFormat || "QR") as BarcodeFormat;
   const altText =
     draft.barcodeAltMode === "NONE" ? "" : draft.barcodeAltMode === "CUSTOM" ? draft.barcodeAltText : "769248";
   const slotFilled = Array.from({ length: stampsRequired }, (_, i) => i < filled);
@@ -129,6 +131,7 @@ export function PassKitPreview({
 export function ApplePreviewPane({
   draft,
   tenant,
+  barcodeFormat,
   isStamp,
   stampsRequired,
   rewardLabel,
@@ -137,6 +140,7 @@ export function ApplePreviewPane({
 }: {
   draft: ProgramWalletDraft;
   tenant: TenantWalletDefaults;
+  barcodeFormat?: BarcodeFormat;
   isStamp: boolean;
   stampsRequired: number;
   rewardLabel: string;
@@ -173,6 +177,7 @@ export function ApplePreviewPane({
         <PassKitPreview
           draft={draft}
           tenant={tenant}
+          barcodeFormat={barcodeFormat}
           side={side}
           isStamp={isStamp}
           stampsRequired={total}

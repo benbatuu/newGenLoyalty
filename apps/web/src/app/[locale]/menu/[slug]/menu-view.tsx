@@ -23,14 +23,10 @@ export function PublicMenuView({
   qrCode?: string;
   initialMenu?: PublicMenuPayload | null;
 }) {
-  const [menu, setMenu] = useState<PublicMenuPayload | null>(() => {
-    if (typeof window !== "undefined") {
-      const key = publicMenuCacheKey({ slug, branchId: branchId ?? "", qrCode });
-      const cached = readPublicMenuCache(key);
-      if (cached && isMenuCacheUsable(cached)) return cached.data;
-    }
-    return initialMenu ? hydratePublicMenu(initialMenu) : null;
-  });
+  // İlk çizim sunucuyla aynı olmalı (hydration); önbellek aşağıdaki effect'te hemen uygulanır
+  const [menu, setMenu] = useState<PublicMenuPayload | null>(() =>
+    initialMenu ? hydratePublicMenu(initialMenu) : null,
+  );
   const [loading, setLoading] = useState(!menu);
   const [error, setError] = useState<string | null>(null);
   const [selectedBranch, setSelectedBranch] = useState(branchId ?? "");

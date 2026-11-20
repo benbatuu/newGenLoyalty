@@ -3,8 +3,10 @@
 import { Panel } from "../../../../components/ui";
 import { resolveAdminAssetUrl } from "../../../../lib/public-urls";
 import { StampGlyph, type StampTheme } from "../../../../components/stamp-glyph";
-import { BarcodePreview } from "./barcode-preview";
+import { WalletBarcode } from "../../../reward/_panels/wallet-barcode";
 import { PREVIEW_PAD, type BarcodeFormat, type StampInset } from "./types";
+import { StampStripPreview } from "../../../reward/_panels/stamp-strip-preview";
+import type { ProgramWalletDraft } from "../../../reward/_panels/wallet-types";
 import { passTextColors } from "../../../../lib/wallet-text";
 
 type WalletPreviewProps = {
@@ -19,6 +21,8 @@ type WalletPreviewProps = {
   previewFilled: number;
   stampsRequired: number;
   stampGrid: { cols: number; rows: number };
+  /** Damga dizilimi: kart detayı önizlemesiyle aynı taslak */
+  stampDraft: ProgramWalletDraft;
   stampInset: StampInset;
   stampTheme: StampTheme;
   stampIconFilledUrl: string;
@@ -57,6 +61,7 @@ export function WalletPreview({
   previewFilled,
   stampsRequired,
   stampGrid,
+  stampDraft,
   stampInset,
   stampTheme,
   stampIconFilledUrl,
@@ -153,31 +158,14 @@ export function WalletPreview({
               ) : null}
             </div>
 
-            <div
-              className="mx-3 mt-3 justify-items-center gap-x-1.5 gap-y-2 rounded-xl"
-              style={{
-                background: "rgba(0,0,0,0.12)",
-                display: "grid",
-                gridTemplateColumns: `repeat(${stampGrid.cols}, minmax(0, 1fr))`,
-                padding: PREVIEW_PAD[stampInset] || PREVIEW_PAD.NORMAL,
-              }}
-            >
-              {Array.from({ length: Math.min(stampsRequired, 16) }).map(
-                (_, i) => (
-                  <StampGlyph
-                    key={i}
-                    theme={stampTheme}
-                    filled={i < previewFilled}
-                    color={tc.fg}
-                    filledUrl={
-                      stampTheme === "CUSTOM" ? stampIconFilledUrl : undefined
-                    }
-                    emptyUrl={
-                      stampTheme === "CUSTOM" ? stampIconEmptyUrl : undefined
-                    }
-                  />
-                ),
-              )}
+            <div className="mx-3 mt-3">
+              <StampStripPreview
+                slotFilled={Array.from({ length: Math.min(stampsRequired, 16) }, (_, i) => i < previewFilled)}
+                draft={stampDraft}
+                filledUrl={stampTheme === "CUSTOM" ? stampIconFilledUrl || null : null}
+                emptyUrl={stampTheme === "CUSTOM" ? stampIconEmptyUrl || null : null}
+                transparent
+              />
             </div>
 
             <div className="px-4 pb-4 pt-3">
@@ -247,9 +235,14 @@ export function WalletPreview({
                   </div>
                 ) : null}
               </div>
-              <div className="mt-4 flex flex-col items-center gap-1">
-                <BarcodePreview format={barcodeFormat} />
-                <p className="text-[10px] opacity-70">{barcodeFormat}</p>
+              {/* Barkod: kart detayındaki önizlemeyle aynı çizim ve alt yazı */}
+              <div className="mx-auto mt-5 flex w-[56%] min-w-[150px] flex-col items-center rounded-lg bg-white p-2.5">
+                <WalletBarcode format={barcodeFormat} width={150} />
+                {stampDraft.barcodeAltMode === "NONE" ? null : (
+                  <p className="mt-1 text-[11px] tracking-[0.06em] text-black">
+                    {stampDraft.barcodeAltMode === "CUSTOM" ? stampDraft.barcodeAltText : "769248"}
+                  </p>
+                )}
               </div>
             </div>
           </div>

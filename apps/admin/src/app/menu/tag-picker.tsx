@@ -5,6 +5,7 @@ import { normalizeTagLabel, tagKey } from "@ngl/shared";
 import { ErrorBanner, EmptyState, ListRowsSkeleton, inputClassName } from "../../components/ui";
 import { Btn } from "../../components/btn";
 import { ApiError, api } from "../../lib/api";
+import { ResetCatalogButton } from "./catalog-manager";
 import { useApiQuery } from "../../lib/use-api-query";
 
 export type MenuTagRow = {
@@ -252,6 +253,14 @@ export function TagManager({ onChanged }: { onChanged?: () => void }) {
   return (
     <div className="space-y-4">
       <ErrorBanner message={error} />
+      <div className="flex justify-end">
+        <ResetCatalogButton
+          onDone={() => {
+            void reload(true);
+            onChanged?.();
+          }}
+        />
+      </div>
       <div className="grid grid-cols-[1fr_1fr_auto] gap-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
         <span>Türkçe</span>
         <span>English</span>

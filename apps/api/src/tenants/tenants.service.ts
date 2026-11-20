@@ -19,6 +19,7 @@ import { OwnerPushService } from '../owner-push/owner-push.service';
 import { WalletService } from '../wallet/wallet.service';
 import { CrmService } from '../crm/crm.service';
 import { stripBroadcastStamps } from '../wallet/broadcast-message.util';
+import { sanitizeWalletDefaults } from '../wallet/wallet-defaults';
 import { AssetsService, type AssetSlot } from './assets.service';
 import {
   CreateTenantDto,
@@ -752,6 +753,9 @@ export class TenantsService {
     }
     if (dto.barcodeFormat !== undefined) {
       data.barcodeFormat = dto.barcodeFormat.toUpperCase();
+    }
+    if (dto.walletDefaults !== undefined) {
+      data.walletDefaults = sanitizeWalletDefaults(dto.walletDefaults);
     }
     if (dto.showStampField !== undefined) {
       data.showStampField = dto.showStampField;

@@ -236,7 +236,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         href: "/settings/invite-design",
-        icon: "qr",
+        icon: "heart",
         label: "Müşteri davet sayfası",
         hint: "Sayfayı blok blok tasarla, canlı önizle",
         roles: ["STORE_OWNER"],
@@ -286,6 +286,8 @@ export function navItemActive(pathname: string, href: string): boolean {
   }
   if (href === "/settings") {
     if (!pathname.startsWith("/settings")) return false;
+    // Davet sayfası kendi menü öğesinde vurgulanır; Ayarlar'da değil
+    if (pathname.startsWith("/settings/invite-design")) return false;
     return !isBrandSettingsPath(pathname);
   }
   if (href !== "/platform" && pathname.startsWith(`${href}/`)) return true;

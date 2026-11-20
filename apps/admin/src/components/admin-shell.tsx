@@ -314,12 +314,17 @@ export function AdminShell({ children }: { children: ReactNode }) {
         >
           {rail ? (
             <>
+              {avatarLogoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={resolveAdminAssetUrl(avatarLogoUrl)} alt="" title={me.name} className="h-8 w-8 shrink-0 rounded-full object-cover" />
+              ) : (
               <span
                 className="grid h-8 w-8 place-items-center rounded-full bg-[var(--accent)] text-[0.75rem] font-semibold text-white"
                 title={`${me.name} · ${roleLabel(me.role)}`}
               >
                 {me.name.slice(0, 1).toUpperCase()}
               </span>
+              )}
               <button
                 type="button"
                 onClick={handleLogout}

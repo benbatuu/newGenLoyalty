@@ -8,8 +8,6 @@ import {
   inputClassName,
 } from "../../../../components/ui";
 import { IconUploadField } from "./shared-fields";
-import type { BarcodeFormat } from "./types";
-import { BARCODE_OPTIONS } from "../../../reward/_panels/wallet-types";
 
 type NotifyTabProps = {
   notifyIconUrl: string;
@@ -23,8 +21,6 @@ type NotifyTabProps = {
   headerChangeMessage: string;
   setHeaderChangeMessage: (v: string) => void;
   headerFieldLabel: string;
-  barcodeFormat: BarcodeFormat;
-  setBarcodeFormat: (v: BarcodeFormat) => void;
   primaryColor: string;
   uploadBusy: string | null;
   setUploadBusy: (v: string | null) => void;
@@ -43,8 +39,6 @@ export function NotifyTab({
   headerChangeMessage,
   setHeaderChangeMessage,
   headerFieldLabel,
-  barcodeFormat,
-  setBarcodeFormat,
   primaryColor,
   uploadBusy,
   setUploadBusy,
@@ -54,7 +48,7 @@ export function NotifyTab({
     <Panel>
       <PanelHeader
         step={5}
-        title="Bildirim & barkod"
+        title="Bildirim"
         description={`Kilit ekranı metinleri olaya göre tek bildirim gönderir: damga, ödül hazır veya ödül kullanıldı. %@ yeni değere dönüşür.`}
       />
       <div className="space-y-4">
@@ -110,28 +104,6 @@ export function NotifyTab({
             ) : null}
           </div>
         </SoftBox>
-        <div className="space-y-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3">
-          <p className="text-sm font-medium text-[var(--ink)]">Barkod türü</p>
-          <p className="text-xs text-[var(--muted)]">Müşterinin telefonunda kartın altında görünür. Kasiyer bu kodu okutur.</p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Kasada okutulacak kod">
-            {BARCODE_OPTIONS.map((opt) => {
-              const active = barcodeFormat === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => setBarcodeFormat(opt.id)}
-                  className={`rounded-lg border px-3 py-2 text-left transition ${active ? "border-[var(--ink)] bg-[var(--surface)] ring-1 ring-[var(--ink)]/20" : "border-[var(--line)] hover:bg-[var(--surface)]"}`}
-                >
-                  <span className="block text-[0.8125rem] font-semibold text-[var(--ink)]">{opt.label}</span>
-                  <span className="block text-[0.6875rem] text-[var(--muted)]">{opt.hint}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
       </div>
     </Panel>
   );

@@ -150,7 +150,7 @@ export function FieldsSection({
   );
 }
 
-/** Barkod: görünürlük, biçim ve altındaki yazı */
+/** Barkod: görünürlük ve altındaki yazı (biçim üstteki Barkod türü seçiminden gelir) */
 export function BarcodeSection({ draft, onChange }: SectionProps) {
   return (
     <div className="space-y-6">
@@ -162,18 +162,6 @@ export function BarcodeSection({ draft, onChange }: SectionProps) {
       />
       {draft.showBarcode && (
         <>
-          <Field label="Barkod biçimi">
-            <div className="flex flex-wrap gap-2">
-              <Chip active={draft.barcodeFormat === ""} onClick={() => onChange({ ...draft, barcodeFormat: "" })}>
-                İşletme varsayılanı
-              </Chip>
-              {BARCODE_OPTIONS.map((o) => (
-                <Chip key={o.id} active={draft.barcodeFormat === o.id} onClick={() => onChange({ ...draft, barcodeFormat: o.id })}>
-                  {o.label}
-                </Chip>
-              ))}
-            </div>
-          </Field>
           <Field label="Barkodun altındaki yazı">
             <div className="flex flex-wrap gap-2">
               <Chip active={draft.barcodeAltMode === "CODE"} onClick={() => onChange({ ...draft, barcodeAltMode: "CODE" })}>

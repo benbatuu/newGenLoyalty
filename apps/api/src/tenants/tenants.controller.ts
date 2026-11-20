@@ -220,7 +220,7 @@ export class TenantsController {
     };
     const html = renderInviteHtml({
       ...data,
-      locale: 'tr',
+      locale: draft.previewLocale === 'en' ? 'en' : 'tr',
       platform: 'both',
     } as Parameters<typeof renderInviteHtml>[0]);
     return { html };

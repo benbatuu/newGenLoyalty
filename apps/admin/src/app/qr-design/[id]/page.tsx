@@ -10,6 +10,7 @@ import {
   removeMenuBlock,
   type MenuBlock,
   type MenuBlockType,
+  type MenuDeviceId,
   type MenuDocument,
   type MenuThemePreset,
 } from "@ngl/shared";
@@ -20,6 +21,7 @@ import { useApiQuery } from "../../../lib/use-api-query";
 import { PreviewWidthContext } from "../../../lib/preview-width";
 import { MenuBlockPanel } from "../../menu/menu-block-panel";
 import { MenuBuilderProps } from "../../menu/menu-builder-props";
+import { QUICK_PALETTES } from "../../menu/palettes";
 import type { MenuContentI18n } from "@ngl/shared";
 
 type SavedThemeDetail = {
@@ -59,11 +61,14 @@ type MenuItemPreview = {
 };
 
 
-/** Cihaz önizlemeleri: Mobil / Tablet / Masaüstü (sütun kırılımlarıyla eşleşir). */
+/**
+ * Düzenlenen ekran: önizleme genişliği ve sağ paneldeki ekrana özel ayarlar buna göre çalışır.
+ * Genişlikler menünün cihaz eşikleriyle eşleşir (tablet ≥768, masaüstü ≥1024).
+ */
 const DEVICES = [
-  { id: "mobil", label: "Mobil", width: 390 },
-  { id: "tablet", label: "Tablet", width: 800 },
-  { id: "masaustu", label: "Masaüstü", width: 1400 },
+  { id: "mobil", label: "Mobil", width: 390, menu: "mobile" as MenuDeviceId },
+  { id: "tablet", label: "Tablet", width: 820, menu: "tablet" as MenuDeviceId },
+  { id: "masaustu", label: "Masaüstü", width: 1280, menu: "desktop" as MenuDeviceId },
 ] as const;
 
 type DeviceId = (typeof DEVICES)[number]["id"];
@@ -95,7 +100,19 @@ function QrDesignEditor() {
   const [preset, setPreset] = useState<MenuThemePreset>("editorial");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [device, setDevice] = useState<DeviceId>("mobil");
-  const screenWidth = DEVICES.find((d) => d.id === device)?.width ?? 390;
+  // Masaüstü önizleme genişliği: farklı ekranlarda nasıl göründüğünü dene
+  const [desktopWidth, setDesktopWidth] = useState(1280);
+  const screenWidth = device === "masaustu" ? desktopWidth : (DEVICES.find((d) => d.id === device)?.width ?? 390);
+  const editDevice: MenuDeviceId = DEVICES.find((d) => d.id === device)?.menu ?? "mobile";
+  // Paneller katlanır: önizleme (özellikle masaüstü) ekrana sığsın
+  const [showBlocks, setShowBlocks] = useState(true);
+  const [showInspector, setShowInspector] = useState(true);
+  function chooseDevice(id: DeviceId) {
+    setDevice(id);
+    // Masaüstü geniş: blok listesini kapat, önizlemeye yer aç. Blok seçimi önizlemeden yapılabilir.
+    if (id === "masaustu") setShowBlocks(false);
+    else setShowBlocks(true);
+  }
   const [previewProductDetail, setPreviewProductDetail] = useState(false);
   const [previewExplore, setPreviewExplore] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -113,6 +130,27 @@ function QrDesignEditor() {
     setName(theme.name);
     setPreset(theme.preset);
     setDoc(normalizeMenuDocument(theme.document, theme.preset, tenant?.primaryColor));
+    // Menü sekmesindeki palet seçimi: ?palette=Ad ile gelindiğinde paleti uygular (kaydedilene kadar taslak)
+    const palName = new URLSearchParams(window.location.search).get("palette");
+    const pal = palName ? QUICK_PALETTES.find((p) => p.name === palName) : undefined;
+    if (pal) {
+      setDoc((prev) =>
+        prev
+          ? {
+              ...prev,
+              theme: {
+                ...prev.theme,
+                backgroundColor: pal.backgroundColor,
+                surfaceColor: pal.surfaceColor,
+                textColor: pal.textColor,
+                mutedColor: pal.mutedColor,
+                accentColor: pal.accentColor,
+                headingColor: pal.textColor,
+              },
+            }
+          : prev,
+      );
+    }
   }, [theme, tenant?.primaryColor]);
 
   const selected = doc?.blocks.find((b) => b.id === selectedId) ?? null;
@@ -246,8 +284,10 @@ function QrDesignEditor() {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  // Önizleme alana sığacak şekilde küçülür; düzen yine seçilen cihaz genişliğinde hesaplanır
-  const stageScale = stageSize.w > 0 ? Math.min(1, (stageSize.w - 48) / screenWidth, (stageSize.h - 48) / 780) : 1;
+  // Önizleme genişliğe sığacak şekilde küçülür; düzen yine seçilen cihaz genişliğinde hesaplanır.
+  // Yükseklik kalan alanı doldurur, böylece masaüstünde de sayfanın büyük kısmı görünür.
+  const stageScale = stageSize.w > 0 ? Math.min(1, (stageSize.w - 32) / screenWidth) : 1;
+  const frameHeight = stageSize.h > 0 ? Math.max(560, Math.round((stageSize.h - 32) / stageScale)) : 780;
 
   const previewFrameRef = useRef<HTMLIFrameElement>(null);
   const frameReady = useRef(false);
@@ -268,6 +308,7 @@ function QrDesignEditor() {
         pushPreview();
       } else if (d?.type === "ngl-preview-select") {
         setSelectedId(d.id ?? null);
+        if (d.id) setShowInspector(true);
       }
     }
     window.addEventListener("message", onFrame);
@@ -354,14 +395,36 @@ function QrDesignEditor() {
             {isDraft ? "Taslak" : "Yayında"}
           </span>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <div role="radiogroup" aria-label="Önizleme cihazı" className="inline-flex rounded-xl border border-[var(--line)] bg-[var(--surface)] p-0.5">
+            <div className="inline-flex rounded-xl border border-[var(--line)] bg-[var(--surface)] p-0.5" aria-label="Paneller">
+              <button
+                type="button"
+                aria-pressed={showBlocks}
+                onClick={() => setShowBlocks((v) => !v)}
+                title={showBlocks ? "Blok listesini gizle" : "Blok listesini göster"}
+                className={`h-8 rounded-lg px-2.5 text-xs font-medium transition ${showBlocks ? "bg-[var(--panel)] text-[var(--ink)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
+              >
+                Bloklar
+              </button>
+              <button
+                type="button"
+                aria-pressed={showInspector}
+                onClick={() => setShowInspector((v) => !v)}
+                title={showInspector ? "Ayar panelini gizle" : "Ayar panelini göster"}
+                className={`h-8 rounded-lg px-2.5 text-xs font-medium transition ${showInspector ? "bg-[var(--panel)] text-[var(--ink)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
+              >
+                Ayarlar
+              </button>
+            </div>
+            <span className="hidden text-[11px] font-medium text-[var(--muted)] lg:inline">Düzenlenen ekran</span>
+            <div role="radiogroup" aria-label="Düzenlenen ekran" className="inline-flex rounded-xl border border-[var(--line)] bg-[var(--surface)] p-0.5">
               {DEVICES.map((d) => (
                 <button
                   key={d.id}
                   type="button"
                   role="radio"
                   aria-checked={device === d.id}
-                  onClick={() => setDevice(d.id)}
+                  onClick={() => chooseDevice(d.id)}
+                  title={`${d.label} (${d.width}px) görünümünü ve bu ekrana özel ayarları düzenle`}
                   className={`h-8 rounded-lg px-3 text-xs font-medium transition ${
                     device === d.id ? "bg-[var(--accent)] text-white" : "text-[var(--muted)] hover:text-[var(--ink)]"
                   }`}
@@ -370,6 +433,19 @@ function QrDesignEditor() {
                 </button>
               ))}
             </div>
+            {device === "masaustu" ? (
+              <select
+                aria-label="Masaüstü ekran genişliği"
+                value={desktopWidth}
+                onChange={(e) => setDesktopWidth(Number(e.target.value))}
+                className="h-9 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-2 text-xs font-medium text-[var(--ink)]"
+              >
+                <option value={1024}>1024px · küçük dizüstü</option>
+                <option value={1280}>1280px · dizüstü</option>
+                <option value={1440}>1440px · geniş</option>
+                <option value={1920}>1920px · büyük ekran</option>
+              </select>
+            ) : null}
             <button
               type="button"
               disabled={saving}
@@ -397,7 +473,8 @@ function QrDesignEditor() {
         ) : null}
 
         <div className="flex min-h-0 flex-1 gap-3 overflow-hidden p-3">
-          <aside className="flex w-[280px] shrink-0 flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)] shadow-[var(--shadow-sm)] [&>*]:w-full [&>*]:border-r-0">
+          {showBlocks ? (
+          <aside className="flex w-[248px] shrink-0 flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)] shadow-[var(--shadow-sm)] [&>*]:w-full [&>*]:border-r-0">
             <MenuBlockPanel
               blocks={doc.blocks}
               selectedId={selectedId}
@@ -420,30 +497,31 @@ function QrDesignEditor() {
               }}
             />
           </aside>
+          ) : null}
 
           <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
             <div className="flex h-11 shrink-0 items-center justify-between border-b border-[var(--line)] bg-[var(--panel)] px-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Canlı önizleme</p>
               <p className="text-[11px] tabular-nums text-[var(--muted)]">
-                {DEVICES.find((d) => d.id === device)?.label} · {screenWidth}px · {blockCount} blok
+                {DEVICES.find((d) => d.id === device)?.label} · {screenWidth}px · %{Math.round(stageScale * 100)} · {blockCount} blok
               </p>
             </div>
             <div
               ref={stageRef}
-              className="relative flex min-h-0 flex-1 items-start justify-center overflow-hidden p-6"
+              className="relative flex min-h-0 flex-1 items-start justify-center overflow-hidden p-4"
               style={{
                 backgroundImage: "radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0)",
                 backgroundSize: "20px 20px",
               }}
             >
-              <div style={{ width: screenWidth * stageScale, height: 780 * stageScale }} className="relative shrink-0">
-                <div style={{ width: screenWidth, height: 780, transform: `scale(${stageScale})`, transformOrigin: "top left" }}>
+              <div style={{ width: screenWidth * stageScale, height: frameHeight * stageScale }} className="relative shrink-0">
+                <div style={{ width: screenWidth, height: frameHeight, transform: `scale(${stageScale})`, transformOrigin: "top left" }}>
                   {previewMenu ? (
                     <iframe
                       ref={previewFrameRef}
                       title="Canlı önizleme"
                       src="/qr-design/frame"
-                      style={{ width: screenWidth, height: 780 }}
+                      style={{ width: screenWidth, height: frameHeight }}
                       className="block overflow-hidden rounded-[1.75rem] border border-[var(--line-strong)] bg-[var(--panel)] shadow-[0_30px_70px_-30px_rgba(0,0,0,0.6)]"
                     />
                   ) : null}
@@ -452,12 +530,14 @@ function QrDesignEditor() {
             </div>
           </main>
 
-          <aside className="flex w-[380px] shrink-0 flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)] shadow-[var(--shadow-sm)]">
+          {showInspector ? (
+          <aside className="flex w-[340px] shrink-0 flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)] shadow-[var(--shadow-sm)]">
             <MenuBuilderProps
-              width={380}
+              width={340}
+              onDeselect={() => setSelectedId(null)}
               document={doc}
               block={selected}
-              device="mobile"
+              device={editDevice}
               uploading={uploading}
               onUploadImage={uploadImage}
               onPreviewProductDetail={setPreviewProductDetail}
@@ -489,6 +569,7 @@ function QrDesignEditor() {
               }}
             />
           </aside>
+          ) : null}
         </div>
       </div>
     </PreviewWidthContext.Provider>

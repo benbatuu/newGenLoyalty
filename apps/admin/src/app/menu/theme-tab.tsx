@@ -7,6 +7,7 @@ import { Btn } from "../../components/btn";
 import { ApiError, api } from "../../lib/api";
 import { useApiQuery } from "../../lib/use-api-query";
 import type { MenuThemePreset } from "@ngl/shared";
+import { QUICK_PALETTES, type QuickPalette } from "./palettes";
 
 type SavedTheme = {
   id: string;
@@ -133,7 +134,7 @@ export function ThemeTab() {
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [creating, setCreating] = useState<{ preset: MenuThemePreset; name: string } | null>(null);
+  const [creating, setCreating] = useState<{ preset: MenuThemePreset; name: string; palette?: string } | null>(null);
   const [query, setQuery] = useState("");
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
@@ -143,7 +144,7 @@ export function ThemeTab() {
     return () => clearTimeout(t);
   }, [ok]);
 
-  async function createFromPreset(preset: MenuThemePreset, name: string) {
+  async function createFromPreset(preset: MenuThemePreset, name: string, palette?: string) {
     setBusyId(preset);
     setError(null);
     try {
@@ -151,7 +152,7 @@ export function ThemeTab() {
         method: "POST",
         body: JSON.stringify({ name: name.trim() || PRESET_SWATCH[preset].label, preset }),
       });
-      router.push(`/qr-design/${created.id}`);
+      router.push(`/qr-design/${created.id}${palette ? `?palette=${encodeURIComponent(palette)}` : ""}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Tema oluşturulamadı");
       setBusyId(null);
@@ -183,6 +184,28 @@ export function ThemeTab() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Silinemedi");
     } finally {
+      setBusyId(null);
+    }
+  }
+
+  /** Paleti seçince tasarım ekranı açılır; palet orada taslak olarak uygulanır */
+  async function openWithPalette(pal: QuickPalette) {
+    setError(null);
+    const target = themes.find((t) => t.isActive) ?? themes[0];
+    const suffix = `?palette=${encodeURIComponent(pal.name)}`;
+    if (target) {
+      router.push(`/qr-design/${target.id}${suffix}`);
+      return;
+    }
+    setBusyId("palette");
+    try {
+      const created = await api<{ id: string }>("/menu/themes", {
+        method: "POST",
+        body: JSON.stringify({ name: PRESET_SWATCH.editorial.label, preset: "editorial" }),
+      });
+      router.push(`/qr-design/${created.id}${suffix}`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Tema oluşturulamadı");
       setBusyId(null);
     }
   }
@@ -265,6 +288,51 @@ export function ThemeTab() {
             );
           })}
         </div>
+      </Section>
+
+      {/* Renk paletleri: tasarım ekranındaki paletlerin aynısı */}
+      <Section
+        title="Renk paletleri"
+        description="Bir palet seçin; tasarım ekranı açılır ve palet uygulanmış halde gelir. Kaydedene kadar yayına girmez."
+      >
+        {(["Açık", "Koyu"] as const).map((group) => (
+          <div key={group} className="space-y-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">{group} paletler</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+              {QUICK_PALETTES.filter((pal) => Boolean(pal.dark) === (group === "Koyu")).map((pal) => (
+                <button
+                  key={pal.name}
+                  type="button"
+                  disabled={busyId === "palette"}
+                  onClick={() => void openWithPalette(pal)}
+                  aria-label={`${pal.name} paletini tasarım ekranında aç`}
+                  className="group overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)] text-left shadow-[0_1px_2px_rgba(26,25,22,0.04)] transition hover:-translate-y-0.5 hover:border-[var(--ink)]/25 hover:shadow-[0_16px_40px_-22px_rgba(26,25,22,0.4)] disabled:opacity-60"
+                >
+                  <span className="flex h-24 items-end gap-2 p-3" style={{ background: pal.backgroundColor }}>
+                    <span className="flex h-full flex-1 flex-col gap-1.5 rounded-xl p-2" style={{ background: pal.surfaceColor }}>
+                      <span className="flex items-center gap-1">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: pal.accentColor }} />
+                        <span className="h-1 w-8 rounded-full" style={{ background: pal.textColor }} />
+                      </span>
+                      <span className="h-2 rounded-md" style={{ background: pal.accentColor, width: "60%" }} />
+                      <span className="h-1 w-3/4 rounded-full" style={{ background: pal.mutedColor, opacity: 0.6 }} />
+                      <span className="h-1 w-1/2 rounded-full" style={{ background: pal.mutedColor, opacity: 0.4 }} />
+                    </span>
+                    <span className="h-full w-3 rounded-lg" style={{ background: pal.accentColor }} />
+                  </span>
+                  <span className="flex items-center justify-between gap-2 border-t border-[var(--line)] px-3 py-2.5">
+                    <span className="truncate text-xs font-semibold text-[var(--ink)]">{pal.name}</span>
+                    <span className="flex shrink-0 items-center gap-1" aria-hidden>
+                      <span className="h-3 w-3 rounded-full border border-black/10" style={{ background: pal.backgroundColor }} />
+                      <span className="h-3 w-3 rounded-full border border-black/10" style={{ background: pal.surfaceColor }} />
+                      <span className="h-3 w-3 rounded-full border border-black/10" style={{ background: pal.accentColor }} />
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </Section>
 
       {/* Temalarım */}
@@ -358,14 +426,24 @@ export function ThemeTab() {
             if (e.target === e.currentTarget) setCreating(null);
           }}
         >
-          <div role="dialog" aria-modal="true" aria-label="Yeni tema" className="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)] shadow-2xl">
-            <ThemeMock s={PRESET_SWATCH[creating.preset]} size="sm" />
+          <div role="dialog" aria-modal="true" aria-label="Yeni tema" className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--panel)] shadow-2xl">
+            <ThemeMock
+              s={
+                (creating.palette && QUICK_PALETTES.find((p) => p.name === creating.palette)) ? (() => {
+                  const pal = QUICK_PALETTES.find((p) => p.name === creating.palette)!;
+                  return { bg: pal.backgroundColor, surface: pal.surfaceColor, accent: pal.accentColor, ink: pal.textColor, muted: pal.mutedColor };
+                })() : PRESET_SWATCH[creating.preset]
+              }
+              size="sm"
+            />
             <div className="space-y-5 p-6">
               <div>
                 <h3 className="text-base font-semibold tracking-tight text-[var(--ink)]">Yeni tema oluştur</h3>
                 <p className="mt-0.5 text-xs text-[var(--muted)]">Bir ad verin; tasarım editörü açılacak.</p>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-[var(--muted)]">Şablon</p>
+                <div className="grid grid-cols-3 gap-2">
                 {(Object.keys(PRESET_SWATCH) as MenuThemePreset[]).map((p) => (
                   <button
                     key={p}
@@ -378,6 +456,38 @@ export function ThemeTab() {
                     {PRESET_SWATCH[p].label}
                   </button>
                 ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-[var(--muted)]">Renk paleti</p>
+                  {creating.palette ? (
+                    <button type="button" onClick={() => setCreating({ ...creating, palette: undefined })} className="text-[11px] text-[var(--muted)] hover:text-[var(--ink)]">
+                      Şablonun rengini kullan
+                    </button>
+                  ) : null}
+                </div>
+                <div className="grid max-h-56 grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-4 md:grid-cols-6">
+                  {QUICK_PALETTES.map((pal) => {
+                    const on = creating.palette === pal.name;
+                    return (
+                      <button
+                        key={pal.name}
+                        type="button"
+                        aria-pressed={on}
+                        title={pal.name}
+                        onClick={() => setCreating({ ...creating, palette: pal.name })}
+                        className={`overflow-hidden rounded-xl border text-left transition ${on ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30" : "border-[var(--line)] hover:border-[var(--ink)]/30"}`}
+                      >
+                        <span className="flex h-9 items-end gap-1 p-1" style={{ background: pal.backgroundColor }}>
+                          <span className="h-5 flex-1 rounded-md" style={{ background: pal.surfaceColor }} />
+                          <span className="h-5 w-2.5 rounded-md" style={{ background: pal.accentColor }} />
+                        </span>
+                        <span className="block truncate px-1.5 py-1 text-[10px] font-medium text-[var(--ink)]">{pal.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <label className="block space-y-1.5">
                 <span className="text-xs font-medium text-[var(--muted)]">Tema adı</span>
@@ -387,13 +497,13 @@ export function ThemeTab() {
                   onChange={(e) => setCreating({ ...creating, name: e.target.value })}
                   autoFocus
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && creating.name.trim()) void createFromPreset(creating.preset, creating.name);
+                    if (e.key === "Enter" && creating.name.trim()) void createFromPreset(creating.preset, creating.name, creating.palette);
                   }}
                 />
               </label>
               <div className="flex justify-end gap-2">
                 <Btn variant="ghost" onClick={() => setCreating(null)}>İptal</Btn>
-                <Btn variant="primary" disabled={!creating.name.trim() || !!busyId} onClick={() => void createFromPreset(creating.preset, creating.name)}>
+                <Btn variant="primary" disabled={!creating.name.trim() || !!busyId} onClick={() => void createFromPreset(creating.preset, creating.name, creating.palette)}>
                   {busyId ? "Oluşturuluyor…" : "Oluştur ve düzenle"}
                 </Btn>
               </div>

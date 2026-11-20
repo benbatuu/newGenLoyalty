@@ -258,6 +258,11 @@ export {
   type MenuFeedbackFieldType,
   type MenuDeviceId,
   type MenuDeviceFrame,
+  resolveMenuOverlay,
+  DEFAULT_MENU_OVERLAYS,
+  DEFAULT_DIALOG_WIDTH,
+  resolveDetailDialogWidth,
+  type MenuOverlayStyle,
 } from './menu-document';
 
 export {

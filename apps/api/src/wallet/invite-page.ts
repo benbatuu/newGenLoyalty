@@ -4,12 +4,107 @@ export type InvitePolicy = { title: string; body: string };
 
 /** Sayfa blokları — sahip panelden sürükleyip ekleyebilir */
 export const INVITE_BLOCK_TYPES = [
-  'card', 'text', 'image', 'spacer', 'divider', 'wallet', 'form', 'legal', 'policies',
+  'card', 'text', 'image', 'spacer', 'divider', 'wallet', 'form', 'legal', 'policies', 'page',
 ] as const;
 export type InviteBlockType = (typeof INVITE_BLOCK_TYPES)[number];
 export type InviteBlock = { id: string; type: InviteBlockType; props: Record<string, unknown> };
 
 const MAX_BLOCKS = 30;
+
+/** Ekran türleri: telefon < 768px, tablet 768–1099px, masaüstü ≥ 1100px */
+export const INVITE_DEVICES = ['mobile', 'tablet', 'desktop'] as const;
+export type InviteDevice = (typeof INVITE_DEVICES)[number];
+
+/** Ekrana özel sayfa yerleşimi (sayfa ayarları bloğunda saklanır) */
+export type InviteDeviceLayout = {
+  /** 1: tek sütun · 2: sol (kart) + sağ (form, düğmeler) */
+  columns: 1 | 2;
+  maxWidth: number;
+  padX: number;
+  padY: number;
+  /** İki sütun arası boşluk */
+  gap: number;
+  /** Sol sütunun yüzdesi (iki sütunda) */
+  split: number;
+  /** İçeriği ekranda dikey ortala */
+  valign: 'top' | 'center';
+  /** Sol sütun kaydırırken sabit kalsın */
+  sticky: boolean;
+};
+
+export const DEFAULT_INVITE_DEVICES: Record<InviteDevice, InviteDeviceLayout> = {
+  mobile: { columns: 1, maxWidth: 460, padX: 16, padY: 20, gap: 32, split: 46, valign: 'top', sticky: false },
+  tablet: { columns: 1, maxWidth: 560, padX: 32, padY: 40, gap: 40, split: 46, valign: 'top', sticky: false },
+  desktop: { columns: 2, maxWidth: 1080, padX: 40, padY: 56, gap: 64, split: 46, valign: 'center', sticky: true },
+};
+
+function clampNum(v: unknown, min: number, max: number, d: number): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(Math.max(Math.round(n), min), max) : d;
+}
+
+function sanitizeDeviceLayout(raw: unknown, device: InviteDevice): InviteDeviceLayout {
+  const d = DEFAULT_INVITE_DEVICES[device];
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  return {
+    columns: device === 'mobile' ? 1 : r.columns === 2 ? 2 : r.columns === 1 ? 1 : d.columns,
+    maxWidth: clampNum(r.maxWidth, 320, 1600, d.maxWidth),
+    padX: clampNum(r.padX, 0, 96, d.padX),
+    padY: clampNum(r.padY, 0, 160, d.padY),
+    gap: clampNum(r.gap, 0, 160, d.gap),
+    split: clampNum(r.split, 30, 70, d.split),
+    valign: r.valign === 'center' ? 'center' : r.valign === 'top' ? 'top' : d.valign,
+    sticky: typeof r.sticky === 'boolean' ? r.sticky : d.sticky,
+  };
+}
+
+/** Sayfa ayarları bloğundan ekran yerleşimlerini çıkarır (yoksa varsayılan) */
+export function resolveInviteDevices(layout: InviteBlock[] | null): Record<InviteDevice, InviteDeviceLayout> {
+  const page = layout?.find((b) => b.type === 'page');
+  const devices = (page?.props.devices ?? {}) as Record<string, unknown>;
+  return {
+    mobile: sanitizeDeviceLayout(devices.mobile, 'mobile'),
+    tablet: sanitizeDeviceLayout(devices.tablet, 'tablet'),
+    desktop: sanitizeDeviceLayout(devices.desktop, 'desktop'),
+  };
+}
+
+/** Blok varsayılan sütunu: kart ve görsel solda, diğerleri sağda */
+export function inviteBlockColumn(b: InviteBlock): 'a' | 'b' {
+  if (b.props.col === 'a' || b.props.col === 'b') return b.props.col;
+  return b.type === 'card' || b.type === 'image' ? 'a' : 'b';
+}
+
+export type InviteBlockSize = { w?: number; h?: number; align?: 'left' | 'center' | 'right' };
+
+/** Bloğun bir ekrandaki boyut CSS'i (telefon temel; tablet ve masaüstü ayarlanmadıysa önceki ekranı devralır) */
+function inviteBlockSizeCss(cls: string, isImage: boolean, sz: InviteBlockSize | undefined): string {
+  if (!sz) return '';
+  const rules: string[] = [];
+  if (sz.w != null) {
+    const align = sz.align ?? 'center';
+    rules.push(
+      `.${cls}{width:${sz.w}%;max-width:100%;margin-left:${align === 'left' ? '0' : 'auto'};margin-right:${align === 'right' ? '0' : 'auto'}}`,
+    );
+  }
+  if (sz.h != null) {
+    rules.push(
+      sz.h > 0
+        ? isImage
+          ? `.${cls}>.block-image{height:${sz.h}px}`
+          : `.${cls}>*{min-height:${sz.h}px}`
+        : isImage
+          ? ''
+          : `.${cls}>*{min-height:0}`,
+    );
+  }
+  return rules.join('');
+}
+
+function inviteBlockHidden(b: InviteBlock, device: InviteDevice): boolean {
+  const hide = b.props.hide as Partial<Record<InviteDevice, boolean>> | undefined;
+  return Boolean(hide && hide[device]);
+}
 
 function clampStr(v: unknown, max: number): string | null {
   return typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null;
@@ -20,16 +115,30 @@ export function sanitizeInviteLayout(raw: unknown): InviteBlock[] | null {
   if (!Array.isArray(raw)) return null;
   const out: InviteBlock[] = [];
   let hasWallet = false;
+  let hasPage = false;
   for (const item of raw.slice(0, MAX_BLOCKS)) {
     if (!item || typeof item !== 'object') continue;
     const b = item as { id?: unknown; type?: unknown; props?: unknown };
     if (typeof b.type !== 'string' || !(INVITE_BLOCK_TYPES as readonly string[]).includes(b.type)) continue;
     const type = b.type as InviteBlockType;
-    // Cüzdan düğmeleri ve form sayfada tek kez olabilir
+    // Cüzdan düğmeleri, form ve sayfa ayarları sayfada tek kez olabilir
     if (type === 'wallet') { if (hasWallet) continue; hasWallet = true; }
+    if (type === 'page') { if (hasPage) continue; hasPage = true; }
     const pr = (b.props && typeof b.props === 'object' ? b.props : {}) as Record<string, unknown>;
     const props: Record<string, unknown> = {};
     switch (type) {
+      case 'page': {
+        const dev = (pr.devices && typeof pr.devices === 'object' ? pr.devices : {}) as Record<string, unknown>;
+        props.devices = {
+          mobile: sanitizeDeviceLayout(dev.mobile, 'mobile'),
+          tablet: sanitizeDeviceLayout(dev.tablet, 'tablet'),
+          desktop: sanitizeDeviceLayout(dev.desktop, 'desktop'),
+        };
+        const bgImage = clampStr(pr.bgImage, 500);
+        props.bgImage = bgImage && /^https?:\/\//i.test(bgImage) ? bgImage : null;
+        props.bgOverlay = clampNum(pr.bgOverlay, 0, 90, 55);
+        break;
+      }
       case 'card':
         props.headline = clampStr(pr.headline, 80);
         props.subtitle = clampStr(pr.subtitle, 160);
@@ -80,6 +189,28 @@ export function sanitizeInviteLayout(raw: unknown): InviteBlock[] | null {
         break;
       default:
         break;
+    }
+    if (type !== 'page') {
+      // Ekrana göre gizleme ve iki sütunlu ekranlarda sütun seçimi
+      const hide = (pr.hide && typeof pr.hide === 'object' ? pr.hide : {}) as Record<string, unknown>;
+      const h: Partial<Record<InviteDevice, boolean>> = {};
+      for (const d of INVITE_DEVICES) if (hide[d] === true) h[d] = true;
+      if (Object.keys(h).length) props.hide = h;
+      if (pr.col === 'a' || pr.col === 'b') props.col = pr.col;
+      // Ekrana özel boyut: genişlik (%), yükseklik (px, 0 = otomatik), hizalama
+      const sz = (pr.sizes && typeof pr.sizes === 'object' ? pr.sizes : {}) as Record<string, unknown>;
+      const sizes: Partial<Record<InviteDevice, InviteBlockSize>> = {};
+      for (const d of INVITE_DEVICES) {
+        const r = sz[d];
+        if (!r || typeof r !== 'object') continue;
+        const o = r as Record<string, unknown>;
+        const v: InviteBlockSize = {};
+        if (o.w != null) v.w = clampNum(o.w, 20, 100, 100);
+        if (o.h != null) v.h = clampNum(o.h, 0, 1200, 0);
+        if (o.align === 'left' || o.align === 'center' || o.align === 'right') v.align = o.align;
+        if (Object.keys(v).length) sizes[d] = v;
+      }
+      if (Object.keys(sizes).length) props.sizes = sizes;
     }
     out.push({
       id: clampStr(b.id, 40) ?? `${type}-${out.length}`,
@@ -150,6 +281,16 @@ export type InvitePageRenderData = {
   stampIconFilledUrl?: string | null;
   stampIconEmptyUrl?: string | null;
   stampTheme?: string | null;
+  /** Wallet ön yüzü: header ve DAMGA / ÖDÜL / DURUM alanları */
+  passFront?: {
+    header: { label: string; value: string }[];
+    primary: { label: string; value: string }[];
+  } | null;
+  /** Kart tasarımındaki damga şeridi (pass ile aynı dizilim); yoksa varsayılan daireler */
+  stampStrip?: {
+    items: { x: number; y: number; s: number }[];
+    stripImageUrl?: string | null;
+  } | null;
   /** Cihaz OS — apple | google | both */
   platform: InvitePlatform;
   /** Owner önizleme — Wallet indirimi kapalı, banner göster */
@@ -653,7 +794,8 @@ export function renderInviteHtml(data: InvitePageRenderData): string {
   </script>`;
 
   // Cihaz dili SSR'dan farklıysa bir kez ?lang= ile hizala (navigator = sistem dili)
-  const localeSyncScript = `<script>
+  // Önizlemede dil değişimi yöneticinin panelindeki TR/EN ile yapılır; iframe yönlendirilmez
+  const localeSyncScript = preview ? '' : `<script>
 (function () {
   try {
     if (location.search.indexOf('lang=') !== -1) return;
@@ -716,8 +858,30 @@ export function renderInviteHtml(data: InvitePageRenderData): string {
       const svg = presetIconSvg(themeName, on, fg);
       return `<span class="dot dot-svg${on ? ' on' : ''}"><svg viewBox="0 0 64 64" aria-hidden="true">${svg}</svg></span>`;
     }).join('');
-  const customLayout = sanitizeInviteLayout(data.layout) !== null;
-  const layout = sanitizeInviteLayout(data.layout) ?? DEFAULT_INVITE_LAYOUT;
+  // Kart tasarımı: damga şeridi pass ile aynı konum/boyutta (750×246 oranı)
+  const stripFor = (): string => {
+    const strip = data.stampStrip;
+    if (!strip) return '';
+    if (strip.stripImageUrl) {
+      return `<img src="${escapeHtml(strip.stripImageUrl)}" alt="" style="width:100%;height:auto;display:block;border-radius:8px" />`;
+    }
+    const icons = strip.items.map((it, i) => {
+      const on = i < data.stampCount;
+      const src = on
+        ? filledIcon || resolveStampIconSrc(themeName, true)
+        : emptyIcon || resolveStampIconSrc(themeName, false);
+      if (!src) return '';
+      return `<img src="${escapeHtml(src)}" alt="" style="position:absolute;left:${(it.x * 100).toFixed(3)}%;top:${(it.y * 100).toFixed(3)}%;width:${(it.s * 100).toFixed(3)}%;height:auto;${on ? '' : 'opacity:.85;'}" />`;
+    }).join('');
+    return `<div class="strip" style="position:relative;width:100%;aspect-ratio:750/246">${icons}</div>`;
+  };
+  const sanitized = sanitizeInviteLayout(data.layout);
+  const contentBlocks = (sanitized ?? []).filter((b) => b.type !== 'page');
+  // Özel düzen: sahibin eklediği içerik blokları (yalnız sayfa ayarı varsa varsayılan bloklar)
+  const customLayout = contentBlocks.length > 0;
+  const layout = customLayout ? contentBlocks : DEFAULT_INVITE_LAYOUT;
+  const devices = resolveInviteDevices(sanitized);
+  const pageProps = (sanitized?.find((b) => b.type === 'page')?.props ?? {}) as Record<string, unknown>;
   const hasWallet = layout.some((b) => b.type === 'wallet');
   const str = (v: unknown, fallback: string) =>
     typeof v === 'string' && v ? v : fallback;
@@ -743,11 +907,25 @@ export function renderInviteHtml(data: InvitePageRenderData): string {
         const hl = pick(p.headline, headline);
         const sub = pick(p.subtitle, subtitle);
         const status = pick(p.statusText, statusLine);
+        if (data.passFront && data.stampStrip) {
+          // Kartın birebir görünümü: logo + header solda/sağda, şerit tam genişlikte, alanlar sola hizalı
+          const pf = data.passFront;
+          const logoPart = showLogo ? logoOut || cardLogo : '';
+          return `<div class="card pass-front"${cardStyle ? ` style="${cardStyle}"` : ''}>
+      <div class="pf-top"><div class="pf-logo">${logoPart}</div><div class="pf-header">${pf.header
+            .map((h) => `<div class="pf-field"><span class="pf-l">${escapeHtml(h.label)}</span><span class="pf-v">${escapeHtml(h.value)}</span></div>`)
+            .join('')}</div></div>
+      ${stripFor()}
+      <div class="pf-primary">${pf.primary
+            .map((f) => `<div class="pf-field"><span class="pf-l">${escapeHtml(f.label)}</span><span class="pf-v">${escapeHtml(f.value)}</span></div>`)
+            .join('')}</div>
+    </div>`;
+        }
         return `<div class="card"${cardStyle ? ` style="${cardStyle}"` : ''}>
       ${showLogo ? logoOut || cardLogo : ''}
       ${hl ? `<h1>${escapeHtml(hl)}</h1>` : ''}
       ${sub ? `<div class="meta">${escapeHtml(sub)}</div>` : ''}
-      ${showDots ? `<div class="dots" aria-hidden="true">${dotsFor(String(p.fgColor || fg || '#FFFFFF'))}</div>` : ''}
+      ${showDots ? (data.stampStrip ? stripFor() : `<div class="dots" aria-hidden="true">${dotsFor(String(p.fgColor || fg || '#FFFFFF'))}</div>`) : ''}
       <div class="stamp">${data.stampCount} / ${data.stampsRequired}</div>
       ${status ? `<div class="meta">${escapeHtml(status)}</div>` : ''}
     </div>`;
@@ -786,9 +964,72 @@ export function renderInviteHtml(data: InvitePageRenderData): string {
     }
   };
 
+  // Her blok bir sarmalayıcıda: ekrana göre gizleme sınıfları, sıra (order) ve önizlemede seçim için kimlik
+  const wrapBlock = (b: InviteBlock, i: number): string => {
+    const inner = renderBlock(b);
+    if (!inner.trim()) return '';
+    const cls = ['blk', `b${i}`, ...INVITE_DEVICES.filter((d) => inviteBlockHidden(b, d)).map((d) => `hide-${d}`)].join(' ');
+    return `<div class="${cls}" data-bid="${escapeHtml(b.id)}" style="order:${i}">${inner}</div>`;
+  };
+  const colHtml = (col: 'a' | 'b') =>
+    layout.map((b, i) => (inviteBlockColumn(b) === col ? wrapBlock(b, i) : '')).join('\n');
   const blocksHtml =
-    layout.map(renderBlock).join('\n') +
+    `<div class="cols"><div class="col col-a">${colHtml('a')}</div><div class="col col-b">${colHtml('b')}</div></div>` +
     (hasWallet ? '' : `<div class="actions" id="wallet-actions" hidden></div>`);
+
+  // İki sütun yalnız iki sütunda da o ekranda görünen blok varsa uygulanır
+  const twoColFor = (d: InviteDevice) =>
+    devices[d].columns === 2 &&
+    layout.some((b) => inviteBlockColumn(b) === 'a' && !inviteBlockHidden(b, d)) &&
+    layout.some((b) => inviteBlockColumn(b) === 'b' && !inviteBlockHidden(b, d));
+  const sizeCss = (d: InviteDevice) =>
+    layout
+      .map((b, i) =>
+        inviteBlockSizeCss(`b${i}`, b.type === 'image', (b.props.sizes as Partial<Record<InviteDevice, InviteBlockSize>> | undefined)?.[d]),
+      )
+      .join('');
+  const layoutCss = [
+    inviteDeviceCss(devices.mobile, false),
+    sizeCss('mobile'),
+    `@media (min-width: 768px) { ${inviteDeviceCss(devices.tablet, twoColFor('tablet'))}${sizeCss('tablet')} }`,
+    `@media (min-width: 1100px) { ${inviteDeviceCss(devices.desktop, twoColFor('desktop'))}${sizeCss('desktop')} }`,
+    `@media (max-width: 767px) { .hide-mobile { display: none !important; } }`,
+    `@media (min-width: 768px) and (max-width: 1099px) { .hide-tablet { display: none !important; } }`,
+    `@media (min-width: 1100px) { .hide-desktop { display: none !important; } }`,
+  ].join('\n    ');
+
+  const bgImage = typeof pageProps.bgImage === 'string' && pageProps.bgImage ? pageProps.bgImage : null;
+  const bgOverlay = Math.min(Math.max(Number(pageProps.bgOverlay ?? 55), 0), 90) / 100;
+  const bodyBackground = bgImage
+    ? `background: linear-gradient(rgba(0,0,0,${bgOverlay}), rgba(0,0,0,${bgOverlay})), url("${escapeHtml(bgImage)}") center / cover no-repeat, ${escapeHtml(pageBg)};`
+    : `background: radial-gradient(120% 80% at 50% -10%, ${escapeHtml(pageBg)}, #0b0f0d 70%);`;
+
+  // Önizleme: bloğa tıklayınca editörde seçilir; editörden gelen seçim çerçevelenir
+  const previewSelectScript = preview
+    ? `<script>
+(function () {
+  document.addEventListener('click', function (e) {
+    var el = e.target && e.target.closest ? e.target.closest('[data-bid]') : null;
+    if (!el) return;
+    parent.postMessage({ source: 'invite-preview', id: el.getAttribute('data-bid') }, '*');
+  }, true);
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (!d || d.source !== 'invite-editor') return;
+    document.querySelectorAll('.blk.is-sel').forEach(function (n) { n.classList.remove('is-sel'); });
+    if (!d.selected) return;
+    var nodes = document.querySelectorAll('[data-bid]');
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].getAttribute('data-bid') === d.selected) {
+        nodes[i].classList.add('is-sel');
+        if (d.scroll) nodes[i].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  });
+  parent.postMessage({ source: 'invite-preview', ready: true }, '*');
+})();
+</script>`
+    : '';
 
   return `<!doctype html>
 <html lang="${data.locale}">
@@ -803,12 +1044,21 @@ export function renderInviteHtml(data: InvitePageRenderData): string {
     html, body { margin: 0; }
     body {
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      background: radial-gradient(120% 80% at 50% -10%, ${escapeHtml(pageBg)}, #0b0f0d 70%);
+      ${bodyBackground}
+      background-color: #0b0f0d;
       color: #f4f4f4; min-height: 100vh; -webkit-font-smoothing: antialiased;
     }
+    @media (min-width: 1100px) { body { background-attachment: fixed; } }
     .preview-banner { background: #f59e0b; color: #1a1a1a; text-align: center; font-size: .8rem; font-weight: 600; padding: 10px 12px; }
-    .wrap { width: 100%; max-width: 460px; margin: 0 auto; padding: 20px 16px 40px; }
-    @media (min-width: 640px) { .wrap { padding: 40px 24px 56px; } }
+    .wrap { width: 100%; margin: 0 auto; }
+    .blk { min-width: 0; }
+    /* Bloklar arasında otomatik boşluk yok; aralığı Boşluk bloğu belirler */
+    .blk > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+    .col-a .card { margin: 0; }
+    ${layoutCss}
+    ${preview ? `.blk { cursor: pointer; border-radius: 14px; transition: outline-color .15s ease; outline: 2px solid transparent; outline-offset: 6px; }
+    .blk:hover { outline: 1px dashed rgba(255,255,255,.35); }
+    .blk.is-sel { outline: 2px solid #ff5a5f; }` : ''}
 
     .lang-switch { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(255,255,255,.08); margin: 0 0 16px auto; width: max-content; }
     .lang-switch { display: flex; justify-content: flex-end; }
@@ -827,6 +1077,17 @@ export function renderInviteHtml(data: InvitePageRenderData): string {
     .meta { opacity: .88; font-size: .92rem; line-height: 1.45; }
     .stamp { font-size: clamp(1.9rem, 8vw, 2.4rem); font-weight: 750; margin: 18px 0 10px; letter-spacing: -0.03em; }
     .dots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px 0 16px; width: 100%; }
+    .pass-front { text-align: left; }
+    .pf-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .pf-logo img { display: block; max-width: 100%; height: auto; }
+    .pf-header { display: flex; gap: 14px; justify-content: flex-end; text-align: right; }
+    .pf-field { display: flex; flex-direction: column; }
+    .pf-l { font-size: 10px; letter-spacing: .06em; opacity: .7; text-transform: uppercase; }
+    .pf-v { font-size: 15px; font-weight: 600; }
+    .pass-front .strip { margin: 14px 0; }
+    .pf-primary { display: flex; flex-wrap: wrap; gap: 8px 22px; justify-content: flex-start; margin-top: 12px; }
+    .pf-primary .pf-field { min-width: 0; }
+    .pf-primary .pf-v { font-size: 22px; font-weight: 700; }
     .dot-img img { width: 100%; height: 100%; object-fit: contain; border-radius: 50%; }
     .dot-svg { border: none; background: transparent; padding: 0; opacity: 1; }
     .dot-svg svg { width: 100%; height: 100%; display: block; }
@@ -891,19 +1152,42 @@ export function renderInviteHtml(data: InvitePageRenderData): string {
 </head>
 <body>
   ${previewBanner}
+  <div class="page">
   <div class="wrap">
-    <div class="lang-switch">
+    ${preview ? '' : `<div class="lang-switch">
       <a href="?lang=tr" class="${data.locale === 'tr' ? 'active' : ''}">TR</a>
       <a href="?lang=en" class="${data.locale === 'en' ? 'active' : ''}">EN</a>
-    </div>
+    </div>`}
     ${blocksHtml}
   </div>
+  </div>
   ${platformRefineScript}
+  ${previewSelectScript}
   ${addAllScript}
   ${policyModalScript}
   ${scriptBlock}
 </body>
 </html>`;
+}
+
+/** Bir ekranın yerleşim CSS'i: genişlik, boşluklar, tek/iki sütun ve dikey hizalama */
+function inviteDeviceCss(d: InviteDeviceLayout, twoCol: boolean): string {
+  const parts = [
+    `.wrap{max-width:${d.maxWidth}px;padding:${d.padY}px ${d.padX}px ${d.padY + 20}px}`,
+    d.valign === 'center'
+      ? `.page{min-height:100vh;display:flex;flex-direction:column;justify-content:center}`
+      : `.page{min-height:0;display:block}`,
+  ];
+  if (twoCol) {
+    parts.push(
+      `.cols{display:grid;grid-template-columns:minmax(0,${d.split}fr) minmax(0,${100 - d.split}fr);column-gap:${d.gap}px;align-items:${d.valign === 'center' && !d.sticky ? 'center' : 'start'}}`,
+      `.col{display:flex;flex-direction:column;min-width:0}`,
+      d.sticky ? `.col-a{position:sticky;top:${Math.max(16, d.padY)}px}` : `.col-a{position:static}`,
+    );
+  } else {
+    parts.push(`.cols{display:flex;flex-direction:column}.col{display:contents}.col-a{position:static}`);
+  }
+  return parts.join('');
 }
 
 function monthOptions(selected: number | null, months: string[]): string {

@@ -5,7 +5,45 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { normalizeTagLabel, tagKey, DEFAULT_MENU_TAGS } from '@ngl/shared';
+import { normalizeTagLabel, tagKey, DEFAULT_MENU_TAGS, DEFAULT_MENU_ALLERGENS } from '@ngl/shared';
+
+export type CatalogKind = 'ALLERGEN' | 'EXTRA';
+export type CatalogInput = {
+  kind: string;
+  label: string;
+  translations?: Record<string, { name?: string }>;
+  defaultPrice?: number | string | null;
+};
+
+
+function parseCatalogKind(raw: unknown): CatalogKind {
+  if (raw === 'ALLERGEN' || raw === 'EXTRA') return raw;
+  throw new BadRequestException('Geçersiz katalog türü');
+}
+
+function toPriceOrNull(raw: unknown): Prisma.Decimal | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0 || n > 100000) throw new BadRequestException('Geçersiz ekstra ücreti');
+  return new Prisma.Decimal(n.toFixed(2));
+}
+
+function toCatalogDto(row: {
+  id: string;
+  kind: string;
+  label: string;
+  translations: Prisma.JsonValue;
+  defaultPrice: Prisma.Decimal | null;
+}) {
+  return {
+    id: row.id,
+    kind: row.kind,
+    label: row.label,
+    translations: (row.translations ?? {}) as Record<string, { name?: string }>,
+    defaultPrice: row.defaultPrice == null ? null : Number(row.defaultPrice),
+  };
+}
+
 import { PrismaService } from '../prisma/prisma.service';
 import { PlansService } from '../plans/plans.service';
 import { ObjectStorageService } from '../storage/object-storage.service';
@@ -445,6 +483,21 @@ export class MenuService {
       tagLabels[row.label] = map;
     }
 
+    // Alerjen adı → { dil: çeviri }; istemci ürün alerjenlerini seçili dile çevirir
+    const allergenRows = await this.prisma.menuCatalogEntry.findMany({
+      where: { tenantId: tenant.id, kind: 'ALLERGEN' },
+      select: { label: true, translations: true },
+    });
+    const allergenLabels: Record<string, Record<string, string>> = {};
+    for (const row of allergenRows) {
+      const tr = (row.translations ?? {}) as Record<string, { name?: string }>;
+      const map: Record<string, string> = { tr: row.label };
+      for (const [lang, v] of Object.entries(tr)) {
+        if (v?.name) map[lang] = v.name;
+      }
+      allergenLabels[row.label] = map;
+    }
+
     const branches = await this.prisma.branch.findMany({
       where: { tenantId: tenant.id, isActive: true },
       select: { id: true, name: true },
@@ -481,6 +534,7 @@ export class MenuService {
       categories,
       branches,
       tagLabels,
+      allergenLabels,
     };
   }
 
@@ -1036,6 +1090,172 @@ export class MenuService {
     await this.replaceTagInItems(tenantId, tag.label, null);
     await this.prisma.menuTag.delete({ where: { id } });
     return { ok: true };
+  }
+
+  // ── Alerjen ve ekstra kataloğu ──
+
+  async listCatalog(tenantId: string, kind: CatalogKind) {
+    const rows = await this.prisma.menuCatalogEntry.findMany({
+      where: { tenantId, kind },
+      orderBy: { label: 'asc' },
+    });
+    return rows.map(toCatalogDto);
+  }
+
+  /** Alerjen kataloğunu AB'nin 14 zorunlu alerjeniyle doldurur (yoksa). Mevcut kayıtlara dokunmaz. */
+  async seedDefaultAllergens(tenantId: string) {
+    for (const d of DEFAULT_MENU_ALLERGENS) {
+      const exists = await this.prisma.menuCatalogEntry.findFirst({
+        where: { tenantId, kind: 'ALLERGEN', label: { equals: d.tr, mode: 'insensitive' } },
+      });
+      if (!exists) {
+        await this.prisma.menuCatalogEntry.create({
+          data: {
+            tenantId,
+            kind: 'ALLERGEN',
+            label: d.tr,
+            translations: { tr: { name: d.tr }, en: { name: d.en } },
+          },
+        });
+      }
+    }
+    return this.listCatalog(tenantId, 'ALLERGEN');
+  }
+
+  /**
+   * Etiket ve alerjen kataloğunu sıfırlar: mevcut kayıtlar silinir, hazır listeler (TR + EN) yazılır.
+   * Ürünlerdeki etiket/alerjen değerleri yeni listeye eşlenir; listede olmayanlar ürünlerden kaldırılır.
+   */
+  async resetDefaultCatalog(tenantId: string) {
+    const tagCanon = new Map(DEFAULT_MENU_TAGS.map((d) => [tagKey(d.tr), d.tr]));
+    const allergenCanon = new Map(
+      DEFAULT_MENU_ALLERGENS.map((d) => [d.tr.toLocaleLowerCase('tr-TR'), d.tr]),
+    );
+    const items = await this.prisma.menuItem.findMany({
+      where: { tenantId },
+      select: { id: true, tags: true, allergens: true },
+    });
+    const ops: Prisma.PrismaPromise<unknown>[] = [
+      this.prisma.menuTag.deleteMany({ where: { tenantId } }),
+      this.prisma.menuCatalogEntry.deleteMany({ where: { tenantId, kind: 'ALLERGEN' } }),
+      this.prisma.menuTag.createMany({
+        data: DEFAULT_MENU_TAGS.map((d) => ({
+          tenantId,
+          label: d.tr,
+          translations: { tr: { name: d.tr }, en: { name: d.en } } as Prisma.InputJsonValue,
+        })),
+      }),
+      this.prisma.menuCatalogEntry.createMany({
+        data: DEFAULT_MENU_ALLERGENS.map((d) => ({
+          tenantId,
+          kind: 'ALLERGEN',
+          label: d.tr,
+          translations: { tr: { name: d.tr }, en: { name: d.en } } as Prisma.InputJsonValue,
+        })),
+      }),
+    ];
+    let itemsChanged = 0;
+    for (const it of items) {
+      const tags: string[] = [];
+      for (const t of it.tags) {
+        const v = tagCanon.get(tagKey(t));
+        if (v && !tags.includes(v)) tags.push(v);
+      }
+      const allergens: string[] = [];
+      for (const a of it.allergens) {
+        const v = allergenCanon.get(a.toLocaleLowerCase('tr-TR'));
+        if (v && !allergens.includes(v)) allergens.push(v);
+      }
+      const changed =
+        tags.length !== it.tags.length ||
+        allergens.length !== it.allergens.length ||
+        tags.some((t, k) => t !== it.tags[k]) ||
+        allergens.some((a, k) => a !== it.allergens[k]);
+      if (changed) {
+        itemsChanged++;
+        ops.push(this.prisma.menuItem.update({ where: { id: it.id }, data: { tags, allergens } }));
+      }
+    }
+    await this.prisma.$transaction(ops);
+    return {
+      tags: DEFAULT_MENU_TAGS.length,
+      allergens: DEFAULT_MENU_ALLERGENS.length,
+      itemsChanged,
+    };
+  }
+
+  async createCatalogEntry(tenantId: string, dto: CatalogInput) {
+    const kind = parseCatalogKind(dto.kind);
+    const label = normalizeTagLabel(dto.label ?? '');
+    if (!label) throw new BadRequestException('Ad boş olamaz');
+    const existing = await this.prisma.menuCatalogEntry.findFirst({
+      where: { tenantId, kind, label: { equals: label, mode: 'insensitive' } },
+    });
+    if (existing) throw new BadRequestException('Bu ad zaten kataloğda var');
+    const row = await this.prisma.menuCatalogEntry.create({
+      data: {
+        tenantId,
+        kind,
+        label,
+        translations: this.normalizeTagTranslations(label, dto.translations) as Prisma.InputJsonValue,
+        defaultPrice: kind === 'EXTRA' ? toPriceOrNull(dto.defaultPrice) : null,
+      },
+    });
+    return toCatalogDto(row);
+  }
+
+  async updateCatalogEntry(tenantId: string, id: string, dto: Partial<CatalogInput>) {
+    const row = await this.prisma.menuCatalogEntry.findFirst({ where: { id, tenantId } });
+    if (!row) throw new NotFoundException('Kayıt bulunamadı');
+    const kind = row.kind as CatalogKind;
+    const nextLabel = dto.label !== undefined ? normalizeTagLabel(dto.label) : row.label;
+    if (!nextLabel) throw new BadRequestException('Ad boş olamaz');
+    if (nextLabel.toLowerCase() !== row.label.toLowerCase()) {
+      const clash = await this.prisma.menuCatalogEntry.findFirst({
+        where: { tenantId, kind, label: { equals: nextLabel, mode: 'insensitive' }, NOT: { id } },
+      });
+      if (clash) throw new BadRequestException('Bu ad zaten kataloğda var');
+      if (kind === 'ALLERGEN') await this.replaceAllergenInItems(tenantId, row.label, nextLabel);
+    }
+    const translations = this.normalizeTagTranslations(
+      nextLabel,
+      dto.translations ?? (row.translations as Record<string, { name?: string }> | null) ?? undefined,
+    );
+    const updated = await this.prisma.menuCatalogEntry.update({
+      where: { id },
+      data: {
+        label: nextLabel,
+        translations: translations as Prisma.InputJsonValue,
+        ...(kind === 'EXTRA'
+          ? { defaultPrice: dto.defaultPrice !== undefined ? toPriceOrNull(dto.defaultPrice) : row.defaultPrice }
+          : {}),
+      },
+    });
+    return toCatalogDto(updated);
+  }
+
+  async deleteCatalogEntry(tenantId: string, id: string) {
+    const row = await this.prisma.menuCatalogEntry.findFirst({ where: { id, tenantId } });
+    if (!row) throw new NotFoundException('Kayıt bulunamadı');
+    if (row.kind === 'ALLERGEN') await this.replaceAllergenInItems(tenantId, row.label, null);
+    await this.prisma.menuCatalogEntry.delete({ where: { id } });
+    return { ok: true };
+  }
+
+  /** Ürünlerdeki alerjen adını değiştirir (newLabel null ise kaldırır). */
+  private async replaceAllergenInItems(tenantId: string, oldLabel: string, newLabel: string | null) {
+    const items = await this.prisma.menuItem.findMany({
+      where: { tenantId, allergens: { has: oldLabel } },
+      select: { id: true, allergens: true },
+    });
+    for (const it of items) {
+      const next: string[] = [];
+      for (const a of it.allergens) {
+        const v = a === oldLabel ? newLabel : a;
+        if (v && !next.includes(v)) next.push(v);
+      }
+      await this.prisma.menuItem.update({ where: { id: it.id }, data: { allergens: next } });
+    }
   }
 
   private normalizeTagTranslations(

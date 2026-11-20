@@ -8,7 +8,6 @@ import {
   FormSkeleton,
   SoftBox,
   SuccessBanner,
-  Tabs,
   btnPrimary,
 } from "../../../../components/ui";
 import { ApiError, api } from "../../../../lib/api";
@@ -18,6 +17,12 @@ import { BackTab } from "./back-tab";
 import { BrandTab } from "./brand-tab";
 import { FrontTab } from "./front-tab";
 import { NotifyTab } from "./notify-tab";
+import { BarcodeTab } from "./barcode-tab";
+import { BrandFieldsTab } from "./brand-fields-tab";
+import { draftFromProgramWallet, walletTemplatePayload } from "../../../reward/_panels/wallet-helpers";
+import type { ProgramWalletDraft, TenantWalletDefaults } from "../../../reward/_panels/wallet-types";
+
+const STAMP_KEYS = ["stampRows","stampLayout","stampGapX","stampGapY","stampIconScale","stampStaggerRatio","stampOffsetX","stampOffsetY","stampPositions","stampRowAdjust","stripImageUrl"] as const;
 import { StampTab } from "./stamp-tab";
 import {
   SETTINGS_TABS,
@@ -114,6 +119,7 @@ export function CardSettingsContent() {
   const [statusChangeMessage, setStatusChangeMessage] = useState("%@");
   const [headerChangeMessage, setHeaderChangeMessage] = useState("Damga: %@");
   const [barcodeFormat, setBarcodeFormat] = useState<BarcodeFormat>("QR");
+  const [walletDefaults, setWalletDefaults] = useState<Record<string, unknown>>({});
   const [stampsRequired, setStampsRequired] = useState(10);
   const [rewardLabel, setRewardLabel] = useState("1 bedava kahve");
   const [previewFilled, setPreviewFilled] = useState(3);
@@ -196,6 +202,7 @@ export function CardSettingsContent() {
     setBarcodeFormat(
       ((t.barcodeFormat || "QR").toUpperCase() as BarcodeFormat) || "QR",
     );
+    setWalletDefaults(t.walletDefaults ?? {});
     setStampsRequired(t.rewardRule?.stampsRequired ?? 10);
     setRewardLabel(t.rewardRule?.rewardLabel ?? "1 bedava kahve");
     setPreviewFilled(Math.min(3, t.rewardRule?.stampsRequired ?? 10));
@@ -230,6 +237,22 @@ export function CardSettingsContent() {
     broadcastEmptyText.trim() || "No announcement";
   const previewLogo = logoText.trim() || name || "Kafe";
   const stampGrid = computeStampGrid(stampsRequired);
+  // Damga dizilimi: düzenleyici ve önizleme aynı taslağı kullanır (kart detayıyla aynı mantık)
+  const stampDraft = useMemo<ProgramWalletDraft>(
+    () =>
+      draftFromProgramWallet(
+        { walletTemplate: { ...walletDefaults, inheritBrandFields: false } },
+        { name, stampTheme, stampInset, stampIconFilledUrl, stampIconEmptyUrl, primaryColor } as TenantWalletDefaults,
+        name,
+      ),
+    [walletDefaults, name, stampTheme, stampInset, stampIconFilledUrl, stampIconEmptyUrl, primaryColor],
+  );
+  const onStampDraftChange = (d: ProgramWalletDraft) => {
+    const payload = walletTemplatePayload({ ...d, inheritBrandFields: false }) as Record<string, unknown>;
+    const next: Record<string, unknown> = { ...walletDefaults };
+    for (const k of STAMP_KEYS) next[k] = payload[k];
+    setWalletDefaults(next);
+  };
   const remaining = Math.max(stampsRequired - previewFilled, 0);
   const rewardReady = remaining === 0;
   const previewStatus = rewardReady
@@ -380,6 +403,7 @@ export function CardSettingsContent() {
             statusChangeMessage: statusChangeMessage || null,
             headerChangeMessage: headerChangeMessage || null,
             barcodeFormat,
+            walletDefaults,
           }),
         },
       );
@@ -433,25 +457,29 @@ export function CardSettingsContent() {
           ayarları içindir.
         </SoftBox>
         <div className="flex flex-wrap items-center justify-between gap-3">
-        <Tabs
-          tabs={[...SETTINGS_TABS]}
-          value={settingsTab}
-          onChange={(id) => {
-            setSettingsTab(id as SettingsTab);
-            // Sekmeye karşılık gelen kart yüzünü önizlemede aç
-            if (id === "front") setPreviewSide("front");
-            if (id === "back") setPreviewSide("back");
-            if (id === "notify") setPreviewSide("notify");
-          }}
-        />
-          <button
-            type="submit"
-            form="card-design-form"
-            className={`${btnPrimary()} shrink-0`}
-            disabled={saving}
-          >
-            {saving ? "Kaydediliyor…" : "Kaydet"}
-          </button>
+        <div role="tablist" aria-label="Kart ayarları" className="flex min-w-0 flex-1 gap-1 overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-1">
+          {SETTINGS_TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={settingsTab === t.id}
+              onClick={() => {
+                setSettingsTab(t.id as SettingsTab);
+                // Sekmeye karşılık gelen kart yüzünü önizlemede aç
+                if (t.id === "look" || t.id === "barcode" || t.id === "fields") setPreviewSide("front");
+                if (t.id === "back") setPreviewSide("back");
+                if (t.id === "notify") setPreviewSide("notify");
+              }}
+              className={`flex min-w-[112px] flex-1 shrink-0 flex-col items-start rounded-xl px-3 py-2 text-left transition ${
+                settingsTab === t.id ? "bg-[var(--accent)] text-white shadow-[var(--shadow-sm)]" : "text-[var(--ink)] hover:bg-[var(--surface)]"
+              }`}
+            >
+              <span className="text-[0.8125rem] font-semibold">{t.label}</span>
+              <span className={`mt-0.5 block w-full truncate text-[0.6875rem] ${settingsTab === t.id ? "text-white/70" : "text-[var(--muted)]"}`}>{t.hint}</span>
+            </button>
+          ))}
+        </div>
         </div>
       </div>
 
@@ -476,13 +504,15 @@ export function CardSettingsContent() {
               setStampsRequired={setStampsRequired}
               rewardLabel={rewardLabel}
               setRewardLabel={setRewardLabel}
+              draft={stampDraft}
+              onDraftChange={onStampDraftChange}
               uploadBusy={uploadBusy}
               setUploadBusy={setUploadBusy}
               setError={setError}
             />
           ) : null}
 
-          {settingsTab === "brand" ? (
+          {settingsTab === "look" ? (
             <BrandTab
               name={name}
               setName={setName}
@@ -502,7 +532,7 @@ export function CardSettingsContent() {
             />
           ) : null}
 
-          {settingsTab === "front" ? (
+          {settingsTab === "look" ? (
             <FrontTab
               showStampField={showStampField}
               setShowStampField={setShowStampField}
@@ -576,6 +606,20 @@ export function CardSettingsContent() {
             />
           ) : null}
 
+          {settingsTab === "barcode" ? (
+            <BarcodeTab barcodeFormat={barcodeFormat} setBarcodeFormat={setBarcodeFormat} />
+          ) : null}
+
+          {settingsTab === "fields" || settingsTab === "relevance" ? (
+            <BrandFieldsTab
+              tab={settingsTab}
+              walletDefaults={walletDefaults}
+              setWalletDefaults={setWalletDefaults}
+              tenantName={name}
+              tenantHasHeader={Boolean(headerFieldLabel.trim())}
+            />
+          ) : null}
+
           {settingsTab === "notify" ? (
             <NotifyTab
               notifyIconUrl={notifyIconUrl}
@@ -589,8 +633,6 @@ export function CardSettingsContent() {
               headerChangeMessage={headerChangeMessage}
               setHeaderChangeMessage={setHeaderChangeMessage}
               headerFieldLabel={headerFieldLabel}
-              barcodeFormat={barcodeFormat}
-              setBarcodeFormat={setBarcodeFormat}
               primaryColor={primaryColor}
               uploadBusy={uploadBusy}
               setUploadBusy={setUploadBusy}
@@ -611,6 +653,7 @@ export function CardSettingsContent() {
           previewFilled={previewFilled}
           stampsRequired={stampsRequired}
           stampGrid={stampGrid}
+          stampDraft={stampDraft}
           stampInset={stampInset}
           stampTheme={stampTheme}
           stampIconFilledUrl={stampIconFilledUrl}
@@ -644,7 +687,7 @@ export function CardSettingsContent() {
           <button type="submit" className={btnPrimary()} disabled={saving}>
             {saving
               ? "Kaydediliyor…"
-              : "Tümünü kaydet ve Wallet'a gönder"}
+              : "Kaydet"}
           </button>
         </div>
       </form>
